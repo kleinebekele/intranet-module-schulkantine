@@ -32,6 +32,19 @@
             </div>
 
             <div>
+                <x-input-label for="role_id" value="Standard-Rolle (optional)" />
+                <select id="role_id" name="role_id"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">— keine —</option>
+                    @foreach ($roles as $role)
+                        <option value="{{ $role->role_id }}" @selected(old('role_id', $group->role_id) === $role->role_id)>{{ $role->name }} <span>({{ $role->role_id }})</span></option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-gray-400">Benutzer mit dieser Rolle werden dieser Gruppe zugeordnet (Vorgabe beim Import). Eine Rolle gehört zu höchstens einer Gruppe.</p>
+                <x-input-error :messages="$errors->get('role_id')" class="mt-2" />
+            </div>
+
+            <div>
                 <x-input-label value="Ausgabe-Zeitfenster (optional)" />
                 <div class="mt-1 flex items-center gap-2">
                     <x-text-input name="pickup_from" type="time" class="block" :value="old('pickup_from', $group->pickup_from)" />

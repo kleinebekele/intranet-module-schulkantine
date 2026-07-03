@@ -5,15 +5,17 @@ namespace Intranet\Modules\Schulkantine;
 use App\Models\User;
 use App\Modules\Support\ModuleManifest;
 use App\Modules\Support\ModuleServiceProvider;
-use Intranet\Modules\Schulkantine\Console\SyncEaters;
-use Intranet\Modules\Schulkantine\Models\Eater;
+use Intranet\Modules\Schulkantine\Models\Allergen;
+use Intranet\Modules\Schulkantine\Models\CustomerGroup;
+use Intranet\Modules\Schulkantine\Models\Diet;
 
 /**
  * Anmelde-Klasse des Schulkantine-Moduls.
  *
  * Routen, Views und Migrationen lädt die Basisklasse automatisch anhand der
  * Ordnerstruktur – hier beschreiben wir nur das Manifest (Schlüssel, Name,
- * Icon und die Unterpunkte des linken Menüs).
+ * Icon und die Unterpunkte des linken Menüs) sowie die Kantine-Beziehungen,
+ * die dem Core-Benutzer angehängt werden.
  */
 class SchulkantineServiceProvider extends ModuleServiceProvider
 {
@@ -21,30 +23,19 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
     {
         parent::boot();
 
-        // Automatik: Jeder Intranet-Benutzer ist automatisch Teilnehmer (Esser).
-        // So muss niemand die Teilnehmer doppelt pflegen – sie entstehen und
-        // aktualisieren sich mit den Benutzern. Kinder ohne Account kommen
-        // separat über den CSV-Import hinzu.
-        User::created(function (User $user): void {
-            Eater::firstOrCreate(
-                ['user_id' => $user->id],
-                ['name' => $user->name, 'is_active' => true],
-            );
-        });
+        // Jeder Esser IST ein Benutzer (eigener Account). Die kantinen-
+        // spezifischen Daten (Gruppe je Saison, Sonderkost) hängen daher direkt
+        // am Benutzer. Wir hängen die Relations dem Core-User-Model dynamisch an,
+        // ohne dieses Modell selbst zu verändern (Modul bleibt eigenständig).
+        User::resolveRelationUsing('kantineGroups', fn (User $user) => $user
+            ->belongsToMany(CustomerGroup::class, 'kantine_user_season_group', 'user_id', 'customer_group_id')
+            ->withPivot('season_id'));
 
-        User::updated(function (User $user): void {
-            if ($user->wasChanged('name')) {
-                Eater::where('user_id', $user->id)->update(['name' => $user->name]);
-            }
-        });
+        User::resolveRelationUsing('kantineAllergens', fn (User $user) => $user
+            ->belongsToMany(Allergen::class, 'kantine_user_allergen', 'user_id', 'allergen_id'));
 
-        User::deleting(function (User $user): void {
-            Eater::where('user_id', $user->id)->delete();
-        });
-
-        if ($this->app->runningInConsole()) {
-            $this->commands([SyncEaters::class]);
-        }
+        User::resolveRelationUsing('kantineDiets', fn (User $user) => $user
+            ->belongsToMany(Diet::class, 'kantine_user_diet', 'user_id', 'diet_id'));
     }
 
     public function manifest(): ModuleManifest

@@ -64,13 +64,9 @@ Route::middleware(['web', 'auth'])
         Route::put('gerichte/{dish}', [DishController::class, 'update'])->name('dishes.update');
         Route::delete('gerichte/{dish}', [DishController::class, 'destroy'])->name('dishes.destroy');
 
-        // Teilnehmer (Esser)
+        // Teilnehmer (= Benutzer). Angelegt werden Benutzer über den Benutzer-Import;
+        // hier pflegt man nur die Kantinen-Zusatzdaten (Gruppe je Saison, Sonderkost).
         Route::get('teilnehmer', [EaterController::class, 'index'])->name('eaters.index');
-        Route::get('teilnehmer/import', [EaterController::class, 'importForm'])->name('eaters.import.form');
-        Route::post('teilnehmer/import', [EaterController::class, 'import'])->name('eaters.import');
-        Route::get('teilnehmer/neu', [EaterController::class, 'create'])->name('eaters.create');
-        Route::post('teilnehmer', [EaterController::class, 'store'])->name('eaters.store');
-        Route::get('teilnehmer/{eater}/bearbeiten', [EaterController::class, 'edit'])->name('eaters.edit');
-        Route::put('teilnehmer/{eater}', [EaterController::class, 'update'])->name('eaters.update');
-        Route::delete('teilnehmer/{eater}', [EaterController::class, 'destroy'])->name('eaters.destroy');
+        Route::get('teilnehmer/{user}/bearbeiten', [EaterController::class, 'edit'])->name('eaters.edit');
+        Route::put('teilnehmer/{user}', [EaterController::class, 'update'])->name('eaters.update');
     });

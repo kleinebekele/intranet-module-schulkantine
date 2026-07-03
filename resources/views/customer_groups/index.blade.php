@@ -23,6 +23,7 @@
                         <thead>
                             <tr class="border-b border-gray-200 text-left text-xs font-medium uppercase tracking-wide text-gray-400">
                                 <th class="px-3 py-2">Name</th>
+                                <th class="px-3 py-2">Standard-Rolle</th>
                                 <th class="px-3 py-2">Bestellmodus</th>
                                 <th class="px-3 py-2">Ausgabe</th>
                                 <th class="px-3 py-2">Status</th>
@@ -33,6 +34,13 @@
                             @foreach ($groups as $group)
                                 <tr class="hover:bg-gray-50">
                                     <td class="px-3 py-2 font-medium text-gray-800">{{ $group->name }}</td>
+                                    <td class="px-3 py-2">
+                                        @if ($group->role_id)
+                                            <span class="inline-flex rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">{{ $group->role_id }}</span>
+                                        @else
+                                            <span class="text-gray-300">—</span>
+                                        @endif
+                                    </td>
                                     <td class="px-3 py-2">
                                         <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {{ $group->ordering_mode === 'ja_nein' ? 'bg-amber-50 text-amber-700' : 'bg-indigo-50 text-indigo-700' }}">
                                             {{ $group->orderingModeLabel() }}

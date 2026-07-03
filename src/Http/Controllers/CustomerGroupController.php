@@ -2,6 +2,7 @@
 
 namespace Intranet\Modules\Schulkantine\Http\Controllers;
 
+use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Intranet\Modules\Schulkantine\Models\CustomerGroup;
@@ -28,6 +29,7 @@ class CustomerGroupController
         return view('schulkantine::customer_groups.form', [
             'group' => new CustomerGroup(['ordering_mode' => CustomerGroup::MODE_MENUE, 'is_active' => true]),
             'modes' => CustomerGroup::orderingModes(),
+            'roles' => Role::orderBy('name')->get(),
         ]);
     }
 
@@ -49,6 +51,7 @@ class CustomerGroupController
         return view('schulkantine::customer_groups.form', [
             'group' => $customerGroup,
             'modes' => CustomerGroup::orderingModes(),
+            'roles' => Role::orderBy('name')->get(),
         ]);
     }
 
@@ -56,7 +59,7 @@ class CustomerGroupController
     {
         $this->authorizeAdmin($request);
 
-        $customerGroup->update($this->validated($request));
+        $customerGroup->update($this->validated($request, $customerGroup));
 
         return redirect()
             ->route('module.schulkantine.customer-groups.index')
@@ -77,13 +80,24 @@ class CustomerGroupController
     // ---------------------------------------------------------------- Helfer
 
     /** @return array<string, mixed> */
-    private function validated(Request $request): array
+    private function validated(Request $request, ?CustomerGroup $group = null): array
     {
+        // Leere Auswahl aus dem Dropdown ('') als „keine Rolle" (null) behandeln,
+        // damit die nullable-Regel greift und mehrere Gruppen ohne Rolle erlaubt sind.
+        $request->merge(['role_id' => $request->input('role_id') ?: null]);
+
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'ordering_mode' => ['required', Rule::in(array_keys(CustomerGroup::orderingModes()))],
             'pickup_from' => ['nullable', 'date_format:H:i'],
             'pickup_to' => ['nullable', 'date_format:H:i'],
+            'role_id' => [
+                'nullable',
+                'exists:roles,role_id',
+                Rule::unique('kantine_customer_groups', 'role_id')->ignore($group?->id),
+            ],
+        ], [
+            'role_id.unique' => 'Diese Rolle ist bereits einer anderen Kundengruppe zugeordnet.',
         ]);
 
         return [
@@ -92,6 +106,7 @@ class CustomerGroupController
             'pickup_from' => $request->input('pickup_from') ?: null,
             'pickup_to' => $request->input('pickup_to') ?: null,
             'is_active' => $request->boolean('is_active'),
+            'role_id' => $request->input('role_id') ?: null,
         ];
     }
 
