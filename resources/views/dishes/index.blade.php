@@ -31,6 +31,7 @@
                     @foreach ($categories as $category)
                         <option value="{{ $category->id }}" @selected($categoryFilter === (string) $category->id)>{{ $category->name }}</option>
                     @endforeach
+                    <option value="none" @selected($categoryFilter === 'none')>— ohne Kategorie —</option>
                 </select>
             </div>
             <div>

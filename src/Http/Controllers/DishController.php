@@ -26,7 +26,9 @@ class DishController
 
         $dishes = Dish::with(['category', 'allergens', 'additives', 'diets'])
             ->when($search !== '', fn ($q) => $q->where('name', 'like', "%{$search}%"))
-            ->when($categoryFilter !== '', fn ($q) => $q->where('category_id', $categoryFilter))
+            ->when($categoryFilter !== '', fn ($q) => $categoryFilter === 'none'
+                ? $q->whereNull('category_id')
+                : $q->where('category_id', $categoryFilter))
             ->when($statusFilter === 'active', fn ($q) => $q->where('is_active', true))
             ->when($statusFilter === 'inactive', fn ($q) => $q->where('is_active', false))
             ->orderBy('name')
