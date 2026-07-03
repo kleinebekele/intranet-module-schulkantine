@@ -42,6 +42,7 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
             ->item('customer-groups', 'Kundengruppen', 'module.schulkantine.customer-groups.index')
             ->item('categories', 'Kategorien', 'module.schulkantine.categories.index')
             ->item('dishes', 'Gerichte', 'module.schulkantine.dishes.index')
+            ->item('menus', 'Speiseplan', 'module.schulkantine.menus.index')
             ->item('eaters', 'Teilnehmer', 'module.schulkantine.eaters.index');
     }
 }

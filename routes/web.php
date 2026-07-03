@@ -6,6 +6,7 @@ use Intranet\Modules\Schulkantine\Http\Controllers\CustomerGroupController;
 use Intranet\Modules\Schulkantine\Http\Controllers\DashboardController;
 use Intranet\Modules\Schulkantine\Http\Controllers\DishController;
 use Intranet\Modules\Schulkantine\Http\Controllers\EaterController;
+use Intranet\Modules\Schulkantine\Http\Controllers\MenuController;
 use Intranet\Modules\Schulkantine\Http\Controllers\SeasonController;
 
 /*
@@ -60,6 +61,11 @@ Route::middleware(['web', 'auth'])
         Route::get('gerichte/{dish}/bearbeiten', [DishController::class, 'edit'])->name('dishes.edit');
         Route::put('gerichte/{dish}', [DishController::class, 'update'])->name('dishes.update');
         Route::delete('gerichte/{dish}', [DishController::class, 'destroy'])->name('dishes.destroy');
+
+        // Speiseplan (Menü je Öffnungstag & Bestellmodus)
+        Route::get('speiseplan', [MenuController::class, 'index'])->name('menus.index');
+        Route::post('speiseplan', [MenuController::class, 'store'])->name('menus.store');
+        Route::delete('speiseplan/{menu}', [MenuController::class, 'destroy'])->name('menus.destroy');
 
         // Teilnehmer (= Benutzer). Angelegt werden Benutzer über den Benutzer-Import;
         // hier pflegt man nur die Kantinen-Zusatzdaten (Gruppe je Saison, Sonderkost).
