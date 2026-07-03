@@ -1,0 +1,27 @@
+{
+    "name": "do1emu/module-schulkantine",
+    "description": "Schulkantine-Modul für die modulare Intranet-Plattform: Saison-Kalender, Speiseplan, Vorbestellung, Ausgabe und Abrechnung – mit der Besonderheit, dass Eltern für ihre Kinder bestellen.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["laravel", "intranet", "modul", "schulkantine", "kantine"],
+    "authors": [
+        {
+            "name": "do1emu"
+        }
+    ],
+    "require": {
+        "php": "^8.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "Intranet\\Modules\\Schulkantine\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Intranet\\Modules\\Schulkantine\\SchulkantineServiceProvider"
+            ]
+        }
+    }
+}
