@@ -17,15 +17,10 @@
 
     <div class="max-w-5xl">
         <div class="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-            Teilnehmer sind Benutzer des Intranets – angelegt werden sie über den <strong>Benutzer-Import</strong>.
-            Hier pflegst du nur die Kantinen-Daten: <strong>Gruppe je Saison</strong> und <strong>Sonderkost</strong>.
+            Teilnehmer sind Benutzer des Intranets. Die <strong>Gruppe ergibt sich aus der Rolle</strong>
+            (Priorität OGS → Schüler → Sonstige) – sie wird über den Benutzer/Import gesteuert, nicht hier.
+            Hier pflegst du nur die <strong>Sonderkost</strong>.
         </div>
-
-        @unless ($activeSeason)
-            <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Es ist keine Saison als „aktiv" markiert – die Gruppen-Zuordnung greift erst, wenn eine aktive Saison existiert.
-            </div>
-        @endunless
 
         {{-- Filterleiste --}}
         <form method="GET" action="{{ route('module.schulkantine.eaters.index') }}"
@@ -68,14 +63,14 @@
                             <tr class="border-b border-gray-200 text-left text-xs font-medium uppercase tracking-wide text-gray-400">
                                 <th class="px-3 py-2">Name</th>
                                 <th class="px-3 py-2">E-Mail</th>
-                                <th class="px-3 py-2">Gruppe (aktive Saison)</th>
+                                <th class="px-3 py-2">Gruppe (aus Rolle)</th>
                                 <th class="px-3 py-2">Sonderkost</th>
                                 <th class="px-3 py-2 text-right">Aktion</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             @foreach ($users as $user)
-                                @php $group = $activeSeason ? $user->kantineGroups->firstWhere('pivot.season_id', $activeSeason->id) : null; @endphp
+                                @php $group = \Intranet\Modules\Schulkantine\Models\CustomerGroup::forUser($user, $groups); @endphp
                                 <tr class="hover:bg-gray-50">
                                     <td class="px-3 py-2 font-medium text-gray-800">{{ $user->name }}</td>
                                     <td class="px-3 py-2 text-gray-500">{{ $user->email }}</td>
@@ -98,7 +93,7 @@
                                         @endif
                                     </td>
                                     <td class="px-3 py-2 text-right">
-                                        <a href="{{ route('module.schulkantine.eaters.edit', $user) }}" title="Kantinen-Daten bearbeiten"
+                                        <a href="{{ route('module.schulkantine.eaters.edit', $user) }}" title="Sonderkost bearbeiten"
                                            class="inline-flex items-center rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
                                             <x-module-icon name="edit" class="text-base" />
                                         </a>

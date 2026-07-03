@@ -40,13 +40,10 @@ Route::middleware(['web', 'auth'])
         // Ferien & Feiertage per API ziehen
         Route::post('saisons/{season}/ferien-import', [SeasonController::class, 'importHolidays'])->name('seasons.import');
 
-        // Kundengruppen
+        // Kundengruppen (3 feste Gruppen – nur Betriebsparameter editierbar)
         Route::get('kundengruppen', [CustomerGroupController::class, 'index'])->name('customer-groups.index');
-        Route::get('kundengruppen/neu', [CustomerGroupController::class, 'create'])->name('customer-groups.create');
-        Route::post('kundengruppen', [CustomerGroupController::class, 'store'])->name('customer-groups.store');
         Route::get('kundengruppen/{customerGroup}/bearbeiten', [CustomerGroupController::class, 'edit'])->name('customer-groups.edit');
         Route::put('kundengruppen/{customerGroup}', [CustomerGroupController::class, 'update'])->name('customer-groups.update');
-        Route::delete('kundengruppen/{customerGroup}', [CustomerGroupController::class, 'destroy'])->name('customer-groups.destroy');
 
         // Kategorien
         Route::get('kategorien', [CategoryController::class, 'index'])->name('categories.index');

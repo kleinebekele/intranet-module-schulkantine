@@ -6,7 +6,6 @@ use App\Models\User;
 use App\Modules\Support\ModuleManifest;
 use App\Modules\Support\ModuleServiceProvider;
 use Intranet\Modules\Schulkantine\Models\Allergen;
-use Intranet\Modules\Schulkantine\Models\CustomerGroup;
 use Intranet\Modules\Schulkantine\Models\Diet;
 
 /**
@@ -23,14 +22,11 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
     {
         parent::boot();
 
-        // Jeder Esser IST ein Benutzer (eigener Account). Die kantinen-
-        // spezifischen Daten (Gruppe je Saison, Sonderkost) hängen daher direkt
-        // am Benutzer. Wir hängen die Relations dem Core-User-Model dynamisch an,
-        // ohne dieses Modell selbst zu verändern (Modul bleibt eigenständig).
-        User::resolveRelationUsing('kantineGroups', fn (User $user) => $user
-            ->belongsToMany(CustomerGroup::class, 'kantine_user_season_group', 'user_id', 'customer_group_id')
-            ->withPivot('season_id'));
-
+        // Jeder Esser IST ein Benutzer (eigener Account). Die Sonderkost hängt
+        // direkt am Benutzer – wir hängen die Relations dem Core-User-Model
+        // dynamisch an, ohne dieses Modell selbst zu verändern.
+        // (Die Gruppen-Zuordnung wird NICHT gespeichert, sondern aus den Rollen
+        //  abgeleitet – siehe CustomerGroup::forUser().)
         User::resolveRelationUsing('kantineAllergens', fn (User $user) => $user
             ->belongsToMany(Allergen::class, 'kantine_user_allergen', 'user_id', 'allergen_id'));
 

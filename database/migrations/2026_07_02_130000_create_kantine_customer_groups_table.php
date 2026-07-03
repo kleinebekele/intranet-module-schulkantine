@@ -5,13 +5,14 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Kundengruppen (z. B. OGS, Schule ab Klasse 5, Personal, Kita).
- * Die Gruppe steuert den Bestellmodus (ja/nein vs. Menü-Auswahl) und hat ein
- * eigenes Ausgabe-Zeitfenster (z. B. OGS isst zu einer anderen Zeit).
+ * Kundengruppen (Esser-Gruppen). Es gibt genau DREI feste Gruppen, die per
+ * Seed-Migration angelegt werden (OGS, Schüler, Sonstige) – kein Anlegen/Löschen
+ * weiterer. Die Gruppe steuert den Bestellmodus (ja/nein vs. Menü-Auswahl) und
+ * hat ein eigenes Ausgabe-Zeitfenster.
  *
- * `role_id` ist die Standard-Rolle der Gruppe: Benutzer mit dieser Rolle werden
- * beim Import dieser Gruppe zugeordnet. Eine Rolle gehört zu HÖCHSTENS einer
- * Gruppe (unique), damit ein Nutzer nicht in zwei Gruppen gleichzeitig landet.
+ * `role_id` ist die fest verknüpfte Rolle der Gruppe: Die Einstufung eines
+ * Benutzers ergibt sich aus seinen Rollen (Priorität OGS → Schüler → Sonstige).
+ * Eine Rolle gehört zu genau einer Gruppe (unique).
  */
 return new class extends Migration
 {
@@ -23,8 +24,7 @@ return new class extends Migration
             $table->string('ordering_mode')->default('menue'); // ja_nein | menue
             $table->string('pickup_from', 5)->nullable();       // Ausgabe von, "HH:MM"
             $table->string('pickup_to', 5)->nullable();         // Ausgabe bis, "HH:MM"
-            $table->boolean('is_active')->default(true);
-            $table->string('role_id', 64)->nullable()->unique(); // Standard-Rolle (roles.role_id)
+            $table->string('role_id', 64)->nullable()->unique(); // fest verknüpfte Rolle (roles.role_id)
             $table->timestamps();
 
             $table->foreign('role_id')->references('role_id')->on('roles')->nullOnDelete();
