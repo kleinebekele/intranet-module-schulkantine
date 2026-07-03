@@ -33,7 +33,12 @@
                             @foreach ($categories as $category)
                                 <tr class="hover:bg-gray-50">
                                     <td class="px-3 py-2 text-gray-400">{{ $category->sort_order }}</td>
-                                    <td class="px-3 py-2 font-medium text-gray-800">{{ $category->name }}</td>
+                                    <td class="px-3 py-2 font-medium text-gray-800">
+                                        <span class="inline-flex items-center gap-2">
+                                            <span class="inline-block h-3 w-3 rounded-full border border-black/10" style="background-color: {{ $category->color ?? '#9ca3af' }};"></span>
+                                            {{ $category->name }}
+                                        </span>
+                                    </td>
                                     <td class="px-3 py-2">
                                         @if ($category->allows_walkin)
                                             <span class="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">möglich</span>

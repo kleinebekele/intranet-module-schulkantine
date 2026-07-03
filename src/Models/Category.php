@@ -15,6 +15,7 @@ class Category extends Model
         'name',
         'allows_walkin',
         'sort_order',
+        'color',
         'is_active',
     ];
 

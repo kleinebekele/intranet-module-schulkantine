@@ -27,6 +27,16 @@
                 <x-input-error :messages="$errors->get('sort_order')" class="mt-2" />
             </div>
 
+            <div>
+                <x-input-label for="color" value="Farbe" />
+                <div class="mt-1 flex items-center gap-3">
+                    <input id="color" name="color" type="color" value="{{ old('color', $category->color ?? '#9ca3af') }}"
+                           class="h-9 w-14 cursor-pointer rounded border border-gray-300 bg-white p-0.5">
+                    <span class="text-xs text-gray-400">Hintergrund dieser Kategorie im Speiseplan – hilft, Kategorien auf einen Blick zu erkennen.</span>
+                </div>
+                <x-input-error :messages="$errors->get('color')" class="mt-2" />
+            </div>
+
             <label class="flex items-start gap-2 text-sm text-gray-700">
                 <input type="checkbox" name="allows_walkin" value="1" @checked(old('allows_walkin', $category->allows_walkin))
                        class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">

@@ -76,12 +76,14 @@ class CategoryController
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
+            'color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
         ]);
 
         return [
             'name' => $request->string('name')->toString(),
             'allows_walkin' => $request->boolean('allows_walkin'),
             'sort_order' => (int) $request->input('sort_order', 0),
+            'color' => $request->input('color') ?: null,
             'is_active' => $request->boolean('is_active'),
         ];
     }
