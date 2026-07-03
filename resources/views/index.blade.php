@@ -10,30 +10,42 @@
         <div class="rounded-xl border border-gray-200 bg-white p-6">
             <h2 class="text-lg font-semibold text-gray-800">Willkommen in der Schulkantine 🍽️</h2>
             <p class="mt-2 text-gray-600">
-                Das Modul-Grundgerüst steht! Wir bauen es Schritt für Schritt in Phasen auf.
-                Unten siehst du den Fahrplan – jeder Bereich wird nach und nach lebendig.
+                <strong>Stammdaten</strong> und <strong>Speiseplan</strong> stehen. Als Nächstes kommt die
+                <strong>Vorbestellung</strong> – hier siehst du den Fahrplan.
             </p>
         </div>
 
         @php
             $phasen = [
-                ['nr' => 1, 'titel' => 'Stammdaten', 'text' => 'Saison &amp; Kalender, Gruppen, Kategorien, Gerichte, Allergene, Teilnehmer', 'status' => 'Als Nächstes'],
-                ['nr' => 2, 'titel' => 'Speiseplan', 'text' => 'Menüs je Gruppe und Tag', 'status' => 'Geplant'],
-                ['nr' => 3, 'titel' => 'Vorbestellung', 'text' => 'Bestellen, stornieren, Fristen, OGS-Saison-Abo', 'status' => 'Geplant'],
+                ['nr' => 1, 'titel' => 'Stammdaten', 'text' => 'Saison &amp; Kalender, Gruppen, Kategorien, Gerichte, Allergene, Teilnehmer', 'status' => 'Erledigt'],
+                ['nr' => 2, 'titel' => 'Speiseplan', 'text' => 'Tagesangebot je Öffnungstag im Wochen-Raster (Kategorie-Farben, Schließtage)', 'status' => 'Erledigt'],
+                ['nr' => 3, 'titel' => 'Vorbestellung', 'text' => 'Bestellen &amp; stornieren, Fristen, Wochen-Freigabe, OGS-Abo', 'status' => 'Als Nächstes'],
                 ['nr' => 4, 'titel' => 'Ausgabe &amp; Betrieb', 'text' => 'Ausgabelisten, Abhaken, spontane Abholung', 'status' => 'Geplant'],
                 ['nr' => 5, 'titel' => 'Auswertung', 'text' => 'Mengen und Export für die Abrechnung', 'status' => 'Geplant'],
                 ['nr' => 6, 'titel' => 'Feedback', 'text' => 'Daumen-Bewertung (anonym ausgewertet)', 'status' => 'Optional'],
+            ];
+
+            $styles = [
+                'Erledigt'     => ['badge' => 'bg-green-50 text-green-700', 'circle' => 'bg-green-100 text-green-700', 'card' => 'border-green-200'],
+                'Als Nächstes' => ['badge' => 'bg-amber-100 text-amber-800', 'circle' => 'bg-amber-100 text-amber-800', 'card' => 'border-amber-300 ring-1 ring-amber-200'],
+                'Geplant'      => ['badge' => 'bg-gray-100 text-gray-500', 'circle' => 'bg-gray-100 text-gray-400', 'card' => 'border-gray-200'],
+                'Optional'     => ['badge' => 'bg-gray-100 text-gray-500', 'circle' => 'bg-gray-100 text-gray-400', 'card' => 'border-gray-200 border-dashed'],
             ];
         @endphp
 
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             @foreach ($phasen as $phase)
-                <div class="rounded-xl border border-gray-200 bg-white p-5">
+                @php $s = $styles[$phase['status']] ?? $styles['Geplant']; @endphp
+                <div class="rounded-xl border bg-white p-5 {{ $s['card'] }}">
                     <div class="flex items-center justify-between">
-                        <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-indigo-50 text-sm font-semibold text-indigo-600">
-                            {{ $phase['nr'] }}
+                        <span class="inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold {{ $s['circle'] }}">
+                            @if ($phase['status'] === 'Erledigt')
+                                &check;
+                            @else
+                                {{ $phase['nr'] }}
+                            @endif
                         </span>
-                        <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                        <span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $s['badge'] }}">
                             {{ $phase['status'] }}
                         </span>
                     </div>
