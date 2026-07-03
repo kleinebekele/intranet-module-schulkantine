@@ -24,7 +24,22 @@
                     @endif
                 </div>
             </div>
-            <p class="mt-2 text-xs text-gray-400">Name/E-Mail werden im Benutzer-Bereich gepflegt; die Gruppe ergibt sich aus der Rolle des Benutzers.</p>
+
+            @if ($user->parents->isNotEmpty())
+                <div class="mt-3 border-t border-gray-200 pt-3">
+                    <span class="text-gray-400">Eltern / Vormunde:</span>
+                    <div class="mt-1 flex flex-wrap items-center gap-2">
+                        @foreach ($user->parents as $parent)
+                            <span class="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                                {{ $parent->name }}
+                                <span class="ml-1 text-indigo-400">{{ $parent->email }}</span>
+                            </span>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
+            <p class="mt-2 text-xs text-gray-400">Name/E-Mail/Eltern werden im Benutzer-Bereich gepflegt; die Gruppe ergibt sich aus der Rolle des Benutzers.</p>
         </div>
 
         <form method="POST"

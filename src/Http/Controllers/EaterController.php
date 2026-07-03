@@ -40,7 +40,7 @@ class EaterController
     {
         $this->authorizeAdmin($request);
 
-        $user->load(['roles', 'kantineAllergens', 'kantineDiets']);
+        $user->load(['roles', 'kantineAllergens', 'kantineDiets', 'parents']);
 
         return view('schulkantine::eaters.form', [
             'user' => $user,
