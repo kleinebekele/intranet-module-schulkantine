@@ -42,6 +42,7 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
             ->item('sonderkost', 'Meine Daten', 'module.schulkantine.sonderkost.index', icon: 'diet')
             ->item('servings', 'Ausgabe', 'module.schulkantine.servings.index', icon: 'serving')
             ->item('ogs-list', 'OGS-Sammelliste', 'module.schulkantine.servings.ogs', icon: 'list')
+            ->item('reports', 'Auswertung', 'module.schulkantine.reports.index', icon: 'chart')
             ->item('seasons', 'Saisons & Kalender', 'module.schulkantine.seasons.index', icon: 'calendar')
             ->item('customer-groups', 'Kundengruppen', 'module.schulkantine.customer-groups.index', icon: 'users')
             ->item('categories', 'Kategorien', 'module.schulkantine.categories.index', icon: 'category')

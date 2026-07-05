@@ -9,6 +9,7 @@ use Intranet\Modules\Schulkantine\Http\Controllers\DishController;
 use Intranet\Modules\Schulkantine\Http\Controllers\EaterController;
 use Intranet\Modules\Schulkantine\Http\Controllers\MenuController;
 use Intranet\Modules\Schulkantine\Http\Controllers\OrderController;
+use Intranet\Modules\Schulkantine\Http\Controllers\ReportController;
 use Intranet\Modules\Schulkantine\Http\Controllers\SeasonController;
 use Intranet\Modules\Schulkantine\Http\Controllers\ServingController;
 use Intranet\Modules\Schulkantine\Http\Controllers\SonderkostController;
@@ -91,6 +92,14 @@ Route::middleware(['web', 'auth'])
 
         // OGS-Sammelliste – OGS-Betreuer (Zugriff im Controller geprüft).
         Route::get('ogs-sammelliste', [ServingController::class, 'ogsList'])->name('servings.ogs');
+
+        // Auswertung & Abrechnung (Phase 5) – nur Admin (im Controller geprüft).
+        Route::get('auswertung', [ReportController::class, 'index'])->name('reports.index');
+        Route::get('auswertung/csv', [ReportController::class, 'csv'])->name('reports.csv');
+        Route::get('auswertung/person/{user}', [ReportController::class, 'show'])->name('reports.show');
+        Route::get('auswertung/pdf', [ReportController::class, 'pdf'])->name('reports.pdf');
+        Route::post('auswertung/{user}/bezahlt', [ReportController::class, 'markPaid'])->name('reports.paid');
+        Route::delete('auswertung/{user}/bezahlt', [ReportController::class, 'unmarkPaid'])->name('reports.unpaid');
 
         // „Meine Daten" (Selbstbedienung: ich + meine Kinder) – jeder Nutzer.
         Route::get('meine-sonderkost', [SonderkostController::class, 'index'])->name('sonderkost.index');

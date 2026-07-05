@@ -47,13 +47,9 @@
                        class="rounded-md px-3 py-1.5 font-medium {{ $group === 'ogs' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50' }}">OGS</a>
                 </div>
                 <div class="flex items-center gap-4">
-                    <a href="{{ route('module.schulkantine.servings.quantities', ['date' => $date->toDateString()]) }}"
+                    <a href="{{ route('module.schulkantine.servings.mengen.pdf', ['date' => $date->toDateString()]) }}"
                        class="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800">
-                        <x-module-icon name="bar-chart-alt-2" class="text-base" /> Mengen
-                    </a>
-                    <a href="{{ route('module.schulkantine.servings.noshows', ['date' => $date->toDateString()]) }}"
-                       class="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800">
-                        <x-module-icon name="search" class="text-base" /> No-Shows
+                        <x-module-icon name="download" class="text-base" /> Mengen-PDF
                     </a>
                 </div>
             </div>
@@ -63,9 +59,43 @@
                     🔒 Die Kantine hat an diesem Tag nicht geöffnet ({{ $closedReason }}).
                 </div>
             @else
+                {{-- No-Shows ganz oben (Tagesmenü): kurze Zeile + Namen per Accordion.
+                     Ersetzt die frühere Extra-Seite; aktualisiert sich nach jeder Ausgabe. --}}
+                @if ($group === 'menu')
+                    <div id="noshow-box" class="mb-4">
+                        <div x-data="{ open: false }" class="overflow-hidden rounded-xl border border-amber-200 bg-white">
+                            <button type="button" @click="open = ! open"
+                                    class="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-amber-50">
+                                <span class="flex items-center gap-2 text-sm font-semibold text-amber-800">
+                                    <x-module-icon name="search" class="text-base" />
+                                    Bestellt, aber nicht abgeholt
+                                    <span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">{{ $noShowCount }}</span>
+                                </span>
+                                @if ($noShowCount > 0)
+                                    <span class="text-sm text-amber-600" x-text="open ? '▲ einklappen' : '▼ Namen anzeigen'"></span>
+                                @endif
+                            </button>
+                            @if ($noShowCount > 0)
+                                <div x-show="open" x-cloak class="border-t border-amber-100">
+                                    <ul class="divide-y divide-gray-100">
+                                        @foreach ($noShowGroups as $name => $dishes)
+                                            <li class="flex items-start justify-between gap-3 px-4 py-2 text-sm">
+                                                <span class="font-medium text-gray-800">{{ $name }}</span>
+                                                <span class="text-right text-gray-500">{{ implode(', ', array_filter($dishes)) }}</span>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
                 {{-- Ausgabe per NFC-Chip: Chip vorhalten → Modal mit Bestellung → abhaken.
-                     Ohne NFC-Gerät stehen Simulations-Buttons bereit. --}}
-                @if ($canServe)
+                     Ohne NFC-Gerät stehen Simulations-Buttons bereit.
+                     Nur im Tagesmenü-View: OGS-Kinder bekommen bewusst KEINE Chips
+                     (zu klein, würden sie verlieren) – daher entfällt NFC in der OGS-Liste. --}}
+                @if ($group !== 'ogs' && $canServe)
                     <div class="mb-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4"
                          @kantine-open-eater.window="openForEater($event.detail)"
                          x-data="{
@@ -75,6 +105,18 @@
                             toggleUrl: @js(route('module.schulkantine.servings.toggle')),
                             confirmUrl: @js(route('module.schulkantine.servings.confirm')),
                             openEaterUrl: @js(route('module.schulkantine.servings.lookup-eater')),
+                            spontanUrl: @js(route('module.schulkantine.servings.spontaneous')),
+                            walkinDestroyBase: @js(url('modules/schulkantine/ausgabe')),
+                            walkinGroups: @js($walkinGroups),
+                            walkinPick: '',
+                            walkinBusy: false,
+                            searchUsers: @js($searchUsers),
+                            q: '',
+                            get matches() {
+                                const t = this.q.trim().toLowerCase();
+                                if (t.length < 2) return [];
+                                return this.searchUsers.filter(u => u.name.toLowerCase().includes(t)).slice(0, 12);
+                            },
                             csrf: @js(csrf_token()),
                             reasons: ['mag es nicht', 'kein Hunger', 'schon satt', 'verträgt es nicht', 'Sonstiges'],
                             euro(v) { return (Number(v) || 0).toFixed(2).replace('.', ',') + ' €'; },
@@ -153,10 +195,40 @@
                             async refresh() {
                                 try {
                                     const html = await (await fetch(window.location.href, { headers:{'X-Requested-With':'fetch'}, credentials:'same-origin' })).text();
-                                    const fresh = new DOMParser().parseFromString(html, 'text/html').querySelector('#serving-list');
-                                    const cur = document.querySelector('#serving-list');
-                                    if (fresh && cur) cur.innerHTML = fresh.innerHTML;
+                                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                                    ['#serving-list', '#noshow-box', '#mengen-box'].forEach(sel => {
+                                        const fresh = doc.querySelector(sel);
+                                        const cur = document.querySelector(sel);
+                                        if (fresh && cur) cur.innerHTML = fresh.innerHTML;
+                                    });
                                 } catch (e) {}
+                            },
+                            async addWalkin() {
+                                if (!this.modal || !this.walkinPick) return;
+                                this.walkinBusy = true;
+                                try {
+                                    const res = await fetch(this.spontanUrl, { method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':this.csrf}, body: JSON.stringify({ eater_id: this.modal.user_id, date: this.date, dish_id: this.walkinPick }) });
+                                    const r = await res.json();
+                                    if (r.ok) {
+                                        if (!Array.isArray(this.modal.walkin)) this.modal.walkin = [];
+                                        this.modal.walkin.push(r.item);
+                                        this.walkinPick = '';
+                                        this.banner = { ok:true, text: r.text };
+                                        await this.refresh();
+                                    } else {
+                                        this.banner = { ok:false, text: r.error || 'Konnte nicht erfasst werden.' };
+                                    }
+                                } catch (e) { this.banner = { ok:false, text:'Fehler beim Erfassen der spontanen Abholung.' }; }
+                                this.walkinBusy = false;
+                            },
+                            async removeWalkin(item) {
+                                this.walkinBusy = true;
+                                try {
+                                    await fetch(this.walkinDestroyBase + '/' + item.id, { method:'POST', headers:{'Accept':'application/json','X-CSRF-TOKEN':this.csrf,'Content-Type':'application/x-www-form-urlencoded'}, body: new URLSearchParams({ _method:'DELETE' }) });
+                                    this.modal.walkin = (this.modal.walkin || []).filter(w => w.id !== item.id);
+                                    await this.refresh();
+                                } catch (e) { this.banner = { ok:false, text:'Fehler beim Entfernen.' }; }
+                                this.walkinBusy = false;
                             }
                          }">
                         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -193,6 +265,28 @@
                                  :class="banner.ok ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'"
                                  x-text="banner.text"></div>
                         </template>
+
+                        {{-- Suche: Esser per Name finden → öffnet das Ausgabe-Modal --}}
+                        <div class="mt-3">
+                            <div class="relative">
+                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2 text-gray-400">
+                                    <x-module-icon name="search" class="text-base" />
+                                </span>
+                                <input type="search" x-model="q" @keydown.escape="q=''" placeholder="Esser suchen (Name) …"
+                                       class="block w-full rounded-lg border-gray-300 pl-8 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <button type="button" x-show="q !== ''" x-cloak @click="q=''"
+                                        class="absolute inset-y-0 right-0 flex items-center pr-2 text-gray-400 hover:text-gray-600">✕</button>
+                            </div>
+                            <div x-show="q.trim().length >= 2" x-cloak class="mt-2 flex flex-wrap gap-2">
+                                <template x-for="u in matches" :key="u.id">
+                                    <button type="button" @click="openForEater(u.id); q=''"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
+                                        <span x-text="u.name"></span>
+                                    </button>
+                                </template>
+                                <span x-show="!matches.length" class="text-sm text-gray-400">Kein Treffer.</span>
+                            </div>
+                        </div>
 
                         {{-- Kein NFC-Gerät → Simulation --}}
                         <template x-if="!supported">
@@ -330,6 +424,45 @@
                                             </template>
                                         </div>
 
+                                        {{-- Spontane Abholung direkt aus dem Chip-Modal (nicht für OGS-Kinder) --}}
+                                        <div x-show="modal.mode !== 'ja_nein' && walkinGroups.length" x-cloak
+                                             class="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-3">
+                                            <div class="text-xs font-semibold uppercase tracking-wide text-indigo-500">Spontane Abholung</div>
+                                            <p class="mt-0.5 text-xs text-gray-500">Zusätzliches Gericht aus dem Tagesangebot (z. B. Getränk) – wird sofort berechnet.</p>
+
+                                            {{-- bereits erfasst --}}
+                                            <template x-if="modal.walkin && modal.walkin.length">
+                                                <div class="mt-2 flex flex-wrap gap-2">
+                                                    <template x-for="w in modal.walkin" :key="w.id">
+                                                        <span class="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-white px-2.5 py-1 text-sm text-indigo-800">
+                                                            <span x-text="w.name + ' · ' + euro(w.price)"></span>
+                                                            <button type="button" @click="removeWalkin(w)" :disabled="walkinBusy"
+                                                                    title="Entfernen" class="text-indigo-400 hover:text-red-600 disabled:opacity-50">&times;</button>
+                                                        </span>
+                                                    </template>
+                                                </div>
+                                            </template>
+
+                                            {{-- hinzufügen --}}
+                                            <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                                                <select x-model="walkinPick"
+                                                        class="flex-1 rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                                    <option value="">— Gericht wählen —</option>
+                                                    <template x-for="g in walkinGroups" :key="g.category">
+                                                        <optgroup :label="g.category">
+                                                            <template x-for="d in g.dishes" :key="d.id">
+                                                                <option :value="d.id" x-text="d.name + ' · ' + euro(d.price)"></option>
+                                                            </template>
+                                                        </optgroup>
+                                                    </template>
+                                                </select>
+                                                <button type="button" @click="addWalkin()" :disabled="!walkinPick || walkinBusy"
+                                                        class="inline-flex items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+                                                    <x-module-icon name="plus" class="text-base" /> Erfassen
+                                                </button>
+                                            </div>
+                                        </div>
+
                                         {{-- Aktion --}}
                                         <div class="mt-5 flex items-center justify-end gap-2">
                                             <button type="button" @click="close()" class="rounded-lg px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Schließen</button>
@@ -352,15 +485,13 @@
                     </div>
                 @endif
 
+                {{-- OGS: Abhak-Liste mit Namen (OGS-Kinder haben keine Chips zum Scannen).
+                     Der Tagesmenü-View nutzt stattdessen Suche/Scan oben + Mengen unten. --}}
+                @if ($group === 'ogs')
                 <div id="serving-list">
-                {{-- Ausgabeliste --}}
                 @if (empty($rows))
                     <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
-                        @if ($group === 'ogs')
-                            Für diesen Tag isst kein OGS-Kind (kein aktives Abo, keine Bestellung).
-                        @else
-                            Für diesen Tag liegen keine Menü-Bestellungen vor.
-                        @endif
+                        Für diesen Tag isst kein OGS-Kind (kein aktives Abo, keine Bestellung).
                     </div>
                 @else
                     @php
@@ -428,67 +559,67 @@
                     @endif
                 @endif
                 </div>{{-- /#serving-list --}}
+                @else
+                    {{-- Mengen je Gericht (Tagesmenü) – unten. Aktualisiert sich nach jeder Ausgabe. --}}
+                    <div id="mengen-box" class="mt-6">
+                        <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                            <div class="border-b border-gray-100 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700">Mengen je Gericht</div>
+                            @if (empty($menuByDish))
+                                <p class="px-4 py-6 text-center text-sm text-gray-500">Für diesen Tag liegen keine Menü-Bestellungen vor.</p>
+                            @else
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full text-sm">
+                                        <thead>
+                                            <tr class="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400">
+                                                <th class="px-4 py-2 font-medium">Gericht</th>
+                                                <th class="px-3 py-2 font-medium">Kategorie</th>
+                                                <th class="px-3 py-2 text-center font-medium">Bestellt</th>
+                                                <th class="px-3 py-2 text-center font-medium">Ausgegeben</th>
+                                                <th class="px-3 py-2 text-center font-medium">Spontan</th>
+                                                <th class="px-3 py-2 text-center font-medium">Offen</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-50">
+                                            @foreach ($menuByDish as $m)
+                                                <tr>
+                                                    <td class="px-4 py-2 font-medium text-gray-800">{{ $m['dish']?->name ?? '—' }}</td>
+                                                    <td class="px-3 py-2">
+                                                        <span class="inline-flex items-center gap-1 text-gray-600">
+                                                            @if ($m['color'])<span class="inline-block h-2.5 w-2.5 rounded-full" style="background-color: {{ $m['color'] }};"></span>@endif
+                                                            {{ $m['category'] }}
+                                                        </span>
+                                                    </td>
+                                                    <td class="px-3 py-2 text-center font-semibold text-gray-800">{{ $m['ordered'] }}</td>
+                                                    <td class="px-3 py-2 text-center text-green-700">{{ $m['served'] }}</td>
+                                                    <td class="px-3 py-2 text-center text-indigo-600">{{ $m['spontaneous'] }}</td>
+                                                    <td class="px-3 py-2 text-center {{ $m['openNoShow'] > 0 ? 'font-semibold text-amber-600' : 'text-gray-300' }}">{{ $m['openNoShow'] }}</td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="border-t border-gray-200 bg-gray-50">
+                                                <td class="px-4 py-2 font-semibold text-gray-700" colspan="2">Summe</td>
+                                                <td class="px-3 py-2 text-center font-bold text-gray-900">{{ collect($menuByDish)->sum('ordered') }}</td>
+                                                <td class="px-3 py-2 text-center font-bold text-green-700">{{ collect($menuByDish)->sum('served') }}</td>
+                                                <td class="px-3 py-2 text-center font-bold text-indigo-600">{{ collect($menuByDish)->sum('spontaneous') }}</td>
+                                                <td class="px-3 py-2 text-center font-bold text-amber-600">{{ collect($menuByDish)->sum('openNoShow') }}</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            @endif
+                        </div>
 
-                {{-- Spontane Abholung --}}
-                @if ($walkinDishes->isNotEmpty())
-                    <div class="mt-6 rounded-xl border border-gray-200 bg-white p-4">
-                        <h2 class="text-sm font-semibold text-gray-800">Spontane Abholung</h2>
-                        <p class="mt-0.5 text-xs text-gray-500">
-                            Kind ohne (rechtzeitige) Vorbestellung nimmt ein Gericht. Nur Kategorien mit erlaubter spontaner Abholung, ohne Mengen-Limit.
+                        {{-- OGS-Menge (Info) --}}
+                        <div class="mt-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm">
+                            <span class="font-semibold text-gray-800">OGS-Essen</span>
+                            <span class="ml-3 text-gray-600">heute: <strong>{{ $ogsQuant['attending'] }}</strong></span>
+                            <span class="ml-3 text-gray-400">ausgegeben: {{ $ogsQuant['served'] }}</span>
+                        </div>
+
+                        <p class="mt-3 text-xs text-gray-400">
+                            „Offen" = bestellt, aber noch nicht ausgegeben. Zum Ausgeben oben einen Esser <strong>scannen</strong> oder <strong>suchen</strong>.
                         </p>
-
-                        @if ($spontaneous->isNotEmpty())
-                            <div class="mt-3 flex flex-wrap gap-2">
-                                @foreach ($spontaneous as $s)
-                                    <span class="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-sm text-indigo-800">
-                                        <span>{{ $s->user?->name ?? 'Unbekannt' }} · {{ $s->dish?->name ?? '—' }}</span>
-                                        @if ($canServe)
-                                            <form method="POST" action="{{ route('module.schulkantine.servings.destroy', $s) }}"
-                                                  onsubmit="return confirm('Diese spontane Abholung entfernen?')">
-                                                @csrf @method('DELETE')
-                                                <button type="submit" title="Entfernen" class="text-indigo-400 hover:text-red-600">✕</button>
-                                            </form>
-                                        @endif
-                                    </span>
-                                @endforeach
-                            </div>
-                        @endif
-
-                        @if ($canServe)
-                            <form method="POST" action="{{ route('module.schulkantine.servings.spontaneous') }}"
-                                  class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-                                @csrf
-                                <input type="hidden" name="date" value="{{ $date->toDateString() }}">
-                                <div class="flex-1">
-                                    <label class="block text-xs font-medium text-gray-500">Esser</label>
-                                    <select name="eater_id" required
-                                            class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                        <option value="">— Person wählen —</option>
-                                        @foreach ($walkinUsers as $u)
-                                            <option value="{{ $u->id }}">{{ $u->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="flex-1">
-                                    <label class="block text-xs font-medium text-gray-500">Gericht</label>
-                                    <select name="dish_id" required
-                                            class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                        <option value="">— Gericht wählen —</option>
-                                        @foreach ($walkinDishes->groupBy(fn ($d) => $d->category?->name ?? 'Ohne Kategorie') as $catName => $catDishes)
-                                            <optgroup label="{{ $catName }}">
-                                                @foreach ($catDishes as $dish)
-                                                    <option value="{{ $dish->id }}">{{ $dish->name }} ({{ number_format((float) $dish->price, 2, ',', '.') }} €)</option>
-                                                @endforeach
-                                            </optgroup>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <button type="submit"
-                                        class="inline-flex items-center justify-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                                    <x-module-icon name="plus" class="text-base" /> Erfassen
-                                </button>
-                            </form>
-                        @endif
                     </div>
                 @endif
             @endif

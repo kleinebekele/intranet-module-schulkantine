@@ -10,8 +10,9 @@
         <div class="rounded-xl border border-gray-200 bg-white p-6">
             <h2 class="text-lg font-semibold text-gray-800">Willkommen in der Schulkantine 🍽️</h2>
             <p class="mt-2 text-gray-600">
-                <strong>Stammdaten</strong>, <strong>Speiseplan</strong> und <strong>Vorbestellung</strong> stehen.
-                Gerade sind wir an der <strong>Ausgabe &amp; Betrieb</strong> dran – hier siehst du den Fahrplan.
+                <strong>Stammdaten</strong>, <strong>Speiseplan</strong>, <strong>Vorbestellung</strong> und
+                <strong>Ausgabe &amp; Betrieb</strong> stehen. Gerade bauen wir die
+                <strong>Auswertung &amp; Abrechnung</strong> – hier siehst du den Fahrplan.
             </p>
         </div>
 
@@ -20,8 +21,8 @@
                 ['nr' => 1, 'titel' => 'Stammdaten', 'text' => 'Saison &amp; Kalender, Gruppen, Kategorien, Gerichte, Allergene, Teilnehmer', 'status' => 'Erledigt'],
                 ['nr' => 2, 'titel' => 'Speiseplan', 'text' => 'Tagesangebot je Öffnungstag im Wochen-Raster (Kategorie-Farben, Schließtage)', 'status' => 'Erledigt'],
                 ['nr' => 3, 'titel' => 'Vorbestellung', 'text' => 'Bestellen &amp; stornieren, Fristen, Wochen-Freigabe, OGS-Abo', 'status' => 'Erledigt'],
-                ['nr' => 4, 'titel' => 'Ausgabe &amp; Betrieb', 'text' => 'Ausgabelisten, Abhaken, spontane Abholung', 'status' => 'Wir sind dran'],
-                ['nr' => 5, 'titel' => 'Auswertung', 'text' => 'Mengen und Export für die Abrechnung', 'status' => 'Geplant'],
+                ['nr' => 4, 'titel' => 'Ausgabe &amp; Betrieb', 'text' => 'Ausgabelisten, Abhaken, NFC-Ausgabe, spontane Abholung', 'status' => 'Erledigt'],
+                ['nr' => 5, 'titel' => 'Auswertung &amp; Abrechnung', 'text' => 'Monats-/Wochen-Auswertung, Export für die externe Abrechnung, „als bezahlt" markieren', 'status' => 'Wir sind dran'],
                 ['nr' => 6, 'titel' => 'Feedback', 'text' => 'Daumen-Bewertung (anonym ausgewertet)', 'status' => 'Optional'],
             ];
 

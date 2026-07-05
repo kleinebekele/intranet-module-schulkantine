@@ -67,26 +67,70 @@ class ServingController
             ->orderBy('id')
             ->get();
 
-        $walkinDishes = Dish::whereHas('category', fn ($q) => $q->where('allows_walkin', true))
-            ->with('category')
-            ->orderBy('name')
-            ->get();
+        // Spontan wählbar sind nur die HEUTE geplanten Gerichte (Speiseplan des Tages)
+        // aus Walk-in-Kategorien – in Speiseplan-Reihenfolge (sort_order).
+        $walkinDishes = Menu::where('season_id', $season->id)
+            ->whereDate('date', $date->toDateString())
+            ->with(['dish.category'])
+            ->orderBy('sort_order')->orderBy('id')
+            ->get()
+            ->map(fn (Menu $m) => $m->dish)
+            ->filter(fn (?Dish $d) => $d && $d->category && $d->category->allows_walkin)
+            ->unique('id')
+            ->values();
 
-        // Simulations-Chips: die AKTIVEN Chips der heute gelisteten Menü-Esser
-        // (für die Chip-Simulation, wenn kein NFC-Gerät vorhanden ist). Nur aktive
-        // Chips → ein zurückgegebener Chip taucht nicht als „gültig" auf. OGS hat keine.
+        // Gruppiert für das Chip-Modal (Kategorie-Reihenfolge = erstes Auftreten im Plan).
+        $walkinGroups = $walkinDishes
+            ->groupBy(fn (Dish $d) => $d->category?->name ?? 'Ohne Kategorie')
+            ->map(fn ($dishes, $cat) => [
+                'category' => $cat,
+                'dishes' => $dishes->map(fn (Dish $d) => [
+                    'id' => $d->id, 'name' => $d->name, 'price' => (float) $d->price,
+                ])->values(),
+            ])->values();
+
+        // Simulations-Chips: ALLE aktiven Chips (für die Chip-Simulation, wenn kein
+        // NFC-Gerät vorhanden ist). Aktiv = nicht zurückgegeben. Bewusst nicht nur die
+        // heute gelisteten Esser – jeder Chip-Träger kann seinen Chip vorhalten (auch
+        // ohne Bestellung, z. B. für eine spontane Abholung). OGS-Kinder haben keine.
         $simChips = collect();
-        if ($group === 'menu' && ! empty($rows)) {
+        if ($group === 'menu') {
             $rowUsers = collect($rows)->keyBy(fn ($r) => $r['user']->id);
-            $simChips = NfcChip::active()->whereIn('user_id', $rowUsers->keys())->get()
+            $simChips = NfcChip::active()->with('user')->get()
+                ->filter(fn ($c) => $c->user !== null)
                 ->map(fn ($c) => [
                     'uid' => $c->uid,
-                    'name' => $rowUsers[$c->user_id]['user']->name ?? 'Unbekannt',
+                    'name' => $c->user->name,
                     'served' => (bool) ($rowUsers[$c->user_id]['served'] ?? false),
                 ])
                 ->sortBy('name')
                 ->values();
         }
+
+        // No-Shows (bestellt, nicht abgeholt) + Mengen je Gericht – im Tagesmenü-View
+        // direkt in die Ausgabe integriert (keine Extra-Seiten mehr nötig). No-Shows
+        // je Esser gruppiert (Name → Gerichte), damit die Namensliste kurz bleibt.
+        $noShowGroups = [];
+        $menuByDish = [];
+        $ogsQuant = ['attending' => 0, 'served' => 0];
+        if ($open && $group === 'menu') {
+            $quant = $this->quantitiesData($season, $date);
+            $menuByDish = $quant['menuByDish'];
+            $ogsQuant = $quant['ogs'];
+            foreach ($quant['noShows'] as $ns) {
+                $name = $ns['user']?->name ?? 'Unbekannt';
+                $noShowGroups[$name][] = $ns['dish'];
+            }
+            ksort($noShowGroups, SORT_NATURAL | SORT_FLAG_CASE);
+        }
+
+        // Suchliste zum Finden eines Essers (Name → Modal). Keine OGS-Kinder –
+        // die haben keine Chips und werden im Tagesmenü-View nicht ausgegeben.
+        $searchUsers = ($open && $group === 'menu' && $canServe)
+            ? User::whereDoesntHave('roles', fn ($q) => $q->whereIn('roles.role_id',
+                CustomerGroup::where('ordering_mode', CustomerGroup::MODE_JA_NEIN)->pluck('role_id')))
+                ->orderBy('name')->get(['id', 'name'])
+            : collect();
 
         return view('schulkantine::servings.index', [
             'simChips' => $simChips,
@@ -96,9 +140,12 @@ class ServingController
             'group' => $group,
             'rows' => $rows,
             'canServe' => $canServe,
-            'spontaneous' => $spontaneous,
-            'walkinDishes' => $walkinDishes,
-            'walkinUsers' => $walkinDishes->isNotEmpty() ? User::orderBy('name')->get(['id', 'name']) : collect(),
+            'walkinGroups' => $walkinGroups,
+            'searchUsers' => $searchUsers,
+            'noShowGroups' => $noShowGroups,
+            'noShowCount' => count($noShowGroups),
+            'menuByDish' => $menuByDish,
+            'ogsQuant' => $ogsQuant,
             'closedReason' => $open ? null : $this->closedReason($season, $date),
         ] + $this->dayNav($season, $date, ['group' => $group]));
     }
@@ -317,6 +364,20 @@ class ServingController
             }
         }
 
+        // Bereits erfasste spontane Abholungen dieses Essers am Tag (für das Modal).
+        $walkin = Serving::where('season_id', $season->id)
+            ->where('user_id', $eater->id)
+            ->whereDate('date', $date->toDateString())
+            ->where('spontaneous', true)
+            ->with('dish')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (Serving $s) => [
+                'id' => $s->id,
+                'name' => $s->dish?->name ?? '—',
+                'price' => (float) $s->price_snapshot,
+            ])->values();
+
         return [
             'user_id' => $eater->id,
             'name' => $eater->name,
@@ -325,6 +386,7 @@ class ServingController
             'served' => $this->isServed($season, $eater, $date),
             'hasOrder' => $hasOrder,
             'dishes' => $dishes,
+            'walkin' => $walkin,
             'allergens' => $eater->kantineAllergens->pluck('name')->all(),
             'diets' => $eater->kantineDiets->pluck('name')->all(),
             'warn' => collect($dishes)->contains(fn ($d) => ! empty($d['allergenHits']) || ! empty($d['dietHits'])),
@@ -462,7 +524,20 @@ class ServingController
         $date = Carbon::parse($data['date'])->startOfDay();
         $dish = Dish::with('category')->findOrFail($data['dish_id']);
 
+        // Einheitliche Fehlerausgabe: JSON (aus dem Chip-Modal) oder Redirect (Formular).
+        $fail = fn (string $msg) => $request->wantsJson()
+            ? response()->json(['ok' => false, 'error' => $msg], 200)
+            : back()->withErrors(['ausgabe' => $msg]);
+
         abort_unless($season->isOpenOn($date), 422, 'An diesem Tag hat die Kantine nicht geöffnet.');
+
+        // OGS-Kinder (ja/nein) sind vom Spontankauf ausgeschlossen: Sie bekommen ihr
+        // OGS-Essen über das Abo, nicht spontan am Tresen. (UI blendet sie ohnehin aus;
+        // hier als serverseitiges Sicherheitsnetz.)
+        if (CustomerGroup::forUser($eater)?->ordering_mode === CustomerGroup::MODE_JA_NEIN) {
+            return $fail($eater->name.' gehört zur OGS-Gruppe (ja/nein) – dafür ist kein Spontankauf möglich.');
+        }
+
         abort_unless(
             $dish->category && $dish->category->allows_walkin,
             422,
@@ -471,8 +546,7 @@ class ServingController
 
         // Eltern-Freigabe: darf dieses Kind diese Kategorie überhaupt spontan kaufen?
         if (! ChildCategoryPermission::canWalkin($eater->id, $dish->category_id)) {
-            return back()->withErrors(['ausgabe' =>
-                'Für '.$eater->name.' ist der Spontankauf dieser Kategorie nicht freigegeben.']);
+            return $fail('Für '.$eater->name.' ist der Spontankauf dieser Kategorie nicht freigegeben.');
         }
 
         // Wochenbudget für Spontankäufe (falls von den Eltern gesetzt).
@@ -484,13 +558,13 @@ class ServingController
                 ->whereBetween('date', [$weekStart->toDateString(), $weekStart->copy()->addDays(6)->toDateString()])
                 ->sum('price_snapshot');
             if ($spent + (float) $dish->price > $budget + 0.001) {
-                return back()->withErrors(['ausgabe' =>
-                    $eater->name.': Wochenbudget für Spontankäufe erreicht (Limit '.number_format($budget, 2, ',', '.').' €, '
-                    .'diese Woche schon '.number_format($spent, 2, ',', '.').' € genutzt).']);
+                return $fail($eater->name.': Wochenbudget für Spontankäufe erreicht (Limit '
+                    .number_format($budget, 2, ',', '.').' €, diese Woche schon '
+                    .number_format($spent, 2, ',', '.').' € genutzt).');
             }
         }
 
-        Serving::create([
+        $serving = Serving::create([
             'season_id' => $season->id,
             'user_id' => $eater->id,
             'date' => $date->toDateString(),
@@ -502,6 +576,14 @@ class ServingController
             'served_by' => $user->id,
         ]);
 
+        if ($request->wantsJson()) {
+            return response()->json([
+                'ok' => true,
+                'text' => 'Spontan erfasst: '.$dish->name.' für '.$eater->name.'.',
+                'item' => ['id' => $serving->id, 'name' => $dish->name, 'price' => (float) $dish->price],
+            ]);
+        }
+
         return back()->with('status', 'Spontane Abholung erfasst: '.$dish->name.' für '.$eater->name.'.');
     }
 
@@ -512,6 +594,10 @@ class ServingController
 
         $name = $serving->user?->name;
         $serving->delete();
+
+        if ($request->wantsJson()) {
+            return response()->json(['ok' => true]);
+        }
 
         return back()->with('status', 'Ausgabe-Zeile entfernt'.($name ? ' ('.$name.')' : '').'.');
     }
