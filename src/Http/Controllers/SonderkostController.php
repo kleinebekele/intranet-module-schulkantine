@@ -21,12 +21,13 @@ class SonderkostController
     {
         $user = $request->user();
 
-        // Haushalt: der Nutzer selbst + seine Kinder.
+        // Haushalt: KINDER ZUERST, der Nutzer selbst zuletzt (gleiche Reihenfolge
+        // wie auf der Bestell-Seite).
         $user->loadMissing(['kantineAllergens', 'kantineDiets', 'roles']);
         $children = $user->children()
             ->with(['kantineAllergens', 'kantineDiets', 'roles'])
             ->orderBy('name')->get();
-        $members = collect([$user])->concat($children)->unique('id')->values();
+        $members = $children->concat([$user])->unique('id')->values();
 
         $groups = CustomerGroup::all()->keyBy('role_id');
 

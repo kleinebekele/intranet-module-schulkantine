@@ -45,6 +45,9 @@
                     <p><span class="text-gray-400">Zeitraum:</span> {{ $season->start_date->format('d.m.Y') }} &ndash; {{ $season->end_date->format('d.m.Y') }}</p>
                     <p><span class="text-gray-400">Bundesland:</span> {{ $bundeslandName ?: '—' }}</p>
                     <p><span class="text-gray-400">Öffnungstage:</span> {{ $offen }}</p>
+                    <p><span class="text-gray-400">OGS-Essen (Fixpreis):</span>
+                        {{ $season->ogs_price !== null ? number_format((float) $season->ogs_price, 2, ',', '.').' €' : '— (noch nicht festgelegt)' }}
+                    </p>
                 </div>
                 <form method="POST" action="{{ route('module.schulkantine.seasons.import', $season) }}">
                     @csrf

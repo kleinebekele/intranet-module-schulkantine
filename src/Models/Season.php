@@ -18,6 +18,7 @@ class Season extends Model
         'start_date',
         'end_date',
         'bundesland',
+        'ogs_price',
         'opening_weekdays',
         'is_active',
     ];
@@ -27,6 +28,7 @@ class Season extends Model
         return [
             'start_date' => 'date',
             'end_date' => 'date',
+            'ogs_price' => 'decimal:2',
             'opening_weekdays' => 'array',
             'is_active' => 'boolean',
         ];

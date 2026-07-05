@@ -17,7 +17,13 @@ class Subscription extends Model
     protected $fillable = [
         'season_id',
         'user_id',
+        'active',
     ];
+
+    protected function casts(): array
+    {
+        return ['active' => 'boolean'];
+    }
 
     public function season(): BelongsTo
     {

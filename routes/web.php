@@ -74,6 +74,8 @@ Route::middleware(['web', 'auth'])
         // Vorbestellung (für jeden eingeloggten Nutzer – sich selbst & seine Kinder)
         Route::get('bestellen', [OrderController::class, 'index'])->name('orders.index');
         Route::post('bestellen', [OrderController::class, 'store'])->name('orders.store');
+        Route::post('bestellen/abo', [OrderController::class, 'subscription'])->name('orders.subscription');
+        Route::post('bestellen/budget', [OrderController::class, 'budget'])->name('orders.budget');
 
         // Eigene Sonderkost (Selbstbedienung: ich + meine Kinder) – jeder Nutzer
         Route::get('meine-sonderkost', [SonderkostController::class, 'index'])->name('sonderkost.index');

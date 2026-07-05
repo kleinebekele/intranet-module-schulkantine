@@ -47,6 +47,17 @@
             </div>
 
             <div>
+                <x-input-label for="ogs_price" value="OGS-Essen: Fixpreis (€)" />
+                <x-text-input id="ogs_price" name="ogs_price" type="number" step="0.01" min="0" class="mt-1 block w-40"
+                              :value="old('ogs_price', $season->ogs_price)" placeholder="z. B. 3.50" />
+                <p class="mt-1 text-xs text-gray-400">
+                    Einheitlicher Preis für ein OGS-Essen in dieser Saison – gilt <strong>global</strong> für alle OGS-Kinder
+                    (die essen pauschal, ohne Gericht-Auswahl). Leer lassen, wenn noch nicht festgelegt.
+                </p>
+                <x-input-error :messages="$errors->get('ogs_price')" class="mt-2" />
+            </div>
+
+            <div>
                 <x-input-label value="Öffnungs-Wochentage" />
                 @php
                     $wochentage = [1 => 'Mo', 2 => 'Di', 3 => 'Mi', 4 => 'Do', 5 => 'Fr', 6 => 'Sa', 7 => 'So'];

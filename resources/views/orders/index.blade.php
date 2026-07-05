@@ -11,7 +11,7 @@
             </div>
             @if ($season)
                 <div class="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-1.5 text-right">
-                    <div class="text-[11px] uppercase tracking-wide text-indigo-400">offen im {{ $monthStart->isoFormat('MMMM YYYY') }}</div>
+                    <div class="text-[11px] uppercase tracking-wide text-indigo-400">Kosten im {{ $monthStart->isoFormat('MMMM YYYY') }}</div>
                     <div class="text-lg font-bold text-indigo-700">{{ $money($monthTotal) }}</div>
                 </div>
             @endif
@@ -38,7 +38,7 @@
                     @endif
                 </div>
                 <div class="text-center">
-                    <div class="text-sm font-semibold text-gray-800">{{ $weekStart->format('d.m.') }} – {{ $weekEnd->format('d.m.Y') }}</div>
+                    <div class="text-sm font-semibold text-gray-800">KW {{ $weekStart->isoWeek() }} · {{ $weekStart->format('d.m.') }} – {{ $weekEnd->format('d.m.Y') }}</div>
                     <div class="text-xs text-gray-400">Saison „{{ $season->name }}"</div>
                 </div>
                 <div>
@@ -83,7 +83,7 @@
                         <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
                             {{-- Kopf des Essers --}}
                             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 bg-gray-50/60 px-4 py-3">
-                                <div class="flex items-center gap-2">
+                                <div class="flex flex-wrap items-center gap-2">
                                     <span class="font-semibold text-gray-800">{{ $eater->name }}</span>
                                     @if ($eater->id === auth()->id())
                                         <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">ich</span>
@@ -92,15 +92,79 @@
                                     @if ($hasSonderkost)
                                         <span class="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600" title="Es ist Sonderkost hinterlegt">⚠️ Sonderkost</span>
                                     @endif
+                                    @if ($isOgs)
+                                        <form method="POST" action="{{ route('module.schulkantine.orders.subscription') }}" class="inline-flex items-center gap-2">
+                                            @csrf
+                                            <input type="hidden" name="eater_id" value="{{ $eater->id }}">
+                                            <input type="hidden" name="active" value="{{ $isSubscribed ? '0' : '1' }}">
+                                            @if ($isSubscribed)
+                                                <span class="text-xs text-gray-500">🔁 Abo aktiv – isst automatisch mit</span>
+                                                <button type="submit" class="rounded-md border border-red-200 bg-white px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50">Abo abbestellen</button>
+                                            @else
+                                                <span class="text-xs text-amber-600">Abo aus – nur angehakte Tage</span>
+                                                <button type="submit" class="rounded-md border border-green-200 bg-white px-2 py-0.5 text-xs font-medium text-green-700 hover:bg-green-50">Abo aktivieren</button>
+                                            @endif
+                                        </form>
+                                    @endif
                                 </div>
-                                @if ($isOgs && $isSubscribed)
-                                    <span class="text-xs text-gray-500">🔁 Abo aktiv – isst automatisch mit; hier nur Abbestellungen.</span>
-                                @endif
+                                {{-- Offener Betrag DIESER Person im angezeigten Monat --}}
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-[11px] uppercase tracking-wide text-gray-400">Kosten {{ $monthStart->isoFormat('MMM') }}</span>
+                                    <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-sm font-bold text-indigo-700">{{ $money($monthByUser[$eater->id] ?? 0) }}</span>
+                                </div>
                             </div>
 
                             @if (! $e['group'])
                                 <div class="px-4 py-4 text-sm text-gray-400">Für diese Person ist keine Kundengruppe hinterlegt.</div>
                             @else
+                                {{-- Wochenbudget (nur Schüler): Anzeige + Eltern-Setzformulare --}}
+                                @if (isset($budgets[$eater->id]))
+                                    @php $b = $budgets[$eater->id]; $isParent = $eater->id !== auth()->id(); @endphp
+                                    <div class="border-b border-gray-100 bg-indigo-50/40 px-4 py-2">
+                                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                            <span class="font-medium text-gray-700">💶 Wochenbudget:</span>
+                                            @if ($b['effective'] !== null)
+                                                <span class="font-semibold text-indigo-700">{{ $money($b['effective']) }}</span>
+                                                @if ($b['special'] !== null)
+                                                    <span class="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">nur diese Woche</span>
+                                                @endif
+                                                <span class="text-gray-300">·</span>
+                                                <span class="text-gray-500">genutzt {{ $money($b['spent']) }}</span>
+                                                <span class="text-gray-300">·</span>
+                                                <span class="font-medium {{ $b['remaining'] < 0 ? 'text-red-600' : 'text-green-700' }}">frei {{ $money($b['remaining']) }}</span>
+                                            @else
+                                                <span class="text-gray-400">kein Limit gesetzt</span>
+                                            @endif
+                                        </div>
+                                        @if ($isParent)
+                                            <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-2">
+                                                <form method="POST" action="{{ route('module.schulkantine.orders.budget') }}" class="inline-flex items-center gap-1">
+                                                    @csrf
+                                                    <input type="hidden" name="eater_id" value="{{ $eater->id }}">
+                                                    <input type="hidden" name="scope" value="general">
+                                                    <span class="text-[11px] text-gray-500">allgemein</span>
+                                                    <input type="number" step="0.01" min="0" name="amount" value="{{ $b['general'] }}" placeholder="—"
+                                                           class="w-16 rounded-md border-gray-300 px-1.5 py-0.5 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                                    <span class="text-[11px] text-gray-400">€</span>
+                                                    <button type="submit" class="rounded-md bg-indigo-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-indigo-700">ok</button>
+                                                </form>
+                                                <form method="POST" action="{{ route('module.schulkantine.orders.budget') }}" class="inline-flex items-center gap-1">
+                                                    @csrf
+                                                    <input type="hidden" name="eater_id" value="{{ $eater->id }}">
+                                                    <input type="hidden" name="scope" value="week">
+                                                    <input type="hidden" name="week" value="{{ $weekStart->toDateString() }}">
+                                                    <span class="text-[11px] text-gray-500">nur KW {{ $weekStart->isoWeek() }}</span>
+                                                    <input type="number" step="0.01" min="0" name="amount" value="{{ $b['special'] }}" placeholder="—"
+                                                           class="w-16 rounded-md border-gray-300 px-1.5 py-0.5 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                                    <span class="text-[11px] text-gray-400">€</span>
+                                                    <button type="submit" class="rounded-md bg-indigo-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-indigo-700">ok</button>
+                                                </form>
+                                                <span class="text-[10px] text-gray-400">leer lassen = kein Limit</span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endif
+
                                 {{-- Handy: Tage gestapelt (volle Breite) · ab lg: Spalten mit horizontalem Scroll.
                                      Grauer Canvas + Schatten je Karte, damit die Tage klar getrennt sind. --}}
                                 <div class="flex flex-col gap-4 bg-gray-50 p-3 sm:p-4 lg:flex-row lg:gap-3 lg:overflow-x-auto">
@@ -138,7 +202,7 @@
                                                     @if ($day['open'] && $hasOrder && ! $isOgs)
                                                         <span class="rounded-full bg-green-600 px-2 py-0.5 text-xs font-semibold text-white">{{ $money($eaterTotal) }}</span>
                                                     @elseif ($day['open'] && $hasOrder && $isOgs)
-                                                        <span class="rounded-full bg-green-600 px-2 py-0.5 text-xs font-semibold text-white">✓ isst</span>
+                                                        <span class="rounded-full bg-green-600 px-2 py-0.5 text-xs font-semibold text-white">{{ $ogsPrice > 0 ? '✓ '.$money($ogsPrice) : '✓ isst' }}</span>
                                                     @endif
                                                 </div>
                                                 @unless ($day['open'])
@@ -158,10 +222,10 @@
                                             <div class="flex-1 space-y-2 p-2.5">
                                                 @if (! $day['open'])
                                                     <p class="py-6 text-center text-xs text-amber-500">geschlossen</p>
-                                                @elseif ($items->isEmpty())
-                                                    <p class="py-6 text-center text-xs text-gray-400">kein Angebot</p>
                                                 @elseif ($isOgs)
-                                                    {{-- OGS: ja/nein --}}
+                                                    {{-- OGS: nur ja/nein – die konkreten Speisen sind für OGS irrelevant.
+                                                         Steht bewusst VOR der „kein Angebot"-Prüfung, damit OGS auch an
+                                                         Öffnungstagen ohne Speiseplan-Eintrag teilnehmen kann. --}}
                                                     @php $editable = ($attends && $day['canCancel']) || (! $attends && $day['canOrder']); @endphp
                                                     <form method="POST" action="{{ route('module.schulkantine.orders.store') }}">
                                                         @csrf
@@ -175,33 +239,8 @@
                                                             <span class="font-medium">isst an diesem Tag</span>
                                                         </label>
                                                     </form>
-                                                    {{-- Angebot des Tages (mit Allergen-/Warnhinweis) --}}
-                                                    <div class="space-y-1.5">
-                                                        @foreach ($items as $m)
-                                                            @php $warn = $dishWarn($m->dish, $e['allergenIds'], $e['dietIds']); @endphp
-                                                            <div class="flex items-center gap-2 rounded-md border px-2 py-1 {{ $warn ? 'border-red-300 bg-red-50' : 'border-gray-100' }}">
-                                                                @if ($m->dish->photoUrl())
-                                                                    <img src="{{ $m->dish->photoUrl() }}" alt="" class="h-8 w-8 flex-none rounded object-cover">
-                                                                @else
-                                                                    <div class="flex h-8 w-8 flex-none items-center justify-center rounded bg-gray-100 text-gray-300"><x-module-icon name="restaurant" class="text-sm" /></div>
-                                                                @endif
-                                                                <div class="min-w-0 flex-1">
-                                                                    <div class="truncate text-xs font-medium text-gray-700">{{ $m->dish->name }}</div>
-                                                                    @if ($m->dish->allergens->isNotEmpty())
-                                                                        <div class="truncate text-[10px] {{ $warn ? 'text-red-500' : 'text-gray-400' }}"
-                                                                             title="Allergene: {{ $m->dish->allergens->map(fn ($a) => $a->code.' '.$a->name)->join(', ') }}">Allergene: {{ $m->dish->allergens->pluck('code')->join(', ') }}</div>
-                                                                    @endif
-                                                                    @if ($m->dish->additives->isNotEmpty())
-                                                                        <div class="truncate text-[10px] text-gray-400"
-                                                                             title="Zusatzstoffe: {{ $m->dish->additives->map(fn ($a) => $a->code.' '.$a->name)->join(', ') }}">Zusatzstoffe: {{ $m->dish->additives->pluck('code')->join(', ') }}</div>
-                                                                    @endif
-                                                                </div>
-                                                                @if ($warn)
-                                                                    <span class="flex-none rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white" title="Passt nicht zur Sonderkost">⚠️</span>
-                                                                @endif
-                                                            </div>
-                                                        @endforeach
-                                                    </div>
+                                                @elseif ($items->isEmpty())
+                                                    <p class="py-6 text-center text-xs text-gray-400">kein Angebot</p>
                                                 @else
                                                     {{-- Menü-Modus: pro Kategorie auswählbare Gericht-Karten --}}
                                                     @foreach ($items->groupBy(fn ($m) => $m->dish->category?->name ?? 'Ohne Kategorie') as $catName => $catItems)

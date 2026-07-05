@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Intranet\Modules\Schulkantine\Models\Budget;
 use Intranet\Modules\Schulkantine\Models\CustomerGroup;
 use Intranet\Modules\Schulkantine\Models\Menu;
 use Intranet\Modules\Schulkantine\Models\Order;
@@ -144,15 +145,23 @@ class OrderController
         $monthAnchor = $weekStart->copy()->addDays(3);
         $monthStart = $monthAnchor->copy()->startOfMonth();
         $monthEnd = $monthAnchor->copy()->endOfMonth();
-        $monthTotal = (float) Order::whereIn('user_id', $eaterIds)
+        // Offener Betrag JE PERSON (für die Aufschlüsselung im Esser-Kopf) aus den
+        // Menü-Bestellungen (Preis-Snapshot). OGS-Kosten kommen weiter unten dazu;
+        // der Haushalts-Gesamtwert (oben rechts) wird danach als Summe gebildet.
+        $monthByUser = Order::whereIn('user_id', $eaterIds)
             ->where('season_id', $season->id)
             ->where('status', Order::STATUS_ORDERED)
             ->whereBetween('date', [$monthStart->toDateString(), $monthEnd->toDateString()])
-            ->sum('price_snapshot');
+            ->selectRaw('user_id, SUM(price_snapshot) as total')
+            ->groupBy('user_id')
+            ->pluck('total', 'user_id')
+            ->map(fn ($v) => (float) $v)
+            ->all();
 
-        // Abos je Esser (für die OGS-Standard-Teilnahme).
+        // Aktive Abos je Esser (für die OGS-Standard-Teilnahme).
         $subscribed = Subscription::whereIn('user_id', $eaterIds)
             ->where('season_id', $season->id)
+            ->where('active', true)
             ->pluck('user_id')->flip();
 
         // Esser aufbereiten (Gruppe, Modus, Sonderkost-IDs).
@@ -168,6 +177,69 @@ class OrderController
             ];
         });
 
+        // OGS-Kosten in die Monatssummen einrechnen: OGS-Kinder wählen keine
+        // Gerichte (kein Preis-Snapshot), ihr offener Betrag = teilgenommene
+        // Öffnungstage des Monats × Saison-Fixpreis (Season::ogs_price).
+        //  - Mit Abo:  alle Öffnungstage minus Abbestellungen (storniert).
+        //  - Ohne Abo: nur explizit angehakte (bestellte) Tage.
+        $ogsPrice = (float) ($season->ogs_price ?? 0);
+        if ($ogsPrice > 0) {
+            $ogsEaterIds = $eaterData->filter(fn ($e) => $e['mode'] === CustomerGroup::MODE_JA_NEIN)->pluck('user.id');
+
+            if ($ogsEaterIds->isNotEmpty()) {
+                $openMonthDays = [];
+                for ($d = $monthStart->copy(); $d->lte($monthEnd); $d->addDay()) {
+                    if ($season->isOpenOn($d)) {
+                        $openMonthDays[$d->toDateString()] = true;
+                    }
+                }
+                $openMonthCount = count($openMonthDays);
+
+                $ogsMonth = Order::whereIn('user_id', $ogsEaterIds)
+                    ->where('season_id', $season->id)
+                    ->whereNull('category_id')
+                    ->whereBetween('date', [$monthStart->toDateString(), $monthEnd->toDateString()])
+                    ->get(['user_id', 'date', 'status']);
+
+                foreach ($ogsEaterIds as $uid) {
+                    $rows = $ogsMonth->where('user_id', $uid);
+                    if ($subscribed->has($uid)) {
+                        $storno = $rows->where('status', Order::STATUS_CANCELLED)
+                            ->map(fn ($r) => $r->date->toDateString())
+                            ->filter(fn ($ds) => isset($openMonthDays[$ds]))->unique()->count();
+                        $attended = max(0, $openMonthCount - $storno);
+                    } else {
+                        $attended = $rows->where('status', Order::STATUS_ORDERED)
+                            ->map(fn ($r) => $r->date->toDateString())
+                            ->filter(fn ($ds) => isset($openMonthDays[$ds]))->unique()->count();
+                    }
+                    $monthByUser[$uid] = ($monthByUser[$uid] ?? 0) + $attended * $ogsPrice;
+                }
+            }
+        }
+
+        // Haushalts-Gesamtwert (oben rechts) = Summe aller Personen (inkl. OGS).
+        $monthTotal = array_sum($monthByUser);
+
+        // Wochenbudget je SCHÜLER (Rolle kantine_student; OGS/Sonstige haben keins).
+        // Anzeige: Budget / genutzt (Menü-Kosten der Woche) / frei.
+        $budgets = [];
+        foreach ($eaterData as $e) {
+            if ($e['group']?->role_id !== 'kantine_student') {
+                continue;
+            }
+            $uid = $e['user']->id;
+            $effective = $this->effectiveBudget($uid, $weekStart);
+            $spent = array_sum($dayTotals[$uid] ?? []);
+            $budgets[$uid] = [
+                'general' => optional(Budget::where('user_id', $uid)->whereNull('week_start')->first())->amount,
+                'special' => optional(Budget::where('user_id', $uid)->whereDate('week_start', $weekStart->toDateString())->first())->amount,
+                'effective' => $effective,
+                'spent' => $spent,
+                'remaining' => $effective !== null ? $effective - $spent : null,
+            ];
+        }
+
         return view('schulkantine::orders.index', [
             'season' => $season,
             'weekStart' => $weekStart,
@@ -182,6 +254,9 @@ class OrderController
             'subscribed' => $subscribed,
             'dayTotals' => $dayTotals,
             'monthTotal' => $monthTotal,
+            'monthByUser' => $monthByUser,
+            'ogsPrice' => $ogsPrice,
+            'budgets' => $budgets,
             'monthStart' => $monthStart,
             'prevWeek' => $weekStart->copy()->subWeek()->toDateString(),
             'nextWeek' => $weekStart->copy()->addWeek()->toDateString(),
@@ -229,6 +304,95 @@ class OrderController
         return $this->handleMenu($request, $season, $eater, $date, $deadline, $data);
     }
 
+    /**
+     * OGS-Abo ganz an- oder abbestellen. Aus = das Kind isst nur noch an
+     * angehakten Tagen; An = wieder Standard-Teilnahme an allen Öffnungstagen.
+     * (Die Fristen/Abrechnung je Tag bleiben davon unberührt – Feinschliff für
+     *  die spätere Abrechnung folgt in Phase 5.)
+     */
+    public function subscription(Request $request)
+    {
+        $user = $request->user();
+
+        $data = $request->validate([
+            'eater_id' => ['required', 'integer'],
+            'active' => ['required', 'in:0,1'],
+        ]);
+
+        $season = Season::where('is_active', true)->firstOrFail();
+        $eater = User::findOrFail($data['eater_id']);
+
+        abort_unless($this->mayOrderFor($user, $eater), 403, 'Du darfst für diese Person kein Abo verwalten.');
+
+        $group = CustomerGroup::forUser($eater);
+        abort_unless($group && $group->ordering_mode === CustomerGroup::MODE_JA_NEIN, 422, 'Nur OGS-Esser haben ein Abo.');
+
+        $active = $data['active'] === '1';
+        Subscription::updateOrCreate(
+            ['season_id' => $season->id, 'user_id' => $eater->id],
+            ['active' => $active],
+        );
+
+        return back()->with('status', $active
+            ? $eater->name.': Abo aktiviert – isst wieder an allen Öffnungstagen (außer abbestellten).'
+            : $eater->name.': Abo abbestellt – isst nur noch an einzeln angehakten Tagen.');
+    }
+
+    /**
+     * Wochenbudget eines Schülers setzen/entfernen (nur durch die Eltern).
+     * scope=general → allgemein (jede Woche); scope=week → nur diese Woche.
+     * Leerer Betrag entfernt das jeweilige Budget.
+     */
+    public function budget(Request $request)
+    {
+        $user = $request->user();
+
+        $data = $request->validate([
+            'eater_id' => ['required', 'integer'],
+            'scope' => ['required', 'in:general,week'],
+            'week' => ['nullable', 'date'],
+            'amount' => ['nullable', 'numeric', 'min:0', 'max:9999.99'],
+        ]);
+
+        $eater = User::findOrFail($data['eater_id']);
+
+        // Nur ein Elternteil darf das Budget festlegen – nicht das Kind selbst.
+        abort_if($user->id === $eater->id, 403, 'Nur Eltern dürfen das Budget festlegen.');
+        abort_unless($this->mayOrderFor($user, $eater), 403, 'Du darfst für diese Person kein Budget festlegen.');
+
+        $group = CustomerGroup::forUser($eater);
+        abort_unless($group && $group->role_id === 'kantine_student', 422, 'Ein Budget gibt es nur für Schüler.');
+
+        $weekStart = $data['scope'] === 'week'
+            ? Carbon::parse($data['week'] ?? 'today')->startOfWeek(Carbon::MONDAY)
+            : null;
+
+        $query = Budget::where('user_id', $eater->id);
+        $weekStart ? $query->whereDate('week_start', $weekStart->toDateString()) : $query->whereNull('week_start');
+        $existing = $query->first();
+
+        $label = $weekStart ? 'für diese Woche' : 'allgemein';
+
+        if (! $request->filled('amount')) {
+            $existing?->delete();
+
+            return back()->with('status', $eater->name.': Budget '.$label.' entfernt.');
+        }
+
+        $amount = (float) $data['amount'];
+        if ($existing) {
+            $existing->update(['amount' => $amount]);
+        } else {
+            Budget::create([
+                'user_id' => $eater->id,
+                'week_start' => $weekStart?->toDateString(),
+                'amount' => $amount,
+            ]);
+        }
+
+        return back()->with('status', $eater->name.': Wochenbudget '.$label.' auf '.number_format($amount, 2, ',', '.').' € gesetzt.');
+    }
+
     // ------------------------------------------------------------- Menü-Modus
 
     private function handleMenu(Request $request, Season $season, User $eater, Carbon $date, DeadlineService $deadline, array $data)
@@ -269,6 +433,30 @@ class OrderController
 
         if (! $deadline->canOrder($season, $date)) {
             return back()->withErrors(['bestellung' => 'Die Bestellfrist für diesen Tag ist abgelaufen.']);
+        }
+
+        // Wochenbudget (nur Schüler): Die Menü-Kosten der Woche dürfen das von den
+        // Eltern gesetzte Limit nicht übersteigen. Beim Wechsel innerhalb einer
+        // Kategorie zählt nur die Differenz (alter Preis raus, neuer rein).
+        $group = CustomerGroup::forUser($eater);
+        if ($group && $group->role_id === 'kantine_student') {
+            $weekStart = $date->copy()->startOfWeek(Carbon::MONDAY);
+            $budget = $this->effectiveBudget($eater->id, $weekStart);
+            if ($budget !== null) {
+                $weekSpent = (float) Order::where('user_id', $eater->id)
+                    ->where('season_id', $season->id)
+                    ->where('status', Order::STATUS_ORDERED)
+                    ->whereNotNull('category_id')
+                    ->whereBetween('date', [$weekStart->toDateString(), $weekStart->copy()->addDays(6)->toDateString()])
+                    ->sum('price_snapshot');
+                $oldPrice = $existing ? (float) $existing->price_snapshot : 0.0;
+                $after = $weekSpent - $oldPrice + (float) $menu->dish->price;
+                if ($after > $budget + 0.001) {
+                    return back()->withErrors(['bestellung' =>
+                        'Wochenbudget überschritten: Limit '.number_format($budget, 2, ',', '.').' €, '
+                        .'diese Bestellung ergäbe '.number_format($after, 2, ',', '.').' €.']);
+                }
+            }
         }
 
         $attributes = [
@@ -353,18 +541,38 @@ class OrderController
 
     // ----------------------------------------------------------------- Helfer
 
-    /** Der Nutzer selbst + seine Kinder, jeweils mit Sonderkost geladen. */
+    /**
+     * Die Esser des Haushalts – KINDER ZUERST, der Nutzer selbst zuletzt
+     * (Eltern kümmern sich meist zuerst um die Kinder). Jeweils mit Sonderkost.
+     */
     private function eatersFor(User $user): Collection
     {
         $user->loadMissing(['kantineAllergens', 'kantineDiets', 'roles']);
         $children = $user->children()->with(['kantineAllergens', 'kantineDiets', 'roles'])->orderBy('name')->get();
 
-        return collect([$user])->concat($children)->unique('id')->values();
+        return $children->concat([$user])->unique('id')->values();
     }
 
     private function mayOrderFor(User $user, User $eater): bool
     {
         return $user->id === $eater->id || $user->children()->whereKey($eater->id)->exists();
+    }
+
+    /**
+     * Wirksames Wochenbudget eines Schülers: das spezielle (diese Woche) hat
+     * Vorrang vor dem allgemeinen. Null = kein Limit hinterlegt.
+     */
+    private function effectiveBudget(int $userId, Carbon $weekStart): ?float
+    {
+        $special = Budget::where('user_id', $userId)
+            ->whereDate('week_start', $weekStart->toDateString())->value('amount');
+        if ($special !== null) {
+            return (float) $special;
+        }
+
+        $general = Budget::where('user_id', $userId)->whereNull('week_start')->value('amount');
+
+        return $general !== null ? (float) $general : null;
     }
 
     private function resolveWeekStart(Request $request, Season $season): Carbon

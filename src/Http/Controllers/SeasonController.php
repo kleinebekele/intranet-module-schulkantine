@@ -184,6 +184,7 @@ class SeasonController
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after:start_date'],
             'bundesland' => ['nullable', Rule::in(array_keys(Bundeslaender::all()))],
+            'ogs_price' => ['nullable', 'numeric', 'min:0', 'max:999.99'],
             'opening_weekdays' => ['array'],
             'opening_weekdays.*' => [Rule::in(['1', '2', '3', '4', '5', '6', '7'])],
         ]);
@@ -193,6 +194,7 @@ class SeasonController
             'start_date' => $request->date('start_date'),
             'end_date' => $request->date('end_date'),
             'bundesland' => $request->input('bundesland') ?: null,
+            'ogs_price' => $request->filled('ogs_price') ? (float) $request->input('ogs_price') : null,
             'opening_weekdays' => array_map('intval', $request->input('opening_weekdays', [])),
             'is_active' => $request->boolean('is_active'),
         ];
