@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * Ein Gericht aus dem Katalog. Fixpreis, genau eine Kategorie, dazu Allergene,
- * Zusatzstoffe und geeignete Diäten (jeweils n:m).
+ * Zusatzstoffe und die Diäten, für die es NICHT geeignet ist (jeweils n:m).
  */
 class Dish extends Model
 {
@@ -66,7 +66,12 @@ class Dish extends Model
         return $this->belongsToMany(Additive::class, 'kantine_dish_additive', 'dish_id', 'additive_id');
     }
 
-    public function diets(): BelongsToMany
+    /**
+     * Diäten, für die dieses Gericht NICHT geeignet ist (Ausnahmen). Standard =
+     * für alles geeignet; hier werden nur die Verstöße markiert. Grundlage der
+     * Diät-Warnung: fordert ein Esser eine Diät, die hier steht → Warnung.
+     */
+    public function unsuitableDiets(): BelongsToMany
     {
         return $this->belongsToMany(Diet::class, 'kantine_dish_diet', 'dish_id', 'diet_id');
     }

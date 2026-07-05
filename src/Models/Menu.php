@@ -4,6 +4,7 @@ namespace Intranet\Modules\Schulkantine\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Ein Speiseplan-Eintrag: ein Gericht gehört an einem Öffnungstag zum
@@ -35,5 +36,11 @@ class Menu extends Model
     public function dish(): BelongsTo
     {
         return $this->belongsTo(Dish::class);
+    }
+
+    /** Bestellungen, die auf diesen Speiseplan-Eintrag verweisen (Löschschutz). */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
     }
 }

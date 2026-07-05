@@ -24,7 +24,7 @@ class DishController
         $categoryFilter = (string) $request->query('category', '');
         $statusFilter = (string) $request->query('status', '');
 
-        $dishes = Dish::with(['category', 'allergens', 'additives', 'diets'])
+        $dishes = Dish::with(['category', 'allergens', 'additives', 'unsuitableDiets'])
             ->when($search !== '', fn ($q) => $q->where('name', 'like', "%{$search}%"))
             ->when($categoryFilter !== '', fn ($q) => $categoryFilter === 'none'
                 ? $q->whereNull('category_id')
@@ -63,7 +63,7 @@ class DishController
     {
         $this->authorizeAdmin($request);
 
-        $dish->load('allergens', 'additives', 'diets');
+        $dish->load('allergens', 'additives', 'unsuitableDiets');
 
         return view('schulkantine::dishes.form', $this->formData($dish));
     }
@@ -161,7 +161,7 @@ class DishController
     {
         $dish->allergens()->sync($request->input('allergens', []));
         $dish->additives()->sync($request->input('additives', []));
-        $dish->diets()->sync($request->input('diets', []));
+        $dish->unsuitableDiets()->sync($request->input('diets', []));
     }
 
     private function authorizeAdmin(Request $request): void

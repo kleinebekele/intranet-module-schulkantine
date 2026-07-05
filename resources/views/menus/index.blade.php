@@ -7,6 +7,13 @@
     </x-slot>
 
     <div class="max-w-full">
+        {{-- Erfolgsmeldungen zeigt das App-Layout bereits global; hier nur Fehler. --}}
+        @if ($errors->any())
+            <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                {{ $errors->first() }}
+            </div>
+        @endif
+
         @if (! $season)
             <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 Es ist keine Saison als „aktiv" markiert – lege zuerst unter „Saisons &amp; Kalender" eine aktive Saison an.
@@ -30,6 +37,61 @@
                     @if ($canNext)
                         <a href="{{ route('module.schulkantine.menus.index', ['week' => $nextWeek]) }}"
                            class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Nächste Woche ›</a>
+                    @endif
+                </div>
+            </div>
+
+            {{-- Wochen-Freigabe (hybrid): Status + manuelle Übersteuerung --}}
+            <div class="mb-4 flex flex-col gap-2 rounded-lg border px-4 py-3 sm:flex-row sm:items-center sm:justify-between
+                        {{ $weekReleased ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50' }}">
+                <div class="text-sm">
+                    @if ($weekReleased)
+                        <span class="font-semibold text-green-800">✅ Woche freigegeben</span>
+                        <span class="text-green-700">– es kann bestellt werden.</span>
+                    @else
+                        <span class="font-semibold text-gray-700">🔒 Woche nicht freigegeben</span>
+                        <span class="text-gray-500">– Bestellen ist gesperrt.</span>
+                    @endif
+                    <span class="ml-1 text-xs text-gray-400">
+                        @if ($weekOverride === 'released')
+                            (manuell freigegeben)
+                        @elseif ($weekOverride === 'held')
+                            (manuell zurückgehalten)
+                        @else
+                            (automatisch)
+                        @endif
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    @if ($weekOverride !== 'released')
+                        <form method="POST" action="{{ route('module.schulkantine.menus.release') }}">
+                            @csrf
+                            <input type="hidden" name="week" value="{{ $weekStart->toDateString() }}">
+                            <input type="hidden" name="action" value="release">
+                            <button type="submit" class="rounded-md border border-green-300 bg-white px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-50">Jetzt freigeben</button>
+                        </form>
+                    @endif
+
+                    {{-- Sperren nur, solange es noch keine Bestellungen für die Woche gibt. --}}
+                    @if ($weekHasOrders)
+                        <span class="text-xs text-gray-400">🔒 bereits bestellt – Sperren nicht mehr möglich</span>
+                    @else
+                        @if ($weekOverride !== 'held')
+                            <form method="POST" action="{{ route('module.schulkantine.menus.release') }}">
+                                @csrf
+                                <input type="hidden" name="week" value="{{ $weekStart->toDateString() }}">
+                                <input type="hidden" name="action" value="hold">
+                                <button type="submit" class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100">Zurückhalten</button>
+                            </form>
+                        @endif
+                        @if ($weekOverride !== null)
+                            <form method="POST" action="{{ route('module.schulkantine.menus.release') }}">
+                                @csrf
+                                <input type="hidden" name="week" value="{{ $weekStart->toDateString() }}">
+                                <input type="hidden" name="action" value="auto">
+                                <button type="submit" class="rounded-md px-2.5 py-1 text-xs font-medium text-gray-400 hover:text-gray-600">↺ Automatik</button>
+                            </form>
+                        @endif
                     @endif
                 </div>
             </div>
@@ -68,12 +130,16 @@
                                                 @foreach ($catItems as $m)
                                                     <div class="flex items-center justify-between gap-2 rounded-md border border-gray-100 bg-white px-2 py-1 text-sm">
                                                         <span class="text-gray-800">{{ $m->dish->name }}</span>
-                                                        <form method="POST" action="{{ route('module.schulkantine.menus.destroy', $m) }}"
-                                                              onsubmit="return confirm('Gericht entfernen?')">
-                                                            @csrf @method('DELETE')
-                                                            <button type="submit" title="Entfernen"
-                                                                    class="text-gray-400 hover:text-red-600"><x-module-icon name="trash" class="text-sm" /></button>
-                                                        </form>
+                                                        @if ($m->orders_count > 0)
+                                                            <span title="Bereits bestellt – nicht mehr entfernbar" class="text-gray-300">🔒</span>
+                                                        @else
+                                                            <form method="POST" action="{{ route('module.schulkantine.menus.destroy', $m) }}"
+                                                                  onsubmit="return confirm('Gericht entfernen?')">
+                                                                @csrf @method('DELETE')
+                                                                <button type="submit" title="Entfernen"
+                                                                        class="text-gray-400 hover:text-red-600"><x-module-icon name="trash" class="text-sm" /></button>
+                                                            </form>
+                                                        @endif
                                                     </div>
                                                 @endforeach
                                             </div>

@@ -7,7 +7,10 @@ use Intranet\Modules\Schulkantine\Http\Controllers\DashboardController;
 use Intranet\Modules\Schulkantine\Http\Controllers\DishController;
 use Intranet\Modules\Schulkantine\Http\Controllers\EaterController;
 use Intranet\Modules\Schulkantine\Http\Controllers\MenuController;
+use Intranet\Modules\Schulkantine\Http\Controllers\OrderController;
 use Intranet\Modules\Schulkantine\Http\Controllers\SeasonController;
+use Intranet\Modules\Schulkantine\Http\Controllers\SettingController;
+use Intranet\Modules\Schulkantine\Http\Controllers\SonderkostController;
 
 /*
  | Routen des Schulkantine-Moduls.
@@ -65,7 +68,20 @@ Route::middleware(['web', 'auth'])
         // Speiseplan (Menü je Öffnungstag & Bestellmodus)
         Route::get('speiseplan', [MenuController::class, 'index'])->name('menus.index');
         Route::post('speiseplan', [MenuController::class, 'store'])->name('menus.store');
+        Route::post('speiseplan/freigabe', [MenuController::class, 'releaseWeek'])->name('menus.release');
         Route::delete('speiseplan/{menu}', [MenuController::class, 'destroy'])->name('menus.destroy');
+
+        // Vorbestellung (für jeden eingeloggten Nutzer – sich selbst & seine Kinder)
+        Route::get('bestellen', [OrderController::class, 'index'])->name('orders.index');
+        Route::post('bestellen', [OrderController::class, 'store'])->name('orders.store');
+
+        // Eigene Sonderkost (Selbstbedienung: ich + meine Kinder) – jeder Nutzer
+        Route::get('meine-sonderkost', [SonderkostController::class, 'index'])->name('sonderkost.index');
+        Route::put('meine-sonderkost/{user}', [SonderkostController::class, 'update'])->name('sonderkost.update');
+
+        // Einstellungen (Fristen-Zeiten, Freigabe-Vorlauf) – nur Admin
+        Route::get('einstellungen', [SettingController::class, 'edit'])->name('settings.edit');
+        Route::put('einstellungen', [SettingController::class, 'update'])->name('settings.update');
 
         // Teilnehmer (= Benutzer). Angelegt werden Benutzer über den Benutzer-Import;
         // hier pflegt man nur die Kantinen-Zusatzdaten (Gruppe je Saison, Sonderkost).

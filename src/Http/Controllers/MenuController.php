@@ -6,7 +6,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Intranet\Modules\Schulkantine\Models\Dish;
 use Intranet\Modules\Schulkantine\Models\Menu;
+use Intranet\Modules\Schulkantine\Models\Order;
 use Intranet\Modules\Schulkantine\Models\Season;
+use Intranet\Modules\Schulkantine\Models\WeekRelease;
+use Intranet\Modules\Schulkantine\Support\ReleaseService;
 
 /**
  * Speiseplan-Verwaltung als Wochen-Raster. Es gibt EIN Tagesangebot je
@@ -75,9 +78,12 @@ class MenuController
         }
 
         // Tagesangebot der Woche -> $plan[dateStr] = [Menu, …]
+        // withCount('orders') für den Löschschutz: ein Gericht mit ≥1 Bestellung
+        // ist nicht mehr entfernbar (nur noch Hinzufügen bleibt erlaubt).
         $menus = Menu::where('season_id', $season->id)
             ->whereBetween('date', [$weekStart->toDateString(), $weekEnd->toDateString()])
             ->with('dish.category')
+            ->withCount('orders')
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
@@ -86,6 +92,9 @@ class MenuController
         foreach ($menus as $m) {
             $plan[$m->date->toDateString()][] = $m;
         }
+
+        // Wochen-Freigabe (hybrid): effektiver Zustand + evtl. manueller Override.
+        $release = new ReleaseService;
 
         return view('schulkantine::menus.index', [
             'season' => $season,
@@ -98,6 +107,9 @@ class MenuController
             'nextWeek' => $weekStart->copy()->addWeek()->toDateString(),
             'canPrev' => $weekStart->copy()->subWeek()->endOfWeek(Carbon::SUNDAY)->gte($season->start_date),
             'canNext' => $weekStart->copy()->addWeek()->lte($season->end_date),
+            'weekReleased' => $release->isWeekReleased($season, $weekStart),
+            'weekOverride' => $release->override($season, $weekStart),
+            'weekHasOrders' => $this->weekHasOrders($season, $weekStart),
         ]);
     }
 
@@ -134,10 +146,55 @@ class MenuController
     {
         $this->authorizeAdmin($request);
 
+        // Löschschutz: sobald auf dieses Angebot bestellt wurde, ist es nicht mehr
+        // entfernbar (Hinzufügen bleibt immer erlaubt). Schützt bestehende
+        // Bestellungen/Abrechnungen vor dem Verschwinden.
+        if ($menu->orders()->exists()) {
+            return $this->redirectToWeek($menu->date)
+                ->withErrors(['menu' => 'Dieses Gericht kann nicht entfernt werden – es liegen bereits Bestellungen dafür vor.']);
+        }
+
         $date = $menu->date->copy();
         $menu->delete();
 
         return $this->redirectToWeek($date)->with('status', 'Gericht aus dem Speiseplan entfernt.');
+    }
+
+    /**
+     * Manuelle Wochen-Freigabe (hybrid): früher freigeben, zurückhalten oder
+     * zur Automatik zurückkehren. Granularität = ganze Woche.
+     */
+    public function releaseWeek(Request $request)
+    {
+        $this->authorizeAdmin($request);
+
+        $data = $request->validate([
+            'week' => ['required', 'date'],
+            'action' => ['required', 'in:release,hold,auto'],
+        ]);
+
+        $season = Season::where('is_active', true)->firstOrFail();
+        $week = Carbon::parse($data['week']);
+        $release = new ReleaseService;
+
+        // Sperren nur erlauben, solange es für die Woche noch keine Bestellungen
+        // gibt. „Sperren" = zurückhalten, oder zurück auf Automatik, wenn diese
+        // die Woche sperren würde. (Analog zum Löschschutz beim Speiseplan.)
+        $wouldLock = $data['action'] === 'hold'
+            || ($data['action'] === 'auto' && ! $release->isAutoReleased($release->weekStart($week), Carbon::now()));
+
+        if ($wouldLock && $this->weekHasOrders($season, $week)) {
+            return $this->redirectToWeek($week)
+                ->withErrors(['release' => 'Diese Woche kann nicht mehr gesperrt werden – es liegen bereits Bestellungen vor.']);
+        }
+
+        $message = match ($data['action']) {
+            'release' => tap('Woche wurde freigegeben.', fn () => $release->setOverride($season, $week, WeekRelease::STATE_RELEASED)),
+            'hold' => tap('Woche wurde zurückgehalten (gesperrt).', fn () => $release->setOverride($season, $week, WeekRelease::STATE_HELD)),
+            'auto' => tap('Woche folgt wieder der automatischen Freigabe.', fn () => $release->clearOverride($season, $week)),
+        };
+
+        return $this->redirectToWeek($week)->with('status', $message);
     }
 
     // ---------------------------------------------------------------- Helfer
@@ -147,6 +204,17 @@ class MenuController
         return redirect()->route('module.schulkantine.menus.index', [
             'week' => $date->copy()->startOfWeek(Carbon::MONDAY)->toDateString(),
         ]);
+    }
+
+    /** Gibt es für die Woche von $anyDayInWeek (irgend)eine Bestellung? */
+    private function weekHasOrders(Season $season, Carbon $anyDayInWeek): bool
+    {
+        $weekStart = $anyDayInWeek->copy()->startOfWeek(Carbon::MONDAY);
+        $weekEnd = $weekStart->copy()->addDays(6);
+
+        return Order::where('season_id', $season->id)
+            ->whereBetween('date', [$weekStart->toDateString(), $weekEnd->toDateString()])
+            ->exists();
     }
 
     private function authorizeAdmin(Request $request): void

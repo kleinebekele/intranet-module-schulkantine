@@ -10,8 +10,8 @@
         <div class="rounded-xl border border-gray-200 bg-white p-6">
             <h2 class="text-lg font-semibold text-gray-800">Willkommen in der Schulkantine 🍽️</h2>
             <p class="mt-2 text-gray-600">
-                <strong>Stammdaten</strong> und <strong>Speiseplan</strong> stehen. Als Nächstes kommt die
-                <strong>Vorbestellung</strong> – hier siehst du den Fahrplan.
+                <strong>Stammdaten</strong>, <strong>Speiseplan</strong> und <strong>Vorbestellung</strong> stehen.
+                Als Nächstes kommt die <strong>Ausgabe &amp; Betrieb</strong> – hier siehst du den Fahrplan.
             </p>
         </div>
 
@@ -19,8 +19,8 @@
             $phasen = [
                 ['nr' => 1, 'titel' => 'Stammdaten', 'text' => 'Saison &amp; Kalender, Gruppen, Kategorien, Gerichte, Allergene, Teilnehmer', 'status' => 'Erledigt'],
                 ['nr' => 2, 'titel' => 'Speiseplan', 'text' => 'Tagesangebot je Öffnungstag im Wochen-Raster (Kategorie-Farben, Schließtage)', 'status' => 'Erledigt'],
-                ['nr' => 3, 'titel' => 'Vorbestellung', 'text' => 'Bestellen &amp; stornieren, Fristen, Wochen-Freigabe, OGS-Abo', 'status' => 'Als Nächstes'],
-                ['nr' => 4, 'titel' => 'Ausgabe &amp; Betrieb', 'text' => 'Ausgabelisten, Abhaken, spontane Abholung', 'status' => 'Geplant'],
+                ['nr' => 3, 'titel' => 'Vorbestellung', 'text' => 'Bestellen &amp; stornieren, Fristen, Wochen-Freigabe, OGS-Abo', 'status' => 'Erledigt'],
+                ['nr' => 4, 'titel' => 'Ausgabe &amp; Betrieb', 'text' => 'Ausgabelisten, Abhaken, spontane Abholung', 'status' => 'Als Nächstes'],
                 ['nr' => 5, 'titel' => 'Auswertung', 'text' => 'Mengen und Export für die Abrechnung', 'status' => 'Geplant'],
                 ['nr' => 6, 'titel' => 'Feedback', 'text' => 'Daumen-Bewertung (anonym ausgewertet)', 'status' => 'Optional'],
             ];

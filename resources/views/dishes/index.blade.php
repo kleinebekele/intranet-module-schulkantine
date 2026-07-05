@@ -77,7 +77,7 @@
                                 <th class="px-3 py-2 text-right">Preis</th>
                                 <th class="px-3 py-2">Allergene</th>
                                 <th class="px-3 py-2">Zusatzstoffe</th>
-                                <th class="px-3 py-2">Diäten</th>
+                                <th class="px-3 py-2">Nicht für</th>
                                 <th class="px-3 py-2">Status</th>
                                 <th class="px-3 py-2 text-right">Aktion</th>
                             </tr>
@@ -107,7 +107,7 @@
                                         $badgeSets = [
                                             ['items' => $dish->allergens->map(fn ($a) => $a->code.' '.$a->name), 'class' => 'bg-rose-50 text-rose-700'],
                                             ['items' => $dish->additives->map(fn ($a) => $a->code.' '.$a->name), 'class' => 'bg-amber-50 text-amber-700'],
-                                            ['items' => $dish->diets->pluck('name'), 'class' => 'bg-green-50 text-green-700'],
+                                            ['items' => $dish->unsuitableDiets->pluck('name'), 'class' => 'bg-red-50 text-red-700'],
                                         ];
                                     @endphp
                                     @foreach ($badgeSets as $set)

@@ -8,7 +8,7 @@
     @php
         $selAllergens = old('allergens', $dish->exists ? $dish->allergens->pluck('id')->all() : []);
         $selAdditives = old('additives', $dish->exists ? $dish->additives->pluck('id')->all() : []);
-        $selDiets = old('diets', $dish->exists ? $dish->diets->pluck('id')->all() : []);
+        $selDiets = old('diets', $dish->exists ? $dish->unsuitableDiets->pluck('id')->all() : []);
     @endphp
 
     <div class="max-w-2xl space-y-6">
@@ -102,14 +102,18 @@
                 </div>
             </div>
 
-            {{-- Diäten --}}
+            {{-- Diäten: NICHT geeignet für (nur Ausnahmen ankreuzen) --}}
             <div>
-                <x-input-label value="Geeignet für (Diäten)" />
+                <x-input-label value="NICHT geeignet für (Diäten)" />
+                <p class="mt-0.5 text-xs text-gray-400">
+                    Standard: für alles geeignet. Nur ankreuzen, wofür das Gericht <strong>nicht</strong> geeignet ist
+                    (z. B. ein Fleischgericht → „vegetarisch" &amp; „vegan"). Esser mit dieser Diät bekommen dann eine Warnung.
+                </p>
                 <div class="mt-2 flex flex-wrap gap-x-4 gap-y-2">
                     @foreach ($diets as $diet)
                         <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                             <input type="checkbox" name="diets[]" value="{{ $diet->id }}" @checked(in_array($diet->id, $selDiets))
-                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                   class="rounded border-gray-300 text-red-600 focus:ring-red-500">
                             {{ $diet->name }}
                         </label>
                     @endforeach
