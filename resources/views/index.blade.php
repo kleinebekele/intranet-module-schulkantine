@@ -11,7 +11,7 @@
             <h2 class="text-lg font-semibold text-gray-800">Willkommen in der Schulkantine 🍽️</h2>
             <p class="mt-2 text-gray-600">
                 <strong>Stammdaten</strong>, <strong>Speiseplan</strong> und <strong>Vorbestellung</strong> stehen.
-                Als Nächstes kommt die <strong>Ausgabe &amp; Betrieb</strong> – hier siehst du den Fahrplan.
+                Gerade sind wir an der <strong>Ausgabe &amp; Betrieb</strong> dran – hier siehst du den Fahrplan.
             </p>
         </div>
 
@@ -20,14 +20,14 @@
                 ['nr' => 1, 'titel' => 'Stammdaten', 'text' => 'Saison &amp; Kalender, Gruppen, Kategorien, Gerichte, Allergene, Teilnehmer', 'status' => 'Erledigt'],
                 ['nr' => 2, 'titel' => 'Speiseplan', 'text' => 'Tagesangebot je Öffnungstag im Wochen-Raster (Kategorie-Farben, Schließtage)', 'status' => 'Erledigt'],
                 ['nr' => 3, 'titel' => 'Vorbestellung', 'text' => 'Bestellen &amp; stornieren, Fristen, Wochen-Freigabe, OGS-Abo', 'status' => 'Erledigt'],
-                ['nr' => 4, 'titel' => 'Ausgabe &amp; Betrieb', 'text' => 'Ausgabelisten, Abhaken, spontane Abholung', 'status' => 'Als Nächstes'],
+                ['nr' => 4, 'titel' => 'Ausgabe &amp; Betrieb', 'text' => 'Ausgabelisten, Abhaken, spontane Abholung', 'status' => 'Wir sind dran'],
                 ['nr' => 5, 'titel' => 'Auswertung', 'text' => 'Mengen und Export für die Abrechnung', 'status' => 'Geplant'],
                 ['nr' => 6, 'titel' => 'Feedback', 'text' => 'Daumen-Bewertung (anonym ausgewertet)', 'status' => 'Optional'],
             ];
 
             $styles = [
-                'Erledigt'     => ['badge' => 'bg-green-50 text-green-700', 'circle' => 'bg-green-100 text-green-700', 'card' => 'border-green-200'],
-                'Als Nächstes' => ['badge' => 'bg-amber-100 text-amber-800', 'circle' => 'bg-amber-100 text-amber-800', 'card' => 'border-amber-300 ring-1 ring-amber-200'],
+                'Erledigt'      => ['badge' => 'bg-green-50 text-green-700', 'circle' => 'bg-green-100 text-green-700', 'card' => 'border-green-200'],
+                'Wir sind dran' => ['badge' => 'bg-indigo-100 text-indigo-800', 'circle' => 'bg-indigo-100 text-indigo-800', 'card' => 'border-indigo-300 ring-1 ring-indigo-200'],
                 'Geplant'      => ['badge' => 'bg-gray-100 text-gray-500', 'circle' => 'bg-gray-100 text-gray-400', 'card' => 'border-gray-200'],
                 'Optional'     => ['badge' => 'bg-gray-100 text-gray-500', 'circle' => 'bg-gray-100 text-gray-400', 'card' => 'border-gray-200 border-dashed'],
             ];

@@ -90,7 +90,7 @@
                                     @endif
                                     <span class="text-xs text-gray-400">{{ $e['group']?->name ?? 'keine Gruppe' }}</span>
                                     @if ($hasSonderkost)
-                                        <span class="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600" title="Es ist Sonderkost hinterlegt">⚠️ Sonderkost</span>
+                                        <span class="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600" title="Es sind Verträglichkeiten hinterlegt">⚠️ Verträglichkeiten</span>
                                     @endif
                                     @if ($isOgs)
                                         <form method="POST" action="{{ route('module.schulkantine.orders.subscription') }}" class="inline-flex items-center gap-2">
@@ -117,54 +117,6 @@
                             @if (! $e['group'])
                                 <div class="px-4 py-4 text-sm text-gray-400">Für diese Person ist keine Kundengruppe hinterlegt.</div>
                             @else
-                                {{-- Wochenbudget (nur Schüler): Anzeige + Eltern-Setzformulare --}}
-                                @if (isset($budgets[$eater->id]))
-                                    @php $b = $budgets[$eater->id]; $isParent = $eater->id !== auth()->id(); @endphp
-                                    <div class="border-b border-gray-100 bg-indigo-50/40 px-4 py-2">
-                                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                                            <span class="font-medium text-gray-700">💶 Wochenbudget:</span>
-                                            @if ($b['effective'] !== null)
-                                                <span class="font-semibold text-indigo-700">{{ $money($b['effective']) }}</span>
-                                                @if ($b['special'] !== null)
-                                                    <span class="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">nur diese Woche</span>
-                                                @endif
-                                                <span class="text-gray-300">·</span>
-                                                <span class="text-gray-500">genutzt {{ $money($b['spent']) }}</span>
-                                                <span class="text-gray-300">·</span>
-                                                <span class="font-medium {{ $b['remaining'] < 0 ? 'text-red-600' : 'text-green-700' }}">frei {{ $money($b['remaining']) }}</span>
-                                            @else
-                                                <span class="text-gray-400">kein Limit gesetzt</span>
-                                            @endif
-                                        </div>
-                                        @if ($isParent)
-                                            <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-2">
-                                                <form method="POST" action="{{ route('module.schulkantine.orders.budget') }}" class="inline-flex items-center gap-1">
-                                                    @csrf
-                                                    <input type="hidden" name="eater_id" value="{{ $eater->id }}">
-                                                    <input type="hidden" name="scope" value="general">
-                                                    <span class="text-[11px] text-gray-500">allgemein</span>
-                                                    <input type="number" step="0.01" min="0" name="amount" value="{{ $b['general'] }}" placeholder="—"
-                                                           class="w-16 rounded-md border-gray-300 px-1.5 py-0.5 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                                    <span class="text-[11px] text-gray-400">€</span>
-                                                    <button type="submit" class="rounded-md bg-indigo-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-indigo-700">ok</button>
-                                                </form>
-                                                <form method="POST" action="{{ route('module.schulkantine.orders.budget') }}" class="inline-flex items-center gap-1">
-                                                    @csrf
-                                                    <input type="hidden" name="eater_id" value="{{ $eater->id }}">
-                                                    <input type="hidden" name="scope" value="week">
-                                                    <input type="hidden" name="week" value="{{ $weekStart->toDateString() }}">
-                                                    <span class="text-[11px] text-gray-500">nur KW {{ $weekStart->isoWeek() }}</span>
-                                                    <input type="number" step="0.01" min="0" name="amount" value="{{ $b['special'] }}" placeholder="—"
-                                                           class="w-16 rounded-md border-gray-300 px-1.5 py-0.5 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                                    <span class="text-[11px] text-gray-400">€</span>
-                                                    <button type="submit" class="rounded-md bg-indigo-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-indigo-700">ok</button>
-                                                </form>
-                                                <span class="text-[10px] text-gray-400">leer lassen = kein Limit</span>
-                                            </div>
-                                        @endif
-                                    </div>
-                                @endif
-
                                 {{-- Handy: Tage gestapelt (volle Breite) · ab lg: Spalten mit horizontalem Scroll.
                                      Grauer Canvas + Schatten je Karte, damit die Tage klar getrennt sind. --}}
                                 <div class="flex flex-col gap-4 bg-gray-50 p-3 sm:p-4 lg:flex-row lg:gap-3 lg:overflow-x-auto">
@@ -244,8 +196,10 @@
                                                 @else
                                                     {{-- Menü-Modus: pro Kategorie auswählbare Gericht-Karten --}}
                                                     @foreach ($items->groupBy(fn ($m) => $m->dish->category?->name ?? 'Ohne Kategorie') as $catName => $catItems)
+                                                        @php $catId = $catItems->first()->dish->category_id; @endphp
+                                                        {{-- Kategorien, die Eltern für dieses Kind gesperrt haben, ausblenden. --}}
+                                                        @continue(in_array($catId, $e['blockedCats'] ?? []))
                                                         @php
-                                                            $catId = $catItems->first()->dish->category_id;
                                                             $catColor = $catItems->first()->dish->category?->color;
                                                             $cur = $selected[$eater->id][$dateStr][$catId] ?? '';
                                                         @endphp

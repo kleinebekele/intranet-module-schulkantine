@@ -37,15 +37,16 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
     public function manifest(): ModuleManifest
     {
         return ModuleManifest::make('schulkantine', 'Schulkantine', icon: 'restaurant')
-            ->item('index', 'Übersicht', 'module.schulkantine.index')
-            ->item('orders', 'Essen bestellen', 'module.schulkantine.orders.index')
-            ->item('sonderkost', 'Meine Sonderkost', 'module.schulkantine.sonderkost.index')
-            ->item('seasons', 'Saisons & Kalender', 'module.schulkantine.seasons.index')
-            ->item('customer-groups', 'Kundengruppen', 'module.schulkantine.customer-groups.index')
-            ->item('categories', 'Kategorien', 'module.schulkantine.categories.index')
-            ->item('dishes', 'Gerichte', 'module.schulkantine.dishes.index')
-            ->item('menus', 'Speiseplan', 'module.schulkantine.menus.index')
-            ->item('eaters', 'Teilnehmer', 'module.schulkantine.eaters.index')
-            ->item('settings', 'Einstellungen', 'module.schulkantine.settings.edit');
+            ->item('index', 'Übersicht', 'module.schulkantine.index', icon: 'grid')
+            ->item('orders', 'Essen bestellen', 'module.schulkantine.orders.index', icon: 'cart')
+            ->item('sonderkost', 'Meine Daten', 'module.schulkantine.sonderkost.index', icon: 'diet')
+            ->item('servings', 'Ausgabe', 'module.schulkantine.servings.index', icon: 'serving')
+            ->item('ogs-list', 'OGS-Sammelliste', 'module.schulkantine.servings.ogs', icon: 'list')
+            ->item('seasons', 'Saisons & Kalender', 'module.schulkantine.seasons.index', icon: 'calendar')
+            ->item('customer-groups', 'Kundengruppen', 'module.schulkantine.customer-groups.index', icon: 'users')
+            ->item('categories', 'Kategorien', 'module.schulkantine.categories.index', icon: 'category')
+            ->item('dishes', 'Gerichte', 'module.schulkantine.dishes.index', icon: 'dish')
+            ->item('menus', 'Speiseplan', 'module.schulkantine.menus.index', icon: 'menu-card')
+            ->item('eaters', 'Teilnehmer', 'module.schulkantine.eaters.index', icon: 'user');
     }
 }

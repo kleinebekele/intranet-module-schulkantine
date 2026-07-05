@@ -31,4 +31,15 @@ class Budget extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    /**
+     * Das allgemeine Wochenbudget (für Spontankäufe) eines Kindes – oder null,
+     * wenn keins gesetzt ist (= kein Limit).
+     */
+    public static function weeklyAmount(int $userId): ?float
+    {
+        $amount = static::where('user_id', $userId)->whereNull('week_start')->value('amount');
+
+        return $amount !== null ? (float) $amount : null;
+    }
 }

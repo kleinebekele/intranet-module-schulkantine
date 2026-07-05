@@ -82,6 +82,47 @@
                 Diese Saison ist aktiv (es kann nur eine aktiv sein)
             </label>
 
+            @if ($season->exists && isset($settings))
+                {{-- Globale Bestell-Einstellungen. Gelten übergreifend (nicht je Saison),
+                     werden aber hier gepflegt, damit es kein eigenes Einstellungen-Menü braucht. --}}
+                <div class="border-t border-gray-100 pt-5">
+                    <h2 class="text-sm font-semibold text-gray-700">Bestell-Fristen &amp; Freigabe</h2>
+                    <p class="mt-0.5 text-xs text-gray-400">
+                        Diese Werte gelten <strong>übergreifend</strong> für die gesamte Kantine, nicht nur für diese Saison.
+                        Beide Fristen werden gegen den Öffnungskalender gerechnet (geschlossene Tage werden übersprungen).
+                    </p>
+
+                    <div class="mt-3 grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <x-input-label for="order_deadline_time" value="Bestellschluss (voriger Öffnungstag)" />
+                            <x-text-input id="order_deadline_time" name="order_deadline_time" type="time" class="mt-1 block"
+                                          :value="old('order_deadline_time', $settings->order_deadline_time)" required />
+                            <p class="mt-1 text-xs text-gray-400">Bis wann am Vortag (Öffnungstag) bestellt/geändert werden darf. Standard 14:00.</p>
+                            <x-input-error :messages="$errors->get('order_deadline_time')" class="mt-2" />
+                        </div>
+
+                        <div>
+                            <x-input-label for="cancel_deadline_time" value="Abbestellen (am selben Tag)" />
+                            <x-text-input id="cancel_deadline_time" name="cancel_deadline_time" type="time" class="mt-1 block"
+                                          :value="old('cancel_deadline_time', $settings->cancel_deadline_time)" required />
+                            <p class="mt-1 text-xs text-gray-400">Bis wann am Essenstag noch abbestellt werden darf (z. B. Kind krank). Standard 09:00.</p>
+                            <x-input-error :messages="$errors->get('cancel_deadline_time')" class="mt-2" />
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <x-input-label for="release_lead_weeks" value="Automatischer Freigabe-Vorlauf (Wochen)" />
+                        <x-text-input id="release_lead_weeks" name="release_lead_weeks" type="number" min="0" max="52" class="mt-1 block w-32"
+                                      :value="old('release_lead_weeks', $settings->release_lead_weeks)" required />
+                        <p class="mt-1 text-xs text-gray-400">
+                            Wie viele Wochen im Voraus automatisch zum Bestellen freigegeben werden. Einzelne Wochen lassen sich
+                            im Speiseplan manuell früher freigeben oder zurückhalten.
+                        </p>
+                        <x-input-error :messages="$errors->get('release_lead_weeks')" class="mt-2" />
+                    </div>
+                </div>
+            @endif
+
             <div class="flex items-center gap-3 pt-2">
                 <x-primary-button class="gap-1.5">
                     <x-module-icon name="{{ $season->exists ? 'save' : 'plus' }}" class="text-base" />

@@ -38,29 +38,15 @@
             <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ session('error') }}</div>
         @endif
 
-        {{-- Eckdaten + Ferien-Import --}}
+        {{-- Eckdaten der Saison --}}
         <div class="rounded-xl border border-gray-200 bg-white p-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="space-y-1 text-sm text-gray-600">
-                    <p><span class="text-gray-400">Zeitraum:</span> {{ $season->start_date->format('d.m.Y') }} &ndash; {{ $season->end_date->format('d.m.Y') }}</p>
-                    <p><span class="text-gray-400">Bundesland:</span> {{ $bundeslandName ?: '—' }}</p>
-                    <p><span class="text-gray-400">Öffnungstage:</span> {{ $offen }}</p>
-                    <p><span class="text-gray-400">OGS-Essen (Fixpreis):</span>
-                        {{ $season->ogs_price !== null ? number_format((float) $season->ogs_price, 2, ',', '.').' €' : '— (noch nicht festgelegt)' }}
-                    </p>
-                </div>
-                <form method="POST" action="{{ route('module.schulkantine.seasons.import', $season) }}">
-                    @csrf
-                    <button type="submit"
-                            class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                            @disabled(! $season->bundesland)>
-                        <x-module-icon name="download" class="text-base" />
-                        Ferien &amp; Feiertage importieren
-                    </button>
-                    @unless ($season->bundesland)
-                        <p class="mt-1 text-xs text-gray-400">Zuerst ein Bundesland hinterlegen.</p>
-                    @endunless
-                </form>
+            <div class="space-y-1 text-sm text-gray-600">
+                <p><span class="text-gray-400">Zeitraum:</span> {{ $season->start_date->format('d.m.Y') }} &ndash; {{ $season->end_date->format('d.m.Y') }}</p>
+                <p><span class="text-gray-400">Bundesland:</span> {{ $bundeslandName ?: '—' }}</p>
+                <p><span class="text-gray-400">Öffnungstage:</span> {{ $offen }}</p>
+                <p><span class="text-gray-400">OGS-Essen (Fixpreis):</span>
+                    {{ $season->ogs_price !== null ? number_format((float) $season->ogs_price, 2, ',', '.').' €' : '— (noch nicht festgelegt)' }}
+                </p>
             </div>
         </div>
 
@@ -106,9 +92,24 @@
             <x-input-error :messages="$errors->get('date_to')" class="mt-2" />
         </div>
 
-        {{-- Tabelle der Schließtage --}}
+        {{-- Tabelle der Schließtage (wird immer angezeigt – auch leer, damit der
+             Import-Button seinen festen Platz behält) --}}
         <div class="rounded-xl border border-gray-200 bg-white p-6">
-            <h2 class="text-base font-semibold text-gray-800">Schließtage ({{ $season->closedDays->count() }})</h2>
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <h2 class="text-base font-semibold text-gray-800">Schließtage ({{ $season->closedDays->count() }})</h2>
+                <form method="POST" action="{{ route('module.schulkantine.seasons.import', $season) }}" class="shrink-0">
+                    @csrf
+                    <button type="submit"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                            @disabled(! $season->bundesland)>
+                        <x-module-icon name="download" class="text-base" />
+                        Ferien &amp; Feiertage importieren
+                    </button>
+                    @unless ($season->bundesland)
+                        <p class="mt-1 text-right text-xs text-gray-400">Zuerst ein Bundesland hinterlegen.</p>
+                    @endunless
+                </form>
+            </div>
 
             @if ($season->closedDays->isEmpty())
                 <p class="mt-3 text-sm text-gray-500">Noch keine Schließtage. Importiere Ferien &amp; Feiertage oder füge sie manuell hinzu.</p>

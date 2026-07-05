@@ -4,14 +4,17 @@ namespace Intranet\Modules\Schulkantine\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Intranet\Modules\Schulkantine\Models\Allergen;
 use Intranet\Modules\Schulkantine\Models\CustomerGroup;
 use Intranet\Modules\Schulkantine\Models\Diet;
+use Intranet\Modules\Schulkantine\Models\NfcChip;
 
 /**
  * Teilnehmer-Verwaltung. Jeder Teilnehmer IST ein Benutzer (angelegt über den
- * Benutzer-Import). Die Kundengruppe ergibt sich AUS DEN ROLLEN des Benutzers
- * (siehe CustomerGroup::forUser) – hier gepflegt wird nur die Sonderkost.
+ * Benutzer-Import). Die Kundengruppe ergibt sich AUS DEN ROLLEN des Benutzers.
+ * Hier gepflegt werden Sonderkost und – nur durch die Schule – die Schul-Chips
+ * (Ausgabe mit Pfand, Rückgabe).
  */
 class EaterController
 {
@@ -32,6 +35,7 @@ class EaterController
         return view('schulkantine::eaters.index', [
             'users' => $users,
             'groups' => CustomerGroup::all()->keyBy('role_id'), // einmal laden → kein N+1
+            'chips' => NfcChip::active()->whereIn('user_id', $users->pluck('id'))->get()->groupBy('user_id'),
             'search' => $search,
         ]);
     }
@@ -49,6 +53,8 @@ class EaterController
             'diets' => Diet::orderBy('name')->get(),
             'selAllergens' => $user->kantineAllergens->pluck('id')->all(),
             'selDiets' => $user->kantineDiets->pluck('id')->all(),
+            'chips' => NfcChip::active()->where('user_id', $user->id)->orderBy('source')->get(),
+            'isOgs' => CustomerGroup::forUser($user)?->ordering_mode === CustomerGroup::MODE_JA_NEIN,
         ]);
     }
 
@@ -68,7 +74,80 @@ class EaterController
 
         return redirect()
             ->route('module.schulkantine.eaters.index')
-            ->with('status', 'Sonderkost von „'.$user->name.'" wurde gespeichert.');
+            ->with('status', 'Verträglichkeiten von „'.$user->name.'" wurden gespeichert.');
+    }
+
+    // ------------------------------------------------------- Schul-Chips
+
+    /** Schul-Chip an einen Esser ausgeben (mit optionalem Pfand). */
+    public function issueChip(Request $request, User $user)
+    {
+        $this->authorizeAdmin($request);
+        $this->abortIfOgs($user);
+
+        $data = $request->validate([
+            'nfc_uid' => ['required', 'string', 'max:255'],
+            'nfc_deposit' => ['nullable', 'in:0,1'],
+        ]);
+
+        $uid = NfcChip::normalize($data['nfc_uid']);
+        if ($uid === '') {
+            return back()->withErrors(['nfc_uid' => 'Die Chip-Kennung ist leer oder ungültig.']);
+        }
+
+        $conflict = NfcChip::activeForUid($uid);
+        if ($conflict) {
+            $who = $conflict->user_id === $user->id ? 'diesem Esser' : ($conflict->user?->name ?? 'einem anderen Esser');
+
+            return back()->withErrors(['nfc_uid' => 'Dieser Chip ist bereits '.$who.' zugeordnet.']);
+        }
+
+        NfcChip::create([
+            'user_id' => $user->id,
+            'uid' => $uid,
+            'source' => NfcChip::SOURCE_SCHULE,
+            'deposit' => $request->boolean('nfc_deposit') ? NfcChip::SCHULE_DEPOSIT : 0.0,
+            'lent_at' => Carbon::today()->toDateString(),
+        ]);
+
+        return back()->with('status', 'Schul-Chip an „'.$user->name.'" ausgegeben.');
+    }
+
+    /** Schul-Chip zurücknehmen – nur die Schule. Erscheint als Pfand-Rückgabe. */
+    public function returnChip(Request $request, NfcChip $chip)
+    {
+        $this->authorizeAdmin($request);
+
+        abort_unless($chip->isSchool(), 422, 'Nur Schul-Chips können zurückgenommen werden.');
+        if ($chip->isReturned()) {
+            return back();
+        }
+
+        $chip->update(['returned_at' => Carbon::today()->toDateString()]);
+
+        return back()->with('status', 'Schul-Chip von „'.$chip->user?->name.'" zurückgenommen (Pfand-Rückgabe in der Abrechnung dieses Monats).');
+    }
+
+    /** Chip endgültig entfernen (Korrektur). */
+    public function removeChip(Request $request, NfcChip $chip)
+    {
+        $this->authorizeAdmin($request);
+
+        $name = $chip->user?->name;
+        $chip->delete();
+
+        return back()->with('status', 'Chip von „'.$name.'" entfernt.');
+    }
+
+    // ----------------------------------------------------------------- Helfer
+
+    private function abortIfOgs(User $user): void
+    {
+        abort_if(
+            CustomerGroup::forUser($user)?->ordering_mode === CustomerGroup::MODE_JA_NEIN,
+            422,
+            'OGS-Kinder bekommen keinen Chip.'
+        );
     }
 
     private function authorizeAdmin(Request $request): void

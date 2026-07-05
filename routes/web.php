@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Intranet\Modules\Schulkantine\Http\Controllers\CategoryController;
+use Intranet\Modules\Schulkantine\Http\Controllers\ChipController;
 use Intranet\Modules\Schulkantine\Http\Controllers\CustomerGroupController;
 use Intranet\Modules\Schulkantine\Http\Controllers\DashboardController;
 use Intranet\Modules\Schulkantine\Http\Controllers\DishController;
@@ -9,7 +10,7 @@ use Intranet\Modules\Schulkantine\Http\Controllers\EaterController;
 use Intranet\Modules\Schulkantine\Http\Controllers\MenuController;
 use Intranet\Modules\Schulkantine\Http\Controllers\OrderController;
 use Intranet\Modules\Schulkantine\Http\Controllers\SeasonController;
-use Intranet\Modules\Schulkantine\Http\Controllers\SettingController;
+use Intranet\Modules\Schulkantine\Http\Controllers\ServingController;
 use Intranet\Modules\Schulkantine\Http\Controllers\SonderkostController;
 
 /*
@@ -75,19 +76,42 @@ Route::middleware(['web', 'auth'])
         Route::get('bestellen', [OrderController::class, 'index'])->name('orders.index');
         Route::post('bestellen', [OrderController::class, 'store'])->name('orders.store');
         Route::post('bestellen/abo', [OrderController::class, 'subscription'])->name('orders.subscription');
-        Route::post('bestellen/budget', [OrderController::class, 'budget'])->name('orders.budget');
 
-        // Eigene Sonderkost (Selbstbedienung: ich + meine Kinder) – jeder Nutzer
+        // Ausgabe & Betrieb (Phase 4) – Küchen-/Ausgabepersonal (Zugriff im Controller geprüft).
+        Route::get('ausgabe', [ServingController::class, 'index'])->name('servings.index');
+        Route::get('ausgabe/mengen', [ServingController::class, 'quantities'])->name('servings.quantities');
+        Route::get('ausgabe/mengen/pdf', [ServingController::class, 'mengenPdf'])->name('servings.mengen.pdf');
+        Route::get('ausgabe/no-shows', [ServingController::class, 'noShows'])->name('servings.noshows');
+        Route::post('ausgabe/abhaken', [ServingController::class, 'toggle'])->name('servings.toggle');
+        Route::post('ausgabe/lookup', [ServingController::class, 'lookup'])->name('servings.lookup');
+        Route::post('ausgabe/lookup-esser', [ServingController::class, 'lookupEater'])->name('servings.lookup-eater');
+        Route::post('ausgabe/ausgeben', [ServingController::class, 'serveConfirm'])->name('servings.confirm');
+        Route::post('ausgabe/spontan', [ServingController::class, 'spontaneous'])->name('servings.spontaneous');
+        Route::delete('ausgabe/{serving}', [ServingController::class, 'destroy'])->name('servings.destroy');
+
+        // OGS-Sammelliste – OGS-Betreuer (Zugriff im Controller geprüft).
+        Route::get('ogs-sammelliste', [ServingController::class, 'ogsList'])->name('servings.ogs');
+
+        // „Meine Daten" (Selbstbedienung: ich + meine Kinder) – jeder Nutzer.
         Route::get('meine-sonderkost', [SonderkostController::class, 'index'])->name('sonderkost.index');
         Route::put('meine-sonderkost/{user}', [SonderkostController::class, 'update'])->name('sonderkost.update');
+        // Budget (Spontankäufe) + Kategorie-Freigaben eines Kindes – nur Eltern.
+        Route::post('meine-sonderkost/{user}/limits', [SonderkostController::class, 'saveLimits'])->name('sonderkost.limits');
 
-        // Einstellungen (Fristen-Zeiten, Freigabe-Vorlauf) – nur Admin
-        Route::get('einstellungen', [SettingController::class, 'edit'])->name('settings.edit');
-        Route::put('einstellungen', [SettingController::class, 'update'])->name('settings.update');
+        // Eigene NFC-Chips (Selbstbedienung: ich + meine Kinder) – jeder Nutzer.
+        // Die Anzeige ist in „Meine Daten" (sonderkost) integriert; hier nur die Aktionen.
+        // Registrieren erlaubt beliebig viele EIGENE Chips; Schul-Chips sind readonly.
+        Route::post('meine-chips/{user}', [ChipController::class, 'register'])->name('chips.register');
+        Route::delete('meine-chips/chip/{chip}', [ChipController::class, 'remove'])->name('chips.remove');
 
         // Teilnehmer (= Benutzer). Angelegt werden Benutzer über den Benutzer-Import;
         // hier pflegt man nur die Kantinen-Zusatzdaten (Gruppe je Saison, Sonderkost).
         Route::get('teilnehmer', [EaterController::class, 'index'])->name('eaters.index');
         Route::get('teilnehmer/{user}/bearbeiten', [EaterController::class, 'edit'])->name('eaters.edit');
         Route::put('teilnehmer/{user}', [EaterController::class, 'update'])->name('eaters.update');
+
+        // Schul-Chips (nur Verwaltung): ausgeben (mit Pfand), zurücknehmen, entfernen.
+        Route::post('teilnehmer/{user}/chip', [EaterController::class, 'issueChip'])->name('eaters.chip.issue');
+        Route::post('teilnehmer/chip/{chip}/zurueck', [EaterController::class, 'returnChip'])->name('eaters.chip.return');
+        Route::delete('teilnehmer/chip/{chip}', [EaterController::class, 'removeChip'])->name('eaters.chip.remove');
     });

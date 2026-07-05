@@ -7,6 +7,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Intranet\Modules\Schulkantine\Models\ClosedDay;
 use Intranet\Modules\Schulkantine\Models\Season;
+use Intranet\Modules\Schulkantine\Models\Setting;
 use Intranet\Modules\Schulkantine\Support\Bundeslaender;
 use Intranet\Modules\Schulkantine\Support\HolidayImporter;
 
@@ -68,6 +69,7 @@ class SeasonController
         return view('schulkantine::seasons.form', [
             'season' => $season,
             'bundeslaender' => Bundeslaender::all(),
+            'settings' => Setting::current(),
         ]);
     }
 
@@ -77,6 +79,14 @@ class SeasonController
 
         $season->update($this->validated($request));
         $this->syncActiveFlag($season);
+
+        // Globale Kantinen-Einstellungen (Fristen, Freigabe-Vorlauf) werden auf der
+        // Saison-Bearbeiten-Seite mitgepflegt – sie gelten übergreifend, nicht je Saison.
+        Setting::current()->update($request->validate([
+            'order_deadline_time' => ['required', 'date_format:H:i'],
+            'cancel_deadline_time' => ['required', 'date_format:H:i'],
+            'release_lead_weeks' => ['required', 'integer', 'min:0', 'max:52'],
+        ]));
 
         return redirect()
             ->route('module.schulkantine.seasons.show', $season)

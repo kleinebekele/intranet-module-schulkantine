@@ -19,7 +19,7 @@
         <div class="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
             Teilnehmer sind Benutzer des Intranets. Die <strong>Gruppe ergibt sich aus der Rolle</strong>
             (Priorität OGS → Schüler → Sonstige) – sie wird über den Benutzer/Import gesteuert, nicht hier.
-            Hier pflegst du nur die <strong>Sonderkost</strong>.
+            Hier pflegst du nur die <strong>Verträglichkeiten</strong>.
         </div>
 
         {{-- Filterleiste --}}
@@ -64,7 +64,8 @@
                                 <th class="px-3 py-2">Name</th>
                                 <th class="px-3 py-2">E-Mail</th>
                                 <th class="px-3 py-2">Gruppe (aus Rolle)</th>
-                                <th class="px-3 py-2">Sonderkost</th>
+                                <th class="px-3 py-2">Verträglichkeiten</th>
+                                <th class="px-3 py-2 text-center">Chip</th>
                                 <th class="px-3 py-2 text-right">Aktion</th>
                             </tr>
                         </thead>
@@ -92,8 +93,24 @@
                                             <span class="text-gray-300">—</span>
                                         @endif
                                     </td>
+                                    <td class="px-3 py-2 text-center">
+                                        @php
+                                            $userChips = $chips->get($user->id) ?: collect();
+                                            $isOgs = $group && $group->ordering_mode === \Intranet\Modules\Schulkantine\Models\CustomerGroup::MODE_JA_NEIN;
+                                            $chipTip = $userChips->map(fn ($c) => ($c->isSchool()
+                                                    ? 'Schul-Chip'.($c->deposit > 0 ? ' (Pfand '.number_format((float) $c->deposit, 2, ',', '.').' €)' : '')
+                                                    : 'eigener Chip').' · '.$c->uid)->implode("\n");
+                                        @endphp
+                                        @if ($isOgs)
+                                            <span class="cursor-help text-gray-300" title="OGS-Kind – kein Chip nötig (Ausgabe über die Sammelliste)">–</span>
+                                        @elseif ($userChips->isNotEmpty())
+                                            <span class="cursor-help font-semibold text-green-600" title="{{ $chipTip }}">✓@if ($userChips->count() > 1)<span class="ml-0.5 text-xs font-normal text-gray-400">×{{ $userChips->count() }}</span>@endif</span>
+                                        @else
+                                            <span class="cursor-help font-semibold text-red-400" title="Kein Chip registriert">✗</span>
+                                        @endif
+                                    </td>
                                     <td class="px-3 py-2 text-right">
-                                        <a href="{{ route('module.schulkantine.eaters.edit', $user) }}" title="Sonderkost bearbeiten"
+                                        <a href="{{ route('module.schulkantine.eaters.edit', $user) }}" title="Verträglichkeiten bearbeiten"
                                            class="inline-flex items-center rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
                                             <x-module-icon name="edit" class="text-base" />
                                         </a>
