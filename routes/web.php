@@ -7,6 +7,7 @@ use Intranet\Modules\Schulkantine\Http\Controllers\CustomerGroupController;
 use Intranet\Modules\Schulkantine\Http\Controllers\DashboardController;
 use Intranet\Modules\Schulkantine\Http\Controllers\DishController;
 use Intranet\Modules\Schulkantine\Http\Controllers\EaterController;
+use Intranet\Modules\Schulkantine\Http\Controllers\GuideController;
 use Intranet\Modules\Schulkantine\Http\Controllers\MenuController;
 use Intranet\Modules\Schulkantine\Http\Controllers\OrderController;
 use Intranet\Modules\Schulkantine\Http\Controllers\RatingController;
@@ -30,6 +31,10 @@ Route::middleware(['web', 'auth'])
     ->name('module.schulkantine.')
     ->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('index');
+
+        // Admin-Anleitung: online lesen + als PDF laden (Zugriff nur Admin, im Controller geprüft).
+        Route::get('anleitung', [GuideController::class, 'index'])->name('guide.index');
+        Route::get('anleitung/pdf', [GuideController::class, 'pdf'])->name('guide.pdf');
 
         // Saison-Verwaltung (Schuljahr + Öffnungskalender). Zugriff nur für Admins (im Controller geprüft).
         Route::get('saisons', [SeasonController::class, 'index'])->name('seasons.index');

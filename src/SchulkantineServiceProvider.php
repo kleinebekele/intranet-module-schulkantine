@@ -55,6 +55,7 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
             ->item('categories', 'Kategorien', 'module.schulkantine.categories.index', icon: 'category')
             ->item('dishes', 'Gerichte', 'module.schulkantine.dishes.index', icon: 'dish')
             ->item('menus', 'Speiseplan', 'module.schulkantine.menus.index', icon: 'menu-card')
-            ->item('eaters', 'Teilnehmer', 'module.schulkantine.eaters.index', icon: 'user');
+            ->item('eaters', 'Teilnehmer', 'module.schulkantine.eaters.index', icon: 'user')
+            ->item('guide', 'Anleitung', 'module.schulkantine.guide.index', icon: 'book', adminsOnly: true);
     }
 }
