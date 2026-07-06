@@ -3,6 +3,8 @@
 namespace Intranet\Modules\Schulkantine\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Intranet\Modules\Schulkantine\Models\Additive;
 use Intranet\Modules\Schulkantine\Models\Allergen;
 use Intranet\Modules\Schulkantine\Models\Category;
@@ -74,12 +76,14 @@ class SeedDishes extends Command
         // 1) Kategorien sicherstellen (Match über Namen).
         $this->info('Lege Kategorien an …');
         $categoryIds = [];
+        $categoryColors = [];
         foreach (self::CATEGORIES as [$name, $walkin, $sort, $color]) {
             $category = Category::updateOrCreate(
                 ['name' => $name],
                 ['allows_walkin' => $walkin, 'sort_order' => $sort, 'color' => $color, 'is_active' => true],
             );
             $categoryIds[$name] = $category->id;
+            $categoryColors[$name] = $color;
         }
 
         // 2) Stammdaten-Lookups (Code/Name → ID). Diese Referenzlisten werden
@@ -91,6 +95,7 @@ class SeedDishes extends Command
         // 3) Gerichte + Verknüpfungen.
         $this->info('Lege Gerichte an …');
         $count = 0;
+        $photos = 0;
         foreach (self::DISHES as [$categoryName, $name, $price, $allergens, $additives, $diets]) {
             $dish = Dish::updateOrCreate(
                 ['name' => $name],
@@ -104,13 +109,106 @@ class SeedDishes extends Command
             $dish->allergens()->sync($allergenByCode->only($allergens)->values()->all());
             $dish->additives()->sync($additiveByCode->only($additives)->values()->all());
             $dish->unsuitableDiets()->sync($dietByName->only($diets)->values()->all());
+
+            // Platzhalter-Bild NUR erzeugen, wenn noch keins hinterlegt ist –
+            // so bleiben echte Fotos (z. B. in der Entwicklungsumgebung) erhalten.
+            if (empty($dish->photo_path)) {
+                $path = 'kantine/dishes/seed-'.Str::slug($name).'.svg';
+                Storage::disk('public')->put(
+                    $path,
+                    $this->placeholderSvg($name, $categoryName, $categoryColors[$categoryName] ?? '#64748b'),
+                );
+                $dish->forceFill(['photo_path' => $path])->save();
+                $photos++;
+            }
+
             $count++;
         }
 
         $this->newLine();
         $this->info('Fertig: '.count(self::CATEGORIES).' Kategorien und '.$count.' Gerichte.');
-        $this->line('<comment>Hinweis:</comment> Fotos sind nicht enthalten (Bilddateien, keine DB-Daten). Bei Bedarf im UI hochladen.');
+        $this->line("Platzhalter-Bilder erzeugt: {$photos} (vorhandene Fotos blieben unberührt).");
 
         return self::SUCCESS;
+    }
+
+    /** Eine schlichte, quadratische SVG-Platzhalterkarte in der Kategorie-Farbe. */
+    private function placeholderSvg(string $name, string $category, string $color): string
+    {
+        $top = $this->lighten($color, 0.45);
+        $catLabel = htmlspecialchars(mb_strtoupper($category), ENT_QUOTES);
+
+        // Namen in bis zu drei zentrierte Zeilen umbrechen (SVG kann nicht selbst).
+        $lines = $this->wrap($name, 15, 3);
+        $lineHeight = 34;
+        $startY = 322 - (count($lines) - 1) * $lineHeight;
+        $tspans = '';
+        foreach ($lines as $i => $line) {
+            $y = $startY + $i * $lineHeight;
+            $text = htmlspecialchars($line, ENT_QUOTES);
+            $tspans .= '<tspan x="200" y="'.$y.'">'.$text.'</tspan>';
+        }
+
+        return <<<SVG
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="{$top}"/>
+              <stop offset="1" stop-color="{$color}"/>
+            </linearGradient>
+            <linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#0f172a" stop-opacity="0"/>
+              <stop offset="1" stop-color="#0f172a" stop-opacity="0.55"/>
+            </linearGradient>
+          </defs>
+          <rect width="400" height="400" fill="url(#g)"/>
+          <circle cx="200" cy="150" r="82" fill="#ffffff" opacity="0.16"/>
+          <circle cx="200" cy="150" r="56" fill="#ffffff" opacity="0.12"/>
+          <rect y="200" width="400" height="200" fill="url(#scrim)"/>
+          <text x="200" y="66" text-anchor="middle" fill="#ffffff" opacity="0.85"
+                font-family="Arial, sans-serif" font-size="20" letter-spacing="3">{$catLabel}</text>
+          <text text-anchor="middle" fill="#ffffff"
+                font-family="Arial, sans-serif" font-size="28" font-weight="bold">{$tspans}</text>
+        </svg>
+        SVG;
+    }
+
+    /** Text in maximal $max Zeilen à ~$width Zeichen umbrechen (wortweise). */
+    private function wrap(string $text, int $width, int $max): array
+    {
+        $lines = [];
+        $current = '';
+        foreach (explode(' ', $text) as $word) {
+            $candidate = $current === '' ? $word : $current.' '.$word;
+            if (mb_strlen($candidate) > $width && $current !== '') {
+                $lines[] = $current;
+                $current = $word;
+            } else {
+                $current = $candidate;
+            }
+        }
+        if ($current !== '') {
+            $lines[] = $current;
+        }
+
+        if (count($lines) > $max) {
+            $lines = array_slice($lines, 0, $max);
+            $lines[$max - 1] .= '…';
+        }
+
+        return $lines;
+    }
+
+    /** Hex-Farbe Richtung Weiß aufhellen ($amount 0..1). */
+    private function lighten(string $hex, float $amount): string
+    {
+        $hex = ltrim($hex, '#');
+        if (strlen($hex) !== 6) {
+            return '#'.$hex;
+        }
+        $mix = fn (int $c) => (int) round($c + (255 - $c) * $amount);
+        [$r, $g, $b] = [hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2))];
+
+        return sprintf('#%02x%02x%02x', $mix($r), $mix($g), $mix($b));
     }
 }
