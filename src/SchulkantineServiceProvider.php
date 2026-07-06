@@ -32,6 +32,12 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
 
         User::resolveRelationUsing('kantineDiets', fn (User $user) => $user
             ->belongsToMany(Diet::class, 'kantine_user_diet', 'user_id', 'diet_id'));
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                \Intranet\Modules\Schulkantine\Console\Commands\SeedTestUsers::class,
+            ]);
+        }
     }
 
     public function manifest(): ModuleManifest
