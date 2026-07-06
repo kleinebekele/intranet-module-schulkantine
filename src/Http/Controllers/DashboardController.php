@@ -3,13 +3,14 @@
 namespace Intranet\Modules\Schulkantine\Http\Controllers;
 
 /**
- * Start-/Übersichtsseite des Moduls. Aktuell nur ein Willkommens-Dashboard,
- * das den Bau-Fahrplan zeigt – die einzelnen Bereiche kommen Phase für Phase.
+ * Landing-Route des Moduls. Die frühere Roadmap-Übersicht ist mit dem
+ * Abschluss aller Phasen entfallen – wir leiten direkt auf „Essen bestellen",
+ * die zentrale Aktion für Nutzer.
  */
 class DashboardController
 {
     public function index()
     {
-        return view('schulkantine::index');
+        return redirect()->route('module.schulkantine.orders.index');
     }
 }

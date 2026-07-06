@@ -9,6 +9,7 @@ use Intranet\Modules\Schulkantine\Models\Allergen;
 use Intranet\Modules\Schulkantine\Models\Category;
 use Intranet\Modules\Schulkantine\Models\Diet;
 use Intranet\Modules\Schulkantine\Models\Dish;
+use Intranet\Modules\Schulkantine\Models\MealRating;
 
 /**
  * Verwaltung des Gerichte-Katalogs inkl. Allergene/Zusatzstoffe/Diäten.
@@ -36,7 +37,17 @@ class DishController
 
         $categories = Category::orderBy('sort_order')->orderBy('name')->get();
 
-        return view('schulkantine::dishes.index', compact('dishes', 'categories', 'search', 'categoryFilter', 'statusFilter'));
+        // Bewertungen (Daumen) je Gericht – aggregiert, anonym.
+        $ratings = MealRating::query()
+            ->whereIn('dish_id', $dishes->pluck('id'))
+            ->get(['dish_id', 'rating'])
+            ->groupBy('dish_id')
+            ->map(fn ($group) => [
+                'up' => $group->where('rating', MealRating::UP)->count(),
+                'down' => $group->where('rating', MealRating::DOWN)->count(),
+            ]);
+
+        return view('schulkantine::dishes.index', compact('dishes', 'categories', 'search', 'categoryFilter', 'statusFilter', 'ratings'));
     }
 
     public function create(Request $request)

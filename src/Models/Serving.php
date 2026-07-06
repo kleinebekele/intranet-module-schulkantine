@@ -5,6 +5,7 @@ namespace Intranet\Modules\Schulkantine\Models;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Eine tatsächliche Essensausgabe. Siehe Migration für die zwei Ausprägungen
@@ -70,5 +71,11 @@ class Serving extends Model
     public function servedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'served_by');
+    }
+
+    /** Die Bewertung (Daumen) zu dieser Ausgabe – falls schon abgegeben. */
+    public function rating(): HasOne
+    {
+        return $this->hasOne(MealRating::class);
     }
 }

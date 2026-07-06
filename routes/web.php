@@ -9,6 +9,7 @@ use Intranet\Modules\Schulkantine\Http\Controllers\DishController;
 use Intranet\Modules\Schulkantine\Http\Controllers\EaterController;
 use Intranet\Modules\Schulkantine\Http\Controllers\MenuController;
 use Intranet\Modules\Schulkantine\Http\Controllers\OrderController;
+use Intranet\Modules\Schulkantine\Http\Controllers\RatingController;
 use Intranet\Modules\Schulkantine\Http\Controllers\ReportController;
 use Intranet\Modules\Schulkantine\Http\Controllers\SeasonController;
 use Intranet\Modules\Schulkantine\Http\Controllers\ServingController;
@@ -100,6 +101,14 @@ Route::middleware(['web', 'auth'])
         Route::get('auswertung/pdf', [ReportController::class, 'pdf'])->name('reports.pdf');
         Route::post('auswertung/{user}/bezahlt', [ReportController::class, 'markPaid'])->name('reports.paid');
         Route::delete('auswertung/{user}/bezahlt', [ReportController::class, 'unmarkPaid'])->name('reports.unpaid');
+
+        // Bewertung / Feedback (Phase 6).
+        // „Essen bewerten": jeder Nutzer bewertet sich + seine Kinder (Daumen, jederzeit änderbar).
+        Route::get('bewertung', [RatingController::class, 'index'])->name('ratings.index');
+        Route::post('bewertung/{serving}', [RatingController::class, 'rate'])->name('ratings.rate');
+        Route::delete('bewertung/{serving}', [RatingController::class, 'destroy'])->name('ratings.destroy');
+        // „Bewertungen" (aggregiert, anonym) – nur Küchen-/Ausgabepersonal (im Controller geprüft).
+        Route::get('bewertungen', [RatingController::class, 'report'])->name('ratings.report');
 
         // „Meine Daten" (Selbstbedienung: ich + meine Kinder) – jeder Nutzer.
         Route::get('meine-sonderkost', [SonderkostController::class, 'index'])->name('sonderkost.index');
