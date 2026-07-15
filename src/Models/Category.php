@@ -27,4 +27,19 @@ class Category extends Model
             'sort_order' => 'integer',
         ];
     }
+
+    /** Name der per Migration angelegten Sparmenü-Kategorie. */
+    public const BUNDLE_NAME = 'Sparmenü';
+
+    /**
+     * Die Kategorie, unter der Sparmenüs laufen – oder null, wenn es sie nicht gibt.
+     *
+     * Vorhandene Sparmenüs geben den Ton an: Die Kategorie darf umbenannt werden,
+     * ohne dass die Erkennung bricht. Erst wenn es noch keine gibt, zählt der Name.
+     */
+    public static function bundleId(): ?int
+    {
+        return Dish::whereHas('components')->value('category_id')
+            ?? static::where('name', self::BUNDLE_NAME)->value('id');
+    }
 }

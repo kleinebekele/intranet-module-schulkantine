@@ -149,6 +149,9 @@ class DishController
             'additives' => Additive::orderBy('id')->get(),
             'diets' => Diet::orderBy('name')->get(),
             'componentCandidates' => $candidates->groupBy(fn (Dish $d) => $d->category?->name ?? 'Ohne Kategorie'),
+            // Nur in dieser Kategorie blendet das Formular die Bestandteil-Auswahl
+            // ein (und die Verträglichkeiten aus – die erbt ein Sparmenü).
+            'bundleCategoryId' => Category::bundleId(),
             // Ein Gericht, das selbst schon Bestandteil ist, darf kein Sparmenü
             // werden – das ergäbe eine Verschachtelung.
             'canBeBundle' => ! $dish->exists || ! $dish->partOfBundles()->exists(),
@@ -207,9 +210,21 @@ class DishController
 
     private function syncRelations(Dish $dish, Request $request): void
     {
-        $dish->allergens()->sync($request->input('allergens', []));
-        $dish->additives()->sync($request->input('additives', []));
-        $dish->unsuitableDiets()->sync($request->input('diets', []));
+        // Ein Sparmenü hat KEINE eigenen Verträglichkeiten: Es erbt sie von seinen
+        // Bestandteilen (Dish::effectiveAllergens() & Co.). Das Formular blendet die
+        // Felder aus; hier wird es verbindlich, damit keine Altwerte unsichtbar
+        // hängen bleiben. Umgekehrt hat ein normales Gericht keine Bestandteile.
+        $isBundle = $this->isBundleCategory($dish->category_id);
+
+        $dish->allergens()->sync($isBundle ? [] : $request->input('allergens', []));
+        $dish->additives()->sync($isBundle ? [] : $request->input('additives', []));
+        $dish->unsuitableDiets()->sync($isBundle ? [] : $request->input('diets', []));
+
+        if (! $isBundle) {
+            $dish->components()->sync([]);
+
+            return;
+        }
 
         // Bestandteile in der Reihenfolge der Speisefolge ablegen (Kategorie-
         // Reihenfolge: Hauptmenü vor Nachspeise), damit ein Sparmenü sich überall
@@ -226,6 +241,12 @@ class DishController
         $dish->components()->sync($components);
     }
 
+    /** Gehört diese Kategorie zu den Sparmenüs? (siehe Category::bundleId()) */
+    private function isBundleCategory(?int $categoryId): bool
+    {
+        return $categoryId !== null && $categoryId === Category::bundleId();
+    }
+
     /**
      * Prüft die Bestandteile eines Sparmenüs. Bewusst hier und nicht per DB-Regel:
      * SQLite/MySQL können „Bestandteil darf selbst kein Bündel sein" nicht abbilden.
@@ -235,9 +256,26 @@ class DishController
     private function validateComponents(Request $request, ?Dish $dish): void
     {
         $ids = $this->componentIds($request);
+        $isBundle = $this->isBundleCategory($request->input('category_id') ? (int) $request->input('category_id') : null);
 
         if ($ids === []) {
+            // In der Sparmenü-Kategorie ohne Bestandteile: Das wäre ein „Sparmenü",
+            // das nichts enthält – überall als leeres Gericht zum Preis X sichtbar.
+            if ($isBundle) {
+                throw ValidationException::withMessages([
+                    'components' => 'Ein Sparmenü braucht Bestandteile – bitte mindestens zwei Gerichte ankreuzen.',
+                ]);
+            }
+
             return; // normales Gericht – nichts zu prüfen
+        }
+
+        // Bestandteile nur in der Sparmenü-Kategorie (das Formular blendet sie sonst
+        // aus; ohne diese Hürde könnte ein Direktaufruf sie trotzdem setzen).
+        if (! $isBundle) {
+            throw ValidationException::withMessages([
+                'components' => 'Bestandteile gibt es nur in der Kategorie „'.Category::BUNDLE_NAME.'".',
+            ]);
         }
 
         if (count($ids) < 2) {

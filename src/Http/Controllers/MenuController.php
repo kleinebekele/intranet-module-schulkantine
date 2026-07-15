@@ -219,17 +219,19 @@ class MenuController
     }
 
     /**
-     * Kategorie für neue Sparmenüs. Vorhandene Sparmenüs geben den Ton an (die
-     * Kategorie kann umbenannt worden sein); sonst die per Migration angelegte.
+     * Kategorie für neue Sparmenüs (siehe Category::bundleId()). Fehlt sie ganz –
+     * etwa weil jemand sie gelöscht hat –, wird sie hier wieder angelegt: Ohne
+     * Kategorie wäre die Bestellung nicht von einer OGS-Zeile zu unterscheiden.
      */
-    private function bundleCategoryId(): ?int
+    private function bundleCategoryId(): int
     {
-        $fromExisting = Dish::whereHas('components')->value('category_id');
-
-        return $fromExisting ?? Category::firstOrCreate(
-            ['name' => 'Sparmenü'],
-            ['allows_walkin' => false, 'sort_order' => (int) Category::max('sort_order') + 1, 'color' => '#0d9488', 'is_active' => true],
-        )->id;
+        return Category::bundleId() ?? Category::create([
+            'name' => Category::BUNDLE_NAME,
+            'allows_walkin' => false,
+            'sort_order' => (int) Category::max('sort_order') + 1,
+            'color' => '#0d9488',
+            'is_active' => true,
+        ])->id;
     }
 
     /**
