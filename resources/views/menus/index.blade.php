@@ -101,9 +101,13 @@
                     Für diese Saison sind keine Kantinen-Wochentage hinterlegt.
                 </div>
             @else
-                <div class="flex gap-3 overflow-x-auto pb-2">
+                {{-- Tage als umbrechendes Raster: jede Karte will mindestens 15rem, teilt sich die
+                     Breite gleichmäßig und rutscht in die nächste Zeile, wenn kein Platz mehr ist
+                     (kein horizontaler Scroll). Das min() verhindert Überlauf, wenn der Platz
+                     schmaler als die Mindestbreite ist – dann bleibt eine Spalte übrig. --}}
+                <div class="grid grid-cols-[repeat(auto-fit,minmax(min(15rem,100%),1fr))] gap-3 pb-2">
                     @foreach ($days as $d)
-                        <div class="flex min-w-[15rem] flex-1 flex-col overflow-hidden rounded-xl border {{ $d['open'] ? 'border-gray-200 bg-white' : 'border-amber-200 bg-amber-50/40' }}">
+                        <div class="flex w-full flex-col overflow-hidden rounded-xl border {{ $d['open'] ? 'border-gray-200 bg-white' : 'border-amber-200 bg-amber-50/40' }}">
                             {{-- Kopf --}}
                             <div class="border-b px-3 py-2 {{ $d['open'] ? 'border-gray-100 bg-gray-50' : 'border-amber-200 bg-amber-50' }}">
                                 <div class="text-sm font-semibold {{ $d['open'] ? 'text-gray-800' : 'text-amber-800' }}">{{ $d['date']->isoFormat('dddd') }}</div>
