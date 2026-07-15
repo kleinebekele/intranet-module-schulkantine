@@ -72,9 +72,11 @@
                         </form>
                     @endif
 
-                    {{-- Sperren nur, solange es noch keine Bestellungen für die Woche gibt. --}}
+                    {{-- Zurückhalten nur, solange es noch keine Bestellungen für die Woche gibt:
+                         eine freigegebene Woche wieder zuzusperren würde bereits getätigte
+                         Bestellungen entwerten. Freigeben bleibt dagegen immer möglich. --}}
                     @if ($weekHasOrders)
-                        <span class="text-xs text-gray-400">🔒 bereits bestellt – Sperren nicht mehr möglich</span>
+                        <span class="text-xs text-gray-400">🔒 bereits bestellt – die Freigabe kann nicht mehr zurückgenommen werden</span>
                     @else
                         @if ($weekOverride !== 'held')
                             <form method="POST" action="{{ route('module.schulkantine.menus.release') }}">
