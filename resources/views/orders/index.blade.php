@@ -117,9 +117,12 @@
                             @if (! $e['group'])
                                 <div class="px-4 py-4 text-sm text-gray-400">Für diese Person ist keine Kundengruppe hinterlegt.</div>
                             @else
-                                {{-- Handy: Tage gestapelt (volle Breite) · ab lg: Spalten mit horizontalem Scroll.
+                                {{-- Tage als umbrechendes Raster: jede Karte will mindestens 15.5rem, teilt sich
+                                     die Breite gleichmäßig und rutscht in die nächste Zeile, wenn kein Platz mehr ist
+                                     (kein horizontaler Scroll). Das min() verhindert Überlauf, wenn der Platz
+                                     schmaler als die Mindestbreite ist – dann bleibt eine Spalte übrig.
                                      Grauer Canvas + Schatten je Karte, damit die Tage klar getrennt sind. --}}
-                                <div class="flex flex-col gap-4 bg-gray-50 p-3 sm:p-4 lg:flex-row lg:gap-3 lg:overflow-x-auto">
+                                <div class="grid grid-cols-[repeat(auto-fit,minmax(min(15.5rem,100%),1fr))] gap-3 bg-gray-50 p-3 sm:p-4 sm:gap-4">
                                     @foreach ($days as $day)
                                         @php
                                             $dateStr = $day['date']->toDateString();
@@ -143,7 +146,7 @@
                                                 ? 'border-amber-200 bg-amber-50'
                                                 : ($hasOrder ? 'border-green-100 bg-green-50' : 'border-gray-100 bg-white');
                                         @endphp
-                                        <div class="flex w-full flex-col overflow-hidden rounded-xl border shadow-sm lg:min-w-[15.5rem] lg:max-w-[15.5rem] {{ $col }}">
+                                        <div class="flex w-full flex-col overflow-hidden rounded-xl border shadow-sm {{ $col }}">
                                             {{-- Tages-Kopf --}}
                                             <div class="border-b px-3 py-2 {{ $head }}">
                                                 <div class="flex items-center justify-between">
