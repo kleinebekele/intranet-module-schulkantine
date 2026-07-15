@@ -63,9 +63,11 @@
                     //  – Allergen: Gericht enthält ein gemiedenes Allergen.
                     //  – Diät: Gericht ist als „nicht geeignet" für eine vom Esser
                     //          geforderte Diät markiert.
+                    // Bewusst über effective*: Bei einem Sparmenü stecken Allergene
+                    // und Diät-Verstöße in den Bestandteilen, nicht am Bündel selbst.
                     $dishWarn = function ($dish, array $allergenIds, array $dietIds) {
-                        $hasAllergen = $dish->allergens->pluck('id')->intersect($allergenIds)->isNotEmpty();
-                        $conflictsDiet = $dish->unsuitableDiets->pluck('id')->intersect($dietIds)->isNotEmpty();
+                        $hasAllergen = $dish->effectiveAllergens()->pluck('id')->intersect($allergenIds)->isNotEmpty();
+                        $conflictsDiet = $dish->effectiveUnsuitableDiets()->pluck('id')->intersect($dietIds)->isNotEmpty();
                         return $hasAllergen || $conflictsDiet;
                     };
                 @endphp
@@ -215,6 +217,14 @@
                                                             <div class="grid grid-cols-2 gap-2 lg:grid-cols-1 lg:gap-1.5">
                                                                 @foreach ($catItems as $m)
                                                                     @php
+                                                                        // Sparmenü, dessen Bestandteil in einer für dieses Kind
+                                                                        // gesperrten Kategorie liegt, gar nicht erst anbieten –
+                                                                        // sonst käme der gesperrte Nachtisch durchs Hintertürchen.
+                                                                        // (Der Controller lehnt es zusätzlich serverseitig ab.)
+                                                                        $occupied = $m->dish->occupiedCategoryIds();
+                                                                    @endphp
+                                                                    @continue(array_intersect($occupied, $e['blockedCats'] ?? []) !== [])
+                                                                    @php
                                                                         $isSel = (string) $cur === (string) $m->dish_id;
                                                                         $warn = $dishWarn($m->dish, $e['allergenIds'], $e['dietIds']);
                                                                         // Klickbar? Auswählen braucht Bestellfrist; die aktuell
@@ -241,6 +251,7 @@
                                                                                 <div class="min-w-0 flex-1 p-1.5 lg:py-1 lg:pl-2 lg:pr-1">
                                                                                     <div class="flex items-start justify-between gap-1">
                                                                                         <span class="text-xs font-semibold text-gray-800">{{ $m->dish->name }}</span>
+                                                                                        @php $comp = $m->dish->components; @endphp
                                                                                         <span class="flex flex-none items-center gap-1 text-xs font-bold {{ $isSel ? 'text-green-700' : 'text-gray-700' }}">
                                                                                             @if ($isSel)
                                                                                                 <span class="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] font-bold text-white">✓</span>
@@ -248,16 +259,36 @@
                                                                                             {{ $money($m->dish->price) }}
                                                                                         </span>
                                                                                     </div>
-                                                                                    @if ($m->dish->allergens->isNotEmpty())
-                                                                                        <div class="mt-0.5 truncate text-[10px] {{ $warn ? 'text-red-500 font-medium' : 'text-gray-400' }}"
-                                                                                             title="Allergene: {{ $m->dish->allergens->map(fn ($a) => $a->code.' '.$a->name)->join(', ') }}">
-                                                                                            Allergene: {{ $m->dish->allergens->pluck('code')->join(', ') }}
+                                                                                    @if ($comp->isNotEmpty())
+                                                                                        @php $compLine = $comp->pluck('name')->join(' + '); @endphp
+                                                                                        {{-- Sparmenü: Ohne die Bestandteile weiß niemand, was er bestellt.
+                                                                                             Heißt das Sparmenü ohnehin schon so (Auto-Name aus dem
+                                                                                             Speiseplan-Knopf), wäre die Zeile eine Dopplung. --}}
+                                                                                        @if ($compLine !== $m->dish->name)
+                                                                                            <div class="mt-0.5 text-[10px] font-medium text-teal-700">{{ $compLine }}</div>
+                                                                                        @endif
+                                                                                        <div class="text-[10px] text-gray-400">
+                                                                                            einzeln {{ $money($m->dish->componentsPrice()) }}
+                                                                                            @if ($m->dish->savings() > 0)
+                                                                                                · <span class="font-medium text-green-600">{{ $money($m->dish->savings()) }} gespart</span>
+                                                                                            @endif
                                                                                         </div>
                                                                                     @endif
-                                                                                    @if ($m->dish->additives->isNotEmpty())
+                                                                                    @php
+                                                                                        // effective*: beim Sparmenü die Allergene der Bestandteile.
+                                                                                        $effAllergens = $m->dish->effectiveAllergens();
+                                                                                        $effAdditives = $m->dish->effectiveAdditives();
+                                                                                    @endphp
+                                                                                    @if ($effAllergens->isNotEmpty())
+                                                                                        <div class="mt-0.5 truncate text-[10px] {{ $warn ? 'text-red-500 font-medium' : 'text-gray-400' }}"
+                                                                                             title="Allergene: {{ $effAllergens->map(fn ($a) => $a->code.' '.$a->name)->join(', ') }}">
+                                                                                            Allergene: {{ $effAllergens->pluck('code')->join(', ') }}
+                                                                                        </div>
+                                                                                    @endif
+                                                                                    @if ($effAdditives->isNotEmpty())
                                                                                         <div class="truncate text-[10px] text-gray-400"
-                                                                                             title="Zusatzstoffe: {{ $m->dish->additives->map(fn ($a) => $a->code.' '.$a->name)->join(', ') }}">
-                                                                                            Zusatzstoffe: {{ $m->dish->additives->pluck('code')->join(', ') }}
+                                                                                             title="Zusatzstoffe: {{ $effAdditives->map(fn ($a) => $a->code.' '.$a->name)->join(', ') }}">
+                                                                                            Zusatzstoffe: {{ $effAdditives->pluck('code')->join(', ') }}
                                                                                         </div>
                                                                                     @endif
                                                                                     @if ($warn)

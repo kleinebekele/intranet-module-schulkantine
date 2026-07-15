@@ -698,7 +698,7 @@ class ServingController
             ->whereDate('date', $dateStr)
             ->whereNotNull('category_id')
             ->where('status', Order::STATUS_ORDERED)
-            ->with(['dish.category', 'user'])
+            ->with(['dish.category', 'dish.components.category', 'user'])
             ->get();
 
         // Ausgegebene Zeilen des Tages (nicht spontan) je order_id.
@@ -709,28 +709,71 @@ class ServingController
             ->pluck('order_id')
             ->flip();
 
-        // Spontane Abholungen je Gericht.
-        $spontaneousByDish = Serving::where('season_id', $season->id)
+        // Spontane Abholungen des Tages (mit Gericht, um Sparmenüs aufzulösen).
+        $spontaneous = Serving::where('season_id', $season->id)
             ->whereDate('date', $dateStr)
             ->where('spontaneous', true)
             ->whereNotNull('dish_id')
-            ->get()
-            ->countBy('dish_id');
+            ->with('dish.components.category')
+            ->get();
+
+        // Die Küche kocht Gerichte, keine Sparmenüs: Ein Sparmenü zählt als je eine
+        // Portion SEINER BESTANDTEILE. Ohne diese Auflösung stünde bei 5 bestellten
+        // Sparmenüs „Sparmenü 5" und „Spaghetti 0“ – es würde zu wenig gekocht.
+        // `fromBundle` weist aus, wie viele Portionen aus Sparmenüs stammen, damit
+        // die Zahlen nachvollziehbar bleiben.
+        $rows = [];
+        // $onlyExisting: Zeilen entstehen NUR aus Vorbestellungen – wie bisher. Ein
+        // Gericht, das heute ausschließlich spontan gekauft wurde, war noch nie ein
+        // Kochposten (es ist ja schon über den Tresen gegangen) und soll auch jetzt
+        // nicht mit „0 Portionen" in der Liste stehen.
+        $tally = function (?Dish $dish, string $key, bool $fromBundle, bool $onlyExisting = false) use (&$rows) {
+            if (! $dish || ($onlyExisting && ! isset($rows[$dish->id]))) {
+                return;
+            }
+            $rows[$dish->id] ??= [
+                'dish' => $dish,
+                'category' => $dish->category?->name ?? 'Ohne Kategorie',
+                'color' => $dish->category?->color,
+                'ordered' => 0, 'served' => 0, 'spontaneous' => 0, 'fromBundle' => 0,
+            ];
+            $rows[$dish->id][$key]++;
+            if ($fromBundle) {
+                $rows[$dish->id]['fromBundle']++;
+            }
+        };
+
+        /** Ein Sparmenü → seine Bestandteile; jedes andere Gericht → es selbst. */
+        $explode = function (?Dish $dish): array {
+            if (! $dish) {
+                return [];
+            }
+
+            return $dish->isBundle() ? $dish->components->all() : [$dish];
+        };
+
+        foreach ($orders as $order) {
+            $isBundle = (bool) $order->dish?->isBundle();
+            $served = $servedOrderIds->has($order->id);
+            foreach ($explode($order->dish) as $part) {
+                $tally($part, 'ordered', $isBundle);
+                if ($served) {
+                    $tally($part, 'served', false);
+                }
+            }
+        }
+
+        foreach ($spontaneous as $serving) {
+            $isBundle = (bool) $serving->dish?->isBundle();
+            foreach ($explode($serving->dish) as $part) {
+                $tally($part, 'spontaneous', $isBundle, onlyExisting: true);
+            }
+        }
 
         $menuByDish = [];
-        foreach ($orders->groupBy('dish_id') as $dishId => $dishOrders) {
-            $dish = $dishOrders->first()->dish;
-            $ordered = $dishOrders->count();
-            $served = $dishOrders->filter(fn ($o) => $servedOrderIds->has($o->id))->count();
-            $menuByDish[] = [
-                'dish' => $dish,
-                'category' => $dish?->category?->name ?? 'Ohne Kategorie',
-                'color' => $dish?->category?->color,
-                'ordered' => $ordered,
-                'served' => $served,
-                'spontaneous' => (int) ($spontaneousByDish[$dishId] ?? 0),
-                'openNoShow' => $ordered - $served,
-            ];
+        foreach ($rows as $row) {
+            $row['openNoShow'] = $row['ordered'] - $row['served'];
+            $menuByDish[] = $row;
         }
 
         // Reihenfolge wie auf „Essen bestellen": nach dem Tages-Speiseplan.
@@ -790,7 +833,7 @@ class ServingController
     {
         $menus = Menu::where('season_id', $season->id)
             ->whereDate('date', $date->toDateString())
-            ->with('dish:id,category_id')
+            ->with(['dish.components'])
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
@@ -803,6 +846,17 @@ class ServingController
             $catId = $menu->dish?->category_id;
             if ($catId !== null) {
                 $catFirstPos[$catId] ??= $i;
+            }
+
+            // Die Mengenliste zeigt die BESTANDTEILE eines Sparmenüs (das Sparmenü
+            // selbst taucht dort nicht auf). Damit sie eine Position haben, auch wenn
+            // sie nicht einzeln auf dem Plan stehen, erben sie die des Sparmenüs.
+            // `??=` sorgt dafür, dass ein eigener Plan-Eintrag Vorrang behält.
+            foreach ($menu->dish?->components ?? [] as $part) {
+                $dishPos[$part->id] ??= $i;
+                if ($part->category_id !== null) {
+                    $catFirstPos[$part->category_id] ??= $i;
+                }
             }
             $i++;
         }
@@ -861,7 +915,11 @@ class ServingController
             ->whereDate('date', $date->toDateString())
             ->whereNotNull('category_id')
             ->where('status', Order::STATUS_ORDERED)
-            ->with(['dish.category', 'dish.allergens', 'dish.unsuitableDiets'])
+            ->with([
+                'dish.category', 'dish.allergens', 'dish.unsuitableDiets',
+                // Sparmenü: Allergene/Diät-Verstöße stecken in den Bestandteilen.
+                'dish.components.allergens', 'dish.components.unsuitableDiets',
+            ])
             ->get();
 
         if ($orders->isEmpty()) {
@@ -895,8 +953,11 @@ class ServingController
                 ->sortBy(fn (Order $o) => $o->dish?->category?->sort_order ?? 999)
                 ->map(function (Order $o) use ($allergenIds, $dietIds) {
                 $dish = $o->dish;
-                $allergenHits = $dish ? $dish->allergens->whereIn('id', $allergenIds)->pluck('name')->all() : [];
-                $dietHits = $dish ? $dish->unsuitableDiets->whereIn('id', $dietIds)->pluck('name')->all() : [];
+                // effective*: Bei einem Sparmenü sitzen die Allergene in den
+                // Bestandteilen – die eigenen Sets des Bündels sind leer. Ohne das
+                // bekäme die Küche für ein Sparmenü NIE eine Warnung.
+                $allergenHits = $dish ? $dish->effectiveAllergens()->whereIn('id', $allergenIds)->pluck('name')->all() : [];
+                $dietHits = $dish ? $dish->effectiveUnsuitableDiets()->whereIn('id', $dietIds)->pluck('name')->all() : [];
 
                 return [
                     'dish' => $dish,
@@ -904,6 +965,16 @@ class ServingController
                     'color' => $dish?->category?->color,
                     'allergenHits' => $allergenHits,
                     'dietHits' => $dietHits,
+                    // Beim Sparmenü muss das Personal wissen, WAS es ausgibt – und
+                    // welcher Bestandteil das Problem ist („Pudding nicht geben").
+                    'components' => $dish && $dish->isBundle()
+                        ? $dish->components->map(fn (Dish $p) => [
+                            'name' => $p->name,
+                            'hits' => $p->allergens->whereIn('id', $allergenIds)->pluck('name')
+                                ->merge($p->unsuitableDiets->whereIn('id', $dietIds)->pluck('name'))
+                                ->values()->all(),
+                        ])->all()
+                        : [],
                 ];
             })->values();
 

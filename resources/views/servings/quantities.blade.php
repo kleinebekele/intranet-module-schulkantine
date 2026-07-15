@@ -74,7 +74,17 @@
                                 <tbody class="divide-y divide-gray-50">
                                     @foreach ($menuByDish as $m)
                                         <tr>
-                                            <td class="px-4 py-2 font-medium text-gray-800">{{ $m['dish']?->name ?? '—' }}</td>
+                                            <td class="px-4 py-2 font-medium text-gray-800">
+                                                {{ $m['dish']?->name ?? '—' }}
+                                                @if (($m['fromBundle'] ?? 0) > 0)
+                                                    {{-- Sparmenüs sind in dieser Zahl aufgelöst: Zu kochen sind die
+                                                         Bestandteile, nicht das Bündel. Herkunft trotzdem ausweisen. --}}
+                                                    <span class="ml-1 rounded-full bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700"
+                                                          title="Diese Portionen stecken in bestellten Sparmenüs und sind hier bereits mitgezählt.">
+                                                        davon {{ $m['fromBundle'] }} aus Sparmenü
+                                                    </span>
+                                                @endif
+                                            </td>
                                             <td class="px-4 py-2">
                                                 <span class="inline-flex items-center gap-1 text-gray-600">
                                                     @if ($m['color'])

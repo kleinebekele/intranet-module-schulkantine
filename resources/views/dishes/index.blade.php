@@ -108,6 +108,14 @@
                                             {{-- Inaktiv-Hinweis, solange die Status-Spalte ausgeblendet ist --}}
                                             <span class="ml-1 text-xs font-medium text-gray-400 sm:hidden">(inaktiv)</span>
                                         @endunless
+                                        @if ($dish->isBundle())
+                                            {{-- Sparmenü: Bestandteile nennen, sonst steht hier ein Name ohne Inhalt --}}
+                                            <div class="mt-0.5 text-xs font-normal text-teal-700">
+                                                <span class="font-medium">Sparmenü:</span>
+                                                {{ $dish->components->pluck('name')->join(' + ') }}
+                                                <span class="text-gray-400">(einzeln {{ number_format($dish->componentsPrice(), 2, ',', '.') }} €)</span>
+                                            </div>
+                                        @endif
                                         {{-- Kategorie inline, wenn die eigene Spalte ausgeblendet ist --}}
                                         @if ($dish->category)
                                             <span class="mt-0.5 inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 md:hidden">{{ $dish->category->name }}</span>
@@ -122,10 +130,12 @@
                                     </td>
                                     <td class="whitespace-nowrap px-3 py-2 text-right font-medium text-gray-800">{{ number_format((float) $dish->price, 2, ',', '.') }} €</td>
                                     @php
+                                        // Bewusst die effective*-Methoden: Bei einem Sparmenü stecken die
+                                        // Allergene in den Bestandteilen, die eigenen Sets sind leer.
                                         $badgeSets = [
-                                            ['short' => 'Allerg.', 'items' => $dish->allergens->map(fn ($a) => $a->code.' '.$a->name), 'class' => 'bg-rose-50 text-rose-700'],
-                                            ['short' => 'Zusatz', 'items' => $dish->additives->map(fn ($a) => $a->code.' '.$a->name), 'class' => 'bg-amber-50 text-amber-700'],
-                                            ['short' => 'Nicht für', 'items' => $dish->unsuitableDiets->pluck('name'), 'class' => 'bg-red-50 text-red-700'],
+                                            ['short' => 'Allerg.', 'items' => $dish->effectiveAllergens()->map(fn ($a) => $a->code.' '.$a->name), 'class' => 'bg-rose-50 text-rose-700'],
+                                            ['short' => 'Zusatz', 'items' => $dish->effectiveAdditives()->map(fn ($a) => $a->code.' '.$a->name), 'class' => 'bg-amber-50 text-amber-700'],
+                                            ['short' => 'Nicht für', 'items' => $dish->effectiveUnsuitableDiets()->pluck('name'), 'class' => 'bg-red-50 text-red-700'],
                                         ];
                                     @endphp
                                     @foreach ($badgeSets as $set)

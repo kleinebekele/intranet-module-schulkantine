@@ -76,6 +76,7 @@ Route::middleware(['web', 'auth'])
         // Speiseplan (Menü je Öffnungstag & Bestellmodus)
         Route::get('speiseplan', [MenuController::class, 'index'])->name('menus.index');
         Route::post('speiseplan', [MenuController::class, 'store'])->name('menus.store');
+        Route::post('speiseplan/sparmenue', [MenuController::class, 'storeBundle'])->name('menus.bundle');
         Route::post('speiseplan/freigabe', [MenuController::class, 'releaseWeek'])->name('menus.release');
         Route::delete('speiseplan/{menu}', [MenuController::class, 'destroy'])->name('menus.destroy');
 

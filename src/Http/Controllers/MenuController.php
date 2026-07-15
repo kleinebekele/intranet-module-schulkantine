@@ -4,6 +4,7 @@ namespace Intranet\Modules\Schulkantine\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Intranet\Modules\Schulkantine\Models\Category;
 use Intranet\Modules\Schulkantine\Models\Dish;
 use Intranet\Modules\Schulkantine\Models\Menu;
 use Intranet\Modules\Schulkantine\Models\Order;
@@ -82,7 +83,8 @@ class MenuController
         // ist nicht mehr entfernbar (nur noch Hinzufügen bleibt erlaubt).
         $menus = Menu::where('season_id', $season->id)
             ->whereBetween('date', [$weekStart->toDateString(), $weekEnd->toDateString()])
-            ->with('dish.category')
+            // components: für isBundle() im Tages-Sparmenü-Formular (sonst N+1).
+            ->with(['dish.category', 'dish.components'])
             ->withCount('orders')
             ->orderBy('sort_order')
             ->orderBy('id')
@@ -129,17 +131,141 @@ class MenuController
             return back()->withErrors(['date' => 'Die Kantine hat an diesem Tag nicht geöffnet.']);
         }
 
+        $this->addDishToPlan($season, $date, (int) $data['dish_id']);
+
+        return $this->redirectToWeek($date)->with('status', 'Speiseplan aktualisiert.');
+    }
+
+    /**
+     * Baut aus Gerichten DIESES Tages ein Sparmenü und legt es direkt auf den Plan.
+     *
+     * Der Katalog wächst dabei nicht unnötig: Gibt es bereits ein Sparmenü mit genau
+     * denselben Bestandteilen und demselben Preis, wird es wiederverwendet. Das hält
+     * nebenbei die Bewertungs-Statistik zusammen (immer dasselbe Gericht).
+     */
+    public function storeBundle(Request $request)
+    {
+        $this->authorizeAdmin($request);
+
+        $data = $request->validate([
+            'date' => ['required', 'date'],
+            'parts' => ['required', 'array', 'min:2'],
+            'parts.*' => ['integer', 'exists:kantine_dishes,id'],
+            'price' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $season = Season::where('is_active', true)->firstOrFail();
+        $date = Carbon::parse($data['date']);
+
+        if (! $season->isOpenOn($date)) {
+            return back()->withErrors(['date' => 'Die Kantine hat an diesem Tag nicht geöffnet.']);
+        }
+
+        $ids = collect($data['parts'])->map(fn ($v) => (int) $v)->unique()->values();
+        if ($ids->count() < 2) {
+            return $this->redirectToWeek($date)->withErrors(['bundle' => 'Ein Sparmenü braucht mindestens zwei verschiedene Gerichte.']);
+        }
+
+        // Bestandteile in Speisefolge (Hauptmenü vor Nachspeise) – bestimmt Name
+        // und Reihenfolge überall dort, wo das Sparmenü auftaucht.
+        $parts = Dish::with(['category', 'components'])->whereIn('id', $ids)->get()
+            ->sortBy(fn (Dish $d) => [$d->category?->sort_order ?? PHP_INT_MAX, $d->name])
+            ->values();
+
+        // Keine Verschachtelung (siehe DishController::validateComponents).
+        if ($parts->contains(fn (Dish $d) => $d->components->isNotEmpty())) {
+            return $this->redirectToWeek($date)->withErrors(['bundle' => 'Ein Sparmenü kann kein anderes Sparmenü enthalten.']);
+        }
+
+        $price = round((float) $data['price'], 2);
+        $partIds = $parts->pluck('id')->sort()->values()->all();
+
+        $bundle = $this->findBundle($partIds, $price);
+        $reused = (bool) $bundle;
+
+        if (! $bundle) {
+            $bundle = Dish::create([
+                'category_id' => $this->bundleCategoryId(),
+                'name' => $parts->pluck('name')->join(' + '),
+                'price' => $price,
+                'is_active' => true,
+            ]);
+            foreach ($parts->values() as $i => $part) {
+                $bundle->components()->attach($part->id, ['sort_order' => $i]);
+            }
+        }
+
+        $added = $this->addDishToPlan($season, $date, $bundle->id);
+
+        $einzeln = $parts->sum(fn (Dish $d) => (float) $d->price);
+        $status = 'Sparmenü „'.$bundle->name.'" ('.number_format($price, 2, ',', '.').' €, einzeln '
+            .number_format($einzeln, 2, ',', '.').' €) '
+            .($added ? 'steht jetzt auf dem Plan' : 'stand bereits auf dem Plan')
+            .($reused ? ' – vorhandenes Sparmenü wiederverwendet.' : ' und wurde neu im Katalog angelegt.');
+
+        return $this->redirectToWeek($date)->with('status', $status);
+    }
+
+    /**
+     * Ein vorhandenes Sparmenü mit genau diesen Bestandteilen und diesem Preis.
+     *
+     * @param  array<int>  $partIds  aufsteigend sortiert
+     */
+    private function findBundle(array $partIds, float $price): ?Dish
+    {
+        return Dish::with('components')->whereHas('components')->get()
+            ->first(fn (Dish $b) => $b->components->pluck('id')->sort()->values()->all() === $partIds
+                && abs((float) $b->price - $price) < 0.005);
+    }
+
+    /**
+     * Kategorie für neue Sparmenüs. Vorhandene Sparmenüs geben den Ton an (die
+     * Kategorie kann umbenannt worden sein); sonst die per Migration angelegte.
+     */
+    private function bundleCategoryId(): ?int
+    {
+        $fromExisting = Dish::whereHas('components')->value('category_id');
+
+        return $fromExisting ?? Category::firstOrCreate(
+            ['name' => 'Sparmenü'],
+            ['allows_walkin' => false, 'sort_order' => (int) Category::max('sort_order') + 1, 'color' => '#0d9488', 'is_active' => true],
+        )->id;
+    }
+
+    /**
+     * Legt ein Gericht auf den Tagesplan – idempotent.
+     *
+     * ⚠️ Der Abgleich MUSS über whereDate laufen: Der `date`-Cast speichert intern
+     * '<Tag> 00:00:00', ein exakter =-Vergleich gegen 'Y-m-d' trifft das nicht.
+     * Ein firstOrCreate(['date' => 'Y-m-d']) findet die vorhandene Zeile deshalb
+     * NICHT, versucht einzufügen und läuft in den Unique-Index (season, date, dish)
+     * → 500 statt „steht schon drauf". (Dieselbe Falle wie beim Ferien-Import.)
+     *
+     * @return bool true = neu angelegt, false = stand schon drauf
+     */
+    private function addDishToPlan(Season $season, Carbon $date, int $dishId): bool
+    {
+        $exists = Menu::where('season_id', $season->id)
+            ->whereDate('date', $date->toDateString())
+            ->where('dish_id', $dishId)
+            ->exists();
+
+        if ($exists) {
+            return false;
+        }
+
         $sort = (int) Menu::where('season_id', $season->id)
             ->whereDate('date', $date->toDateString())
             ->max('sort_order') + 1;
 
-        Menu::firstOrCreate([
+        Menu::create([
             'season_id' => $season->id,
             'date' => $date->toDateString(),
-            'dish_id' => $data['dish_id'],
-        ], ['sort_order' => $sort]);
+            'dish_id' => $dishId,
+            'sort_order' => $sort,
+        ]);
 
-        return $this->redirectToWeek($date)->with('status', 'Speiseplan aktualisiert.');
+        return true;
     }
 
     public function destroy(Request $request, Menu $menu)

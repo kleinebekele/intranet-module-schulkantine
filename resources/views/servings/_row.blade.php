@@ -16,11 +16,25 @@
         @if ($row['dishes']->isNotEmpty())
             <div class="mt-1 flex flex-wrap gap-1.5">
                 @foreach ($row['dishes'] as $d)
-                    <span class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-sm
+                    <span class="inline-flex flex-col gap-0.5 rounded-md border px-2 py-0.5 text-sm
                                  {{ ($d['allergenHits'] || $d['dietHits']) ? 'border-red-300 bg-red-50 text-red-800' : 'border-gray-200 bg-gray-50 text-gray-700' }}">
-                        {{ $d['dish']?->name ?? '—' }}
-                        @if ($d['allergenHits'] || $d['dietHits'])
-                            <span class="text-xs font-medium">⚠️ {{ implode(', ', array_merge($d['allergenHits'], $d['dietHits'])) }}</span>
+                        <span class="inline-flex items-center gap-1">
+                            {{ $d['dish']?->name ?? '—' }}
+                            @if ($d['allergenHits'] || $d['dietHits'])
+                                <span class="text-xs font-medium">⚠️ {{ implode(', ', array_merge($d['allergenHits'], $d['dietHits'])) }}</span>
+                            @endif
+                        </span>
+                        @if (! empty($d['components']))
+                            {{-- Sparmenü: Das Personal gibt die Bestandteile aus, nicht „ein Sparmenü".
+                                 Der Treffer wird je Bestandteil markiert – „welches soll ich weglassen?" --}}
+                            <span class="flex flex-wrap items-center gap-1 text-xs">
+                                @foreach ($d['components'] as $c)
+                                    <span class="inline-flex items-center gap-0.5 rounded px-1 {{ $c['hits'] ? 'bg-red-600 font-semibold text-white' : 'bg-white/70 text-gray-500' }}">
+                                        {{ $c['name'] }}@if ($c['hits'])<span class="font-normal"> ⚠️ {{ implode(', ', $c['hits']) }}</span>@endif
+                                    </span>
+                                    @if (! $loop->last)<span class="text-gray-400">+</span>@endif
+                                @endforeach
+                            </span>
                         @endif
                     </span>
                 @endforeach

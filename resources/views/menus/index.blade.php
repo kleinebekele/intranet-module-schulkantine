@@ -135,7 +135,16 @@
                                             <div class="space-y-1.5">
                                                 @foreach ($catItems as $m)
                                                     <div class="flex items-center justify-between gap-2 rounded-md border border-gray-100 bg-white px-2 py-1 text-sm">
-                                                        <span class="text-gray-800">{{ $m->dish->name }}</span>
+                                                        <span class="min-w-0 text-gray-800">
+                                                            {{ $m->dish->name }}
+                                                            @if ($m->dish->isBundle())
+                                                                @php $compLine = $m->dish->components->pluck('name')->join(' + '); @endphp
+                                                                {{-- Nicht doppeln, wenn der Name ohnehin die Bestandteile sind. --}}
+                                                                @if ($compLine !== $m->dish->name)
+                                                                    <span class="block truncate text-[11px] text-teal-700">{{ $compLine }}</span>
+                                                                @endif
+                                                            @endif
+                                                        </span>
                                                         @if ($m->orders_count > 0)
                                                             <span title="Bereits bestellt – nicht mehr entfernbar" class="text-gray-300">🔒</span>
                                                         @else
@@ -180,6 +189,78 @@
                                             </div>
                                         </form>
                                     </div>
+
+                                    {{-- Sparmenü aus den Gerichten DIESES Tages bündeln. Nur Nicht-Sparmenüs
+                                         sind wählbar (keine Verschachtelung). --}}
+                                    @php
+                                        $bundleParts = collect($items)->map->dish->filter(fn ($dish) => $dish && ! $dish->isBundle())->values();
+                                        $partPrices = $bundleParts->mapWithKeys(fn ($dish) => [$dish->id => (float) $dish->price]);
+                                    @endphp
+                                    @if ($bundleParts->count() >= 2)
+                                        <div x-data="{
+                                                open: false,
+                                                parts: [],
+                                                prices: {{ Illuminate\Support\Js::from($partPrices) }},
+                                                price: '',
+                                                priceTouched: false,
+                                                get single() { return this.parts.reduce((s, id) => s + (this.prices[id] ?? 0), 0) },
+                                                euro(v) { return v.toFixed(2).replace('.', ',') + ' €' },
+                                                /* Preis-Vorschlag = Einzelsumme, bis der Admin ihn selbst anfasst.
+                                                   Bewusst ein Event-Handler und KEIN x-effect: Ein x-effect, das
+                                                   `price` liest UND schreibt, lief im selben Alpine-Durchlauf wie
+                                                   die Ersparnis-Anzeige – die rechnete dann mit dem alten Wert
+                                                   weiter und blieb auf „x € gespart“ stehen. */
+                                                syncPrice() {
+                                                    this.$nextTick(() => {
+                                                        if (! this.priceTouched) this.price = this.single.toFixed(2)
+                                                    })
+                                                },
+                                            }">
+                                            <button type="button" @click="open = ! open" x-show="!open"
+                                                    class="inline-flex items-center gap-1 text-xs font-medium text-teal-700 hover:text-teal-900">
+                                                <x-module-icon name="plus" class="text-sm" /> Sparmenü
+                                            </button>
+                                            <form x-show="open" x-cloak method="POST" action="{{ route('module.schulkantine.menus.bundle') }}"
+                                                  class="space-y-1.5 rounded-lg border border-teal-200 bg-teal-50/60 p-2">
+                                                @csrf
+                                                <input type="hidden" name="date" value="{{ $d['date']->toDateString() }}">
+                                                <p class="text-[11px] text-gray-500">Gerichte dieses Tages bündeln:</p>
+                                                @foreach ($bundleParts as $part)
+                                                    <label class="flex items-center justify-between gap-1 text-xs text-gray-700">
+                                                        <span class="inline-flex min-w-0 items-center gap-1.5">
+                                                            <input type="checkbox" name="parts[]" value="{{ $part->id }}" x-model.number="parts"
+                                                                   @change="syncPrice()"
+                                                                   class="flex-none rounded border-gray-300 text-teal-600 focus:ring-teal-500">
+                                                            <span class="truncate">{{ $part->name }}</span>
+                                                        </span>
+                                                        <span class="flex-none text-gray-400">{{ number_format((float) $part->price, 2, ',', '.') }} €</span>
+                                                    </label>
+                                                @endforeach
+                                                <div x-show="parts.length >= 2" x-cloak class="space-y-1 border-t border-teal-200 pt-1.5">
+                                                    <div class="flex items-center justify-between text-[11px] text-gray-500">
+                                                        <span>einzeln</span><span x-text="euro(single)" class="font-medium"></span>
+                                                    </div>
+                                                    <label class="flex items-center gap-1.5 text-xs text-gray-700">
+                                                        <span class="flex-none">Preis</span>
+                                                        <input type="number" name="price" step="0.01" min="0" required x-model="price"
+                                                               @input="priceTouched = true"
+                                                               class="w-20 rounded-md border-gray-300 py-0.5 text-xs shadow-sm focus:border-teal-500 focus:ring-teal-500">
+                                                        <span class="text-[11px] font-medium"
+                                                              :class="(single - (parseFloat(price) || 0)) > 0 ? 'text-green-700' : 'text-red-700'"
+                                                              x-text="(single - (parseFloat(price) || 0)) > 0
+                                                                        ? euro(single - (parseFloat(price) || 0)) + ' gespart'
+                                                                        : 'kein Sparpreis'"></span>
+                                                    </label>
+                                                </div>
+                                                <div class="flex items-center gap-2">
+                                                    <button type="submit" :disabled="parts.length < 2"
+                                                            class="inline-flex items-center gap-1 rounded-md bg-teal-600 px-2 py-1 text-xs font-medium text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50">Anlegen</button>
+                                                    <button type="button" @click="open = false"
+                                                            class="text-xs text-gray-500 hover:text-gray-700">Abbrechen</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    @endif
                                 @endif
                             </div>
                         </div>
