@@ -54,6 +54,7 @@
             banner: null,          // { ok, text }
             scanning: false,
             ctrl: null,
+            servedOnLoad: false,   // war beim Stempeln schon etwas gebucht?
 
             init() {
                 this.autoFinish = localStorage.getItem('kantineTerminalAutoFinish') === '1';
@@ -82,7 +83,9 @@
             get hasSomething() {
                 if (this.extrasCount > 0) return true;
                 // Menue-Auswahl zaehlt als Buchung, sobald der Esser eine Bestellung hat.
-                return this.person && this.person.hasOrder;
+                if (this.person && this.person.hasOrder) return true;
+                // War schon etwas gebucht, muss auch das Zuruecknehmen (auf 0) buchbar sein.
+                return this.servedOnLoad;
             },
 
             // ---- Chip / Scan ----
@@ -129,6 +132,9 @@
                 this.person = data;
                 this.banner = null;
                 this.resetSelection();
+                // Wurde für diesen Chip heute schon etwas gebucht, den Stand wieder
+                // herstellen – so kann man ihn ändern oder zurücknehmen.
+                this.applyExisting(data);
             },
 
             // Setzt die Auswahl auf den „frischen Stempel"-Zustand: Menue vorausgewaehlt
@@ -147,6 +153,29 @@
                 }
             },
 
+            // Legt den bereits gebuchten Stand über die Vorauswahl: erfasste Menü-
+            // Ausgabe (genommen/Alternative/abgelehnt) sowie schon erfasste Extras
+            // (Walk-in + Nachschlag) als Mengen.
+            applyExisting(data) {
+                this.servedOnLoad = false;
+                if (data.hasOrder) {
+                    data.dishes.forEach(d => {
+                        if (d.category_id == null || !d.handled) return;
+                        this.servedOnLoad = true;
+                        this.choice[d.category_id] = d.declined ? 'declined' : (d.alternative ? 'alternative' : d.dish_id);
+                    });
+                }
+                (data.walkin || []).forEach(w => {
+                    this.servedOnLoad = true;
+                    if (w.label === 'Nachschlag') {
+                        const k = String(w.price);
+                        this.coinQty[k] = (this.coinQty[k] || 0) + 1;
+                    } else if (w.dish_id != null) {
+                        this.walkinQty[w.dish_id] = (this.walkinQty[w.dish_id] || 0) + 1;
+                    }
+                });
+            },
+
             // ---- Linke Spalte (Menue-Auswahl) ----
             catOrdered(catId) { return this.orderMeta[catId] !== undefined; },
             tileState(catId, dishId) {
@@ -155,6 +184,9 @@
                 const ch = this.choice[catId];
                 const ordered = this.orderMeta[catId].orderedDishId;
                 if (ch === 'declined') return dishId === ordered ? 'declined' : 'idle';
+                // Reload einer Alternative (welches Ersatzgericht ist nicht gespeichert):
+                // am bestellten Gericht als „Alternative" anzeigen.
+                if (ch === 'alternative') return dishId === ordered ? 'alt' : 'selectable';
                 if (ch === dishId) return dishId === ordered ? 'taken' : 'alt';
                 return 'selectable';
             },
@@ -175,7 +207,7 @@
             coinMinus(amt) { const k = String(amt); if (!this.coinQty[k]) return; this.coinQty[k] = Math.max(0, this.coinQty[k] - 1); if (!this.coinQty[k]) delete this.coinQty[k]; },
 
             // ---- Aktionen ----
-            cancel() { this.person = null; this.resetSelection(); this.banner = null; },
+            cancel() { this.person = null; this.servedOnLoad = false; this.resetSelection(); this.banner = null; },
             back() { this.resetSelection(); this.banner = null; }, // zurueck = frischer Stempel-Zustand
 
             toggleAutoFinish() {
@@ -189,7 +221,7 @@
                     const ch = this.choice[catId];
                     let outcome = 'taken';
                     if (ch === 'declined') outcome = 'declined';
-                    else if (ch !== meta.orderedDishId) outcome = 'alternative';
+                    else if (ch === 'alternative' || ch !== meta.orderedDishId) outcome = 'alternative';
                     menu.push({ order_id: meta.order_id, outcome });
                 }
                 const walkin = Object.entries(this.walkinQty).map(([dish_id, qty]) => ({ dish_id: Number(dish_id), qty }));
@@ -212,6 +244,7 @@
                     if (data.plan) this.planGroups = data.plan; // Zaehler aktualisieren
                     if (!silent) this.banner = { ok:true, text: 'Gebucht: ' + data.name + (this.extrasTotal > 0 ? ' · Extras ' + this.euro(this.extrasTotal) : '') };
                     this.person = null;
+                    this.servedOnLoad = false;
                     this.resetSelection();
                     this.busy = false;
                     return true;
@@ -272,6 +305,7 @@
                         <span class="truncate text-3xl font-bold text-gray-800" x-text="person?.name"></span>
                         <span class="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-lg font-semibold text-indigo-700" x-text="'Klasse: ' + (person?.group || '–')"></span>
                         <span x-show="person?.warn" x-cloak class="shrink-0 rounded-full bg-red-600 px-3 py-1 text-base font-bold text-white">⚠️ Verträglichkeiten prüfen</span>
+                        <span x-show="servedOnLoad" x-cloak class="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-base font-semibold text-amber-800">↺ bereits gebucht – änderbar</span>
                     </div>
                     <div class="mt-0.5 text-sm text-gray-500" x-show="person && (person.allergens.length || person.diets.length)">
                         <span x-show="person?.allergens.length">Allergien: <span x-text="person?.allergens.join(', ')"></span>. </span>

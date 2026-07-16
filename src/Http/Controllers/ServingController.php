@@ -377,7 +377,9 @@ class ServingController
             ->get()
             ->map(fn (Serving $s) => [
                 'id' => $s->id,
-                'name' => $s->dish?->name ?? '—',
+                'dish_id' => $s->dish_id,
+                'label' => $s->label,
+                'name' => $s->dish?->name ?? $s->label ?? '—',
                 'price' => (float) $s->price_snapshot,
             ])->values();
 
@@ -1287,6 +1289,14 @@ class ServingController
                     ]);
                 }
             }
+
+            // Die bisherigen spontanen Zeilen (Walk-in + Nachschlag) IMMER ersetzen:
+            // Beim erneuten Vorhalten eines Chips zeigt das Terminal den bereits
+            // gebuchten Stand und schickt ihn – ggf. geändert – komplett zurück.
+            // Ohne dieses Löschen würde ein zweites Bestätigen die Extras verdoppeln;
+            // so ist ein Zurücknehmen (Menge 0) ebenfalls möglich.
+            Serving::where('season_id', $season->id)->where('user_id', $eater->id)
+                ->whereDate('date', $date->toDateString())->where('spontaneous', true)->delete();
 
             // 2) Walk-in (spontan) – je Menge eine Zeile.
             foreach ($walkinDishes as $wd) {
