@@ -58,6 +58,7 @@
             scanning: false,
             ctrl: null,
             servedOnLoad: false,   // war beim Stempeln schon etwas gebucht?
+            overviewOpen: false,   // „Übersicht"-Ansicht (Männchen-Button, Inhalt folgt)
             searchOpen: false,
             searchQuery: '',
             searchResults: [],
@@ -421,6 +422,14 @@
                 </span>
             </div>
         </div>
+
+        {{-- Ganz rechts: „Übersicht"-Ansicht (Inhalt folgt) --}}
+        <div class="flex items-center border-l border-gray-200 bg-gray-50 px-3">
+            <button type="button" @click="overviewOpen = true" title="Übersicht"
+                    class="flex h-14 w-14 items-center justify-center rounded-xl bg-white text-indigo-600 shadow-sm hover:bg-indigo-50">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="h-8 w-8"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z"/></svg>
+            </button>
+        </div>
     </header>
 
     {{-- Banner (Fehler/Erfolg) --}}
@@ -723,6 +732,20 @@
                 <button type="button" @click="padClear()" class="h-14 flex-1 rounded-xl bg-red-100 text-base font-bold text-red-700 shadow-sm hover:bg-red-200">Löschen</button>
                 <button type="button" @click="padCancel()" class="h-14 flex-1 rounded-xl border border-gray-300 bg-white text-base font-semibold text-gray-600 hover:bg-gray-50">Abbrechen</button>
                 <button type="button" @click="padConfirm()" class="h-14 flex-[1.5] rounded-xl bg-green-600 text-base font-bold text-white shadow hover:bg-green-700">Übernehmen</button>
+            </div>
+        </div>
+    </div>
+
+    {{-- „Übersicht"-Ansicht (Vollbild). Inhalt folgt – vorerst Platzhalter. --}}
+    <div x-show="overviewOpen" x-cloak class="fixed inset-0 z-[55] flex flex-col bg-white">
+        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+            <h2 class="text-2xl font-bold text-gray-800">Übersicht</h2>
+            <button @click="overviewOpen = false" class="rounded-xl border border-gray-300 bg-white px-5 py-3 text-base font-semibold text-gray-600 hover:bg-gray-50">✕ Schließen</button>
+        </div>
+        <div class="flex flex-1 items-center justify-center text-center text-gray-400">
+            <div>
+                <div class="text-5xl">🧑‍🤝‍🧑</div>
+                <p class="mt-4 text-xl font-medium">Übersicht – Inhalt folgt.</p>
             </div>
         </div>
     </div>
