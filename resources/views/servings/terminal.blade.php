@@ -363,28 +363,18 @@
                 @endforeach
             </div>
 
-            {{-- Person (nach Stempeln) --}}
-            <div x-show="person" x-cloak class="flex h-full items-center justify-between gap-4 px-5">
-                <div class="min-w-0">
-                    <div class="flex items-center gap-3">
-                        <span class="truncate text-3xl font-bold text-gray-800" x-text="person?.name"></span>
-                        <span class="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-lg font-semibold text-indigo-700" x-text="'Klasse: ' + (person?.group || '–')"></span>
-                        <span x-show="person?.warn" x-cloak class="shrink-0 rounded-full bg-red-600 px-3 py-1 text-base font-bold text-white">⚠️ Verträglichkeiten prüfen</span>
-                        <span x-show="servedOnLoad" x-cloak class="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-base font-semibold text-amber-800">↺ bereits gebucht – änderbar</span>
-                    </div>
-                    <div class="mt-0.5 text-sm text-gray-500" x-show="person && (person.allergens.length || person.diets.length)">
-                        <span x-show="person?.allergens.length">Allergien: <span x-text="person?.allergens.join(', ')"></span>. </span>
-                        <span x-show="person?.diets.length">Diäten: <span x-text="person?.diets.join(', ')"></span>.</span>
-                    </div>
-                    <div class="mt-0.5 text-sm font-medium text-amber-600" x-show="person && !person.hasOrder">Keine Vorbestellung – bitte rechts erfassen.</div>
-                </div>
-                {{-- Aktionsknöpfe --}}
-                <div class="flex shrink-0 items-center gap-2">
-                    <button @click="back()" x-show="!isDefaultState" x-cloak class="rounded-xl border border-gray-300 bg-white px-4 py-3 text-base font-semibold text-gray-600 hover:bg-gray-50">↺ Zurück</button>
-                    <button @click="cancel()" class="rounded-xl border border-gray-300 bg-white px-4 py-3 text-base font-semibold text-gray-600 hover:bg-gray-50">Abbrechen</button>
-                    <button @click="commit()" :disabled="busy || !hasSomething"
-                            class="rounded-xl bg-green-600 px-7 py-3 text-lg font-bold text-white shadow hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-40">✓ Bestätigen</button>
-                </div>
+            {{-- Person (nach Stempeln). Kein „Keine Vorbestellung"-Hinweis mehr – das
+                 sieht man bereits an der gesperrten linken Spalte; so wirkt die Zeile
+                 nicht gequetscht. Aktionsknöpfe liegen jetzt im rechten Footer. --}}
+            <div x-show="person" x-cloak class="flex h-full items-center gap-3 px-5">
+                <span class="truncate text-3xl font-bold text-gray-800" x-text="person?.name"></span>
+                <span class="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-lg font-semibold text-indigo-700" x-text="'Klasse: ' + (person?.group || '–')"></span>
+                <span x-show="person?.warn" x-cloak class="shrink-0 rounded-full bg-red-600 px-3 py-1 text-base font-bold text-white">⚠️ Verträglichkeiten prüfen</span>
+                <span x-show="servedOnLoad" x-cloak class="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-base font-semibold text-amber-800">↺ bereits gebucht – änderbar</span>
+                <span class="min-w-0 truncate text-sm text-gray-500" x-show="person && (person.allergens.length || person.diets.length)">
+                    <span x-show="person?.allergens.length">Allergien: <span x-text="person?.allergens.join(', ')"></span>. </span>
+                    <span x-show="person?.diets.length">Diäten: <span x-text="person?.diets.join(', ')"></span>.</span>
+                </span>
             </div>
         </div>
     </header>
@@ -562,8 +552,14 @@
                     </div>
                 </div>
 
-                {{-- Footer: Gesamtpreis + Buchen --}}
-                <div class="flex items-center justify-end gap-4 border-t-2 border-gray-300 bg-white px-4 py-3">
+                {{-- Footer: links Reset (gelb) + Abbrechen (rot), rechts Gesamt + Buchen --}}
+                <div class="flex items-center justify-between gap-4 border-t-2 border-gray-300 bg-white px-4 py-3">
+                    <div class="flex items-center gap-2">
+                        <button @click="back()" x-show="!isDefaultState" x-cloak
+                                class="rounded-xl bg-amber-400 px-5 py-3 text-base font-bold text-amber-950 shadow hover:bg-amber-500">↺ Reset</button>
+                        <button @click="cancel()"
+                                class="rounded-xl bg-red-600 px-5 py-3 text-base font-bold text-white shadow hover:bg-red-700">Abbrechen</button>
+                    </div>
                     <div class="flex items-center gap-5">
                         <div class="text-right">
                             <div class="text-[11px] uppercase tracking-wide text-gray-400">Gesamt (nur Extras)</div>
