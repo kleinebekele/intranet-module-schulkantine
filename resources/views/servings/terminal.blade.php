@@ -401,8 +401,8 @@
                     </div>
                 </div>
 
-                {{-- Oben: Walk-in-Artikel – untereinander, gleiche Aufteilung wie der Nachschlag:
-                     [− Preis +] in der Mitte, rechts die Summe (Anzahl × Preis) je Artikel. --}}
+                {{-- Oben: Walk-in-Artikel – Minus ganz links, Plus ganz rechts, in der Mitte
+                     Name + Preis daneben (und Anzahl × Summe, sobald gewählt). --}}
                 <div class="min-h-0 flex-1 overflow-y-auto p-3">
                     <div class="mb-1 text-xs font-bold uppercase tracking-wide text-gray-400">Spontan mitnehmen</div>
                     <template x-for="group in walkinGroups" :key="group.category">
@@ -412,19 +412,20 @@
                                 <template x-for="dish in group.dishes" :key="dish.id">
                                     <div class="flex items-center gap-3 rounded-xl border bg-white p-2"
                                          :class="walkinQty[dish.id] ? 'border-indigo-300 ring-1 ring-indigo-200' : 'border-gray-200'">
-                                        <div class="min-w-0 flex-1">
-                                            <div class="truncate text-lg font-semibold text-gray-800" x-text="dish.name"></div>
-                                        </div>
                                         <button type="button" @click="walkinMinus(dish.id)" :disabled="!walkinQty[dish.id]"
                                                 class="step-btn flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-3xl font-bold text-gray-700 disabled:opacity-30">−</button>
-                                        <span class="w-20 shrink-0 text-center text-lg font-bold text-gray-700" x-text="euro(dish.price)"></span>
+                                        <div class="flex min-w-0 flex-1 items-center justify-between gap-3 px-1">
+                                            <div class="flex min-w-0 items-baseline gap-2">
+                                                <span class="truncate text-lg font-semibold text-gray-800" x-text="dish.name"></span>
+                                                <span class="shrink-0 text-sm font-medium text-gray-500" x-text="euro(dish.price)"></span>
+                                            </div>
+                                            <div class="shrink-0 text-right" x-show="walkinQty[dish.id]" x-cloak>
+                                                <span class="text-xl font-extrabold text-gray-900"><span x-text="walkinQty[dish.id] || 0"></span>×</span>
+                                                <span class="ml-1 text-sm text-gray-500" x-text="euro((walkinQty[dish.id] || 0) * dish.price)"></span>
+                                            </div>
+                                        </div>
                                         <button type="button" @click="walkinPlus(dish.id)"
                                                 class="step-btn flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-3xl font-bold text-white">+</button>
-                                        <div class="w-24 shrink-0 text-right">
-                                            <div class="text-xs text-gray-400"><span x-text="walkinQty[dish.id] || 0"></span> ×</div>
-                                            <div class="text-xl font-extrabold" :class="walkinQty[dish.id] ? 'text-gray-900' : 'text-gray-300'"
-                                                 x-text="euro((walkinQty[dish.id] || 0) * dish.price)"></div>
-                                        </div>
                                     </div>
                                 </template>
                             </div>
@@ -433,30 +434,33 @@
                     <div x-show="!walkinGroups.length" class="text-sm text-gray-400">Heute keine Artikel zur spontanen Mitnahme.</div>
                 </div>
 
-                {{-- Unten: Nachschlag – untereinander. Je Zeile: Münze · [− Betrag +] · rechts Summe. --}}
+                {{-- Unten: Nachschlag – Minus ganz links, Plus ganz rechts, Münze + Name in der
+                     Mitte. Kein Betrag zwischen den Buttons (die Münze sagt es schon). --}}
                 <div class="border-t border-gray-200 bg-white p-3">
                     <div class="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">Nachschlag</div>
                     <div class="space-y-2">
                         <template x-for="amt in coins" :key="amt">
                             <div class="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-2"
                                  :class="coinQty[String(amt)] ? 'ring-1 ring-amber-300' : ''">
-                                {{-- Echte Euro-Münze (SVG, je nach Betrag) --}}
-                                <div class="h-14 w-14 shrink-0">
-                                    <template x-if="amt === 0.5"><x-schulkantine::coin value="50c" /></template>
-                                    <template x-if="amt === 1"><x-schulkantine::coin value="1e" /></template>
-                                    <template x-if="amt === 2"><x-schulkantine::coin value="2e" /></template>
-                                </div>
-                                <div class="min-w-0 flex-1 text-lg font-semibold text-amber-900" x-text="amt < 1 ? (amt*100)+' Cent' : amt+' Euro'"></div>
                                 <button type="button" @click="coinMinus(amt)" :disabled="!coinQty[String(amt)]"
                                         class="step-btn flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-3xl font-bold text-gray-700 disabled:opacity-30">−</button>
-                                <span class="w-20 shrink-0 text-center text-lg font-bold text-amber-800" x-text="euro(amt)"></span>
+                                <div class="flex min-w-0 flex-1 items-center justify-between gap-3 px-1">
+                                    <div class="flex min-w-0 items-center gap-3">
+                                        {{-- Echte Euro-Münze (SVG, je nach Betrag) --}}
+                                        <div class="h-12 w-12 shrink-0">
+                                            <template x-if="amt === 0.5"><x-schulkantine::coin value="50c" /></template>
+                                            <template x-if="amt === 1"><x-schulkantine::coin value="1e" /></template>
+                                            <template x-if="amt === 2"><x-schulkantine::coin value="2e" /></template>
+                                        </div>
+                                        <span class="text-lg font-semibold text-amber-900" x-text="amt < 1 ? (amt*100)+' Cent' : amt+' Euro'"></span>
+                                    </div>
+                                    <div class="shrink-0 text-right" x-show="coinQty[String(amt)]" x-cloak>
+                                        <span class="text-xl font-extrabold text-amber-900"><span x-text="coinQty[String(amt)] || 0"></span>×</span>
+                                        <span class="ml-1 text-sm text-amber-700" x-text="euro((coinQty[String(amt)] || 0) * amt)"></span>
+                                    </div>
+                                </div>
                                 <button type="button" @click="coinPlus(amt)"
                                         class="step-btn flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-3xl font-bold text-white">+</button>
-                                <div class="w-24 shrink-0 text-right">
-                                    <div class="text-xs text-gray-400"><span x-text="coinQty[String(amt)] || 0"></span> ×</div>
-                                    <div class="text-xl font-extrabold" :class="coinQty[String(amt)] ? 'text-amber-900' : 'text-gray-300'"
-                                         x-text="euro((coinQty[String(amt)] || 0) * amt)"></div>
-                                </div>
                             </div>
                         </template>
                     </div>
