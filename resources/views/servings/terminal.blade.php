@@ -581,13 +581,13 @@
                     <div class="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">Nachschlag</div>
                     <div class="flex items-center justify-center gap-6">
                         <button type="button" @click="nachschlagMinus()" :disabled="nachschlagTotal <= 0"
-                                class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-4xl font-bold text-gray-700 shadow-sm disabled:opacity-30">−</button>
-                        <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border bg-amber-50 p-1.5 shadow-sm"
+                                class="step-btn flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gray-200 text-5xl font-bold text-gray-700 shadow-sm disabled:opacity-30">−</button>
+                        <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border bg-amber-50 p-1.5 shadow-sm"
                              :class="nachschlagTotal > 0 ? 'border-amber-400 ring-2 ring-amber-200' : 'border-amber-200'">
-                            <div class="h-12 w-12"><x-schulkantine::coin value="50c" /></div>
+                            <div class="h-16 w-16"><x-schulkantine::coin value="50c" /></div>
                         </div>
                         <button type="button" @click="nachschlagPlus()"
-                                class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-4xl font-bold text-white shadow-sm">+</button>
+                                class="step-btn flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-5xl font-bold text-white shadow-sm">+</button>
                         <div class="min-w-[6rem] whitespace-nowrap text-2xl font-extrabold"
                              :class="nachschlagTotal > 0 ? 'text-amber-900' : 'text-gray-300'" x-text="euro(nachschlagTotal)"></div>
                         <button type="button" @click="openPad()"
