@@ -629,7 +629,7 @@
     {{-- Such-Modal: Live-Suche nach Person (max. 3 Treffer, Name + Klasse) mit
          eingebauter Bildschirmtastatur (Touch). --}}
     <div x-show="searchOpen" x-cloak
-         class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-6 pt-16"
+         class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-6"
          @click.self="closeSearch()" @keydown.escape.window="closeSearch()">
         <div class="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl">
             <div class="mb-3 flex items-center justify-between">
