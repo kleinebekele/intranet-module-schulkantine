@@ -41,7 +41,6 @@
             open: @js($open),
             planGroups: @js($planGroups),
             walkinGroups: @js($walkinGroups),
-            coins: @js(array_map('floatval', $coins)),
             simChips: @js($simChips),
             ogsPrice: @js((float) ($season->ogs_price ?? 0)),
 
@@ -50,7 +49,9 @@
             choice: {},            // category_id -> dish_id | 'declined'
             orderMeta: {},         // category_id -> { order_id, orderedDishId }
             walkinQty: {},         // dish_id -> Anzahl
-            coinQty: {},           // Betrag(String) -> Anzahl
+            nachschlagTotal: 0,    // Nachschlag-Betrag (50-ct-Schritte oder manuell)
+            padOpen: false,        // Zahlen-Tastatur (manueller Betrag)
+            padValue: '',
             autoFinish: false,     // beim naechsten Chip automatisch buchen
             busy: false,
             banner: null,          // { ok, text }
@@ -91,31 +92,24 @@
                 this.walkinGroups.forEach(g => g.dishes.forEach(d => { m[d.id] = d.price; }));
                 return m;
             },
-            get extrasCount() {
-                let n = 0;
-                Object.values(this.walkinQty).forEach(q => n += q);
-                Object.values(this.coinQty).forEach(q => n += q);
-                return n;
-            },
+            get hasWalkin() { return Object.values(this.walkinQty).some(q => q > 0); },
             get extrasTotal() {
-                let sum = 0;
+                let sum = this.nachschlagTotal;
                 for (const [id, q] of Object.entries(this.walkinQty)) sum += (this.walkinPrices[id] || 0) * q;
-                for (const [amt, q] of Object.entries(this.coinQty)) sum += parseFloat(amt) * q;
                 return sum;
             },
             get isOgs() { return this.person && this.person.mode === 'ja_nein'; },
             // Ist alles im „frischen Stempel"-Zustand? (Menü = bestellt/genommen,
             // keine Extras.) Dann bringt „Zurück" nichts und wird ausgeblendet.
             get isDefaultState() {
-                for (const q of Object.values(this.walkinQty)) if (q > 0) return false;
-                for (const q of Object.values(this.coinQty)) if (q > 0) return false;
+                if (this.hasWalkin || this.nachschlagTotal > 0) return false;
                 for (const [catId, meta] of Object.entries(this.orderMeta)) {
                     if (this.choice[catId] !== meta.orderedDishId) return false;
                 }
                 return true;
             },
             get hasSomething() {
-                if (this.extrasCount > 0) return true;
+                if (this.hasWalkin || this.nachschlagTotal > 0) return true;
                 // Menue-Auswahl zaehlt als Buchung, sobald der Esser eine Bestellung hat.
                 if (this.person && this.person.hasOrder) return true;
                 // War schon etwas gebucht, muss auch das Zuruecknehmen (auf 0) buchbar sein.
@@ -237,7 +231,7 @@
                 this.choice = {};
                 this.orderMeta = {};
                 this.walkinQty = {};
-                this.coinQty = {};
+                this.nachschlagTotal = 0;
                 if (this.person && this.person.hasOrder) {
                     this.person.dishes.forEach(d => {
                         if (d.category_id == null) return;
@@ -262,8 +256,7 @@
                 (data.walkin || []).forEach(w => {
                     this.servedOnLoad = true;
                     if (w.label === 'Nachschlag') {
-                        const k = String(w.price);
-                        this.coinQty[k] = (this.coinQty[k] || 0) + 1;
+                        this.nachschlagTotal = Math.round((this.nachschlagTotal + w.price) * 100) / 100;
                     } else if (w.dish_id != null) {
                         this.walkinQty[w.dish_id] = (this.walkinQty[w.dish_id] || 0) + 1;
                     }
@@ -297,8 +290,19 @@
             rightEnabled() { return this.person && !this.isOgs; },
             walkinPlus(id) { if (!this.rightEnabled()) return; this.walkinQty[id] = (this.walkinQty[id] || 0) + 1; },
             walkinMinus(id) { if (!this.walkinQty[id]) return; this.walkinQty[id] = Math.max(0, this.walkinQty[id] - 1); if (!this.walkinQty[id]) delete this.walkinQty[id]; },
-            coinPlus(amt) { if (!this.rightEnabled()) return; const k = String(amt); this.coinQty[k] = (this.coinQty[k] || 0) + 1; },
-            coinMinus(amt) { const k = String(amt); if (!this.coinQty[k]) return; this.coinQty[k] = Math.max(0, this.coinQty[k] - 1); if (!this.coinQty[k]) delete this.coinQty[k]; },
+            nachschlagPlus() { if (!this.rightEnabled()) return; this.nachschlagTotal = Math.round((this.nachschlagTotal + 0.5) * 100) / 100; },
+            nachschlagMinus() { this.nachschlagTotal = Math.max(0, Math.round((this.nachschlagTotal - 0.5) * 100) / 100); },
+            // ---- Zahlen-Tastatur (manueller Nachschlag-Betrag) ----
+            openPad() { if (!this.rightEnabled()) return; this.padValue = ''; this.padOpen = true; },
+            padKey(ch) {
+                if (ch === ',') { if (!this.padValue.includes(',')) this.padValue += (this.padValue === '' ? '0,' : ','); return; }
+                if (this.padValue.includes(',') && this.padValue.split(',')[1].length >= 2) return; // max 2 Nachkommastellen
+                this.padValue = (this.padValue === '0') ? ch : this.padValue + ch;
+            },
+            padBackspace() { this.padValue = this.padValue.slice(0, -1); },
+            padClear() { this.padValue = ''; },
+            padConfirm() { this.nachschlagTotal = Math.round((parseFloat(this.padValue.replace(',', '.')) || 0) * 100) / 100; this.padOpen = false; },
+            padCancel() { this.padOpen = false; },
 
             // ---- Aktionen ----
             cancel() { this.person = null; this.servedOnLoad = false; this.resetSelection(); this.banner = null; },
@@ -319,7 +323,7 @@
                     menu.push({ order_id: meta.order_id, outcome });
                 }
                 const walkin = Object.entries(this.walkinQty).map(([dish_id, qty]) => ({ dish_id: Number(dish_id), qty }));
-                const nachschlag = Object.entries(this.coinQty).map(([amount, qty]) => ({ amount: parseFloat(amount), qty }));
+                const nachschlag = this.nachschlagTotal > 0 ? [{ amount: this.nachschlagTotal, qty: 1 }] : [];
                 return { eater_id: this.person.user_id, date: this.date, menu, walkin, nachschlag };
             },
 
@@ -571,33 +575,23 @@
                     <div x-show="!walkinGroups.length" class="text-sm text-gray-400">Heute keine Artikel zur spontanen Mitnahme.</div>
                 </div>
 
-                {{-- Unten: Nachschlag – drei getrennte Kacheln (Minus · Münze · Plus),
-                     danach die Anzahl × Summe. Kein gemeinsamer Rahmen. --}}
+                {{-- Unten: Nachschlag – ein Betrag. 50-ct-Schritte über −/+, oder
+                     „Betrag eingeben" für einen exakten Wert per Zahlen-Tastatur. --}}
                 <div class="border-t border-gray-200 bg-white p-3">
                     <div class="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">Nachschlag</div>
-                    <div class="space-y-2">
-                        <template x-for="amt in coins" :key="amt">
-                            <div class="flex items-center justify-center gap-8">
-                                <button type="button" @click="coinMinus(amt)" :disabled="!coinQty[String(amt)]"
-                                        class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-4xl font-bold text-gray-700 shadow-sm disabled:opacity-30">−</button>
-                                {{-- Münz-Kachel --}}
-                                <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border bg-amber-50 p-1.5 shadow-sm"
-                                     :class="coinQty[String(amt)] ? 'border-amber-400 ring-2 ring-amber-200' : 'border-amber-200'">
-                                    <div class="h-12 w-12">
-                                        <template x-if="amt === 0.5"><x-schulkantine::coin value="50c" /></template>
-                                        <template x-if="amt === 1"><x-schulkantine::coin value="1e" /></template>
-                                        <template x-if="amt === 2"><x-schulkantine::coin value="2e" /></template>
-                                    </div>
-                                </div>
-                                <button type="button" @click="coinPlus(amt)"
-                                        class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-4xl font-bold text-white shadow-sm">+</button>
-                                <div class="min-w-[6.5rem] whitespace-nowrap text-lg font-bold"
-                                     :class="coinQty[String(amt)] ? 'text-amber-900' : 'text-gray-300'">
-                                    <span x-text="coinQty[String(amt)] || 0"></span>×
-                                    <span class="text-sm font-medium" x-text="euro((coinQty[String(amt)] || 0) * amt)"></span>
-                                </div>
-                            </div>
-                        </template>
+                    <div class="flex items-center justify-center gap-6">
+                        <button type="button" @click="nachschlagMinus()" :disabled="nachschlagTotal <= 0"
+                                class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-4xl font-bold text-gray-700 shadow-sm disabled:opacity-30">−</button>
+                        <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border bg-amber-50 p-1.5 shadow-sm"
+                             :class="nachschlagTotal > 0 ? 'border-amber-400 ring-2 ring-amber-200' : 'border-amber-200'">
+                            <div class="h-12 w-12"><x-schulkantine::coin value="50c" /></div>
+                        </div>
+                        <button type="button" @click="nachschlagPlus()"
+                                class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-4xl font-bold text-white shadow-sm">+</button>
+                        <div class="min-w-[6rem] whitespace-nowrap text-2xl font-extrabold"
+                             :class="nachschlagTotal > 0 ? 'text-amber-900' : 'text-gray-300'" x-text="euro(nachschlagTotal)"></div>
+                        <button type="button" @click="openPad()"
+                                class="flex h-16 items-center gap-2 rounded-xl bg-gray-100 px-4 text-base font-semibold text-gray-700 shadow-sm hover:bg-gray-200">⌨ Betrag eingeben</button>
                     </div>
                 </div>
 
@@ -700,6 +694,34 @@
                     <button type="button" @click="keyBackspace()" class="h-14 flex-1 rounded-lg bg-amber-100 text-2xl font-bold text-amber-800 shadow-sm hover:bg-amber-200">⌫</button>
                     <button type="button" @click="keyClear()" class="h-14 flex-1 rounded-lg bg-red-100 text-base font-bold text-red-700 shadow-sm hover:bg-red-200">Löschen</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Zahlen-Tastatur: manueller Nachschlag-Betrag --}}
+    <div x-show="padOpen" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
+         @click.self="padCancel()" @keydown.escape.window="padCancel()">
+        <div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+            <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-gray-800">Nachschlag-Betrag</h3>
+                <button @click="padCancel()" class="rounded-lg px-3 py-1 text-xl text-gray-400 hover:bg-gray-100">✕</button>
+            </div>
+            <div class="mb-4 rounded-xl border-2 border-amber-200 bg-amber-50 px-4 py-3 text-right text-3xl font-extrabold text-amber-900">
+                <span x-text="(padValue || '0') + ' €'"></span>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                <template x-for="n in ['1','2','3','4','5','6','7','8','9']" :key="n">
+                    <button type="button" @click="padKey(n)" class="h-16 rounded-xl bg-gray-100 text-2xl font-bold text-gray-800 shadow-sm hover:bg-gray-200 active:bg-amber-200" x-text="n"></button>
+                </template>
+                <button type="button" @click="padKey(',')" class="h-16 rounded-xl bg-gray-100 text-2xl font-bold text-gray-800 shadow-sm hover:bg-gray-200 active:bg-amber-200">,</button>
+                <button type="button" @click="padKey('0')" class="h-16 rounded-xl bg-gray-100 text-2xl font-bold text-gray-800 shadow-sm hover:bg-gray-200 active:bg-amber-200">0</button>
+                <button type="button" @click="padBackspace()" class="h-16 rounded-xl bg-amber-100 text-2xl font-bold text-amber-800 shadow-sm hover:bg-amber-200">⌫</button>
+            </div>
+            <div class="mt-4 flex gap-2">
+                <button type="button" @click="padClear()" class="h-14 flex-1 rounded-xl bg-red-100 text-base font-bold text-red-700 shadow-sm hover:bg-red-200">Löschen</button>
+                <button type="button" @click="padCancel()" class="h-14 flex-1 rounded-xl border border-gray-300 bg-white text-base font-semibold text-gray-600 hover:bg-gray-50">Abbrechen</button>
+                <button type="button" @click="padConfirm()" class="h-14 flex-[1.5] rounded-xl bg-green-600 text-base font-bold text-white shadow hover:bg-green-700">Übernehmen</button>
             </div>
         </div>
     </div>

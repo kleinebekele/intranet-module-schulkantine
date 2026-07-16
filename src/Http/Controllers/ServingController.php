@@ -1140,9 +1140,6 @@ class ServingController
 
     // ------------------------------------------------- Ausgabe-Terminal (Kiosk)
 
-    /** Feste Nachschlag-Beträge (Münz-Buttons rechts unten). */
-    public const NACHSCHLAG_STEPS = [0.50, 1.00, 2.00];
-
     /**
      * Touch-optimierte Vollbild-Ausgabe (eigenes Layout ohne Header/Sidebar).
      * Liest nur; gebucht wird über terminalCommit(). Der Chip-Stempel läuft im
@@ -1175,7 +1172,6 @@ class ServingController
             'planGroups' => $open ? $this->terminalPlanDishes($season, $date) : collect(),
             'walkinGroups' => $open ? $this->terminalWalkinGroups($season, $date) : collect(),
             'week' => $this->terminalWeek($season, $date),
-            'coins' => self::NACHSCHLAG_STEPS,
             'simChips' => $simChips,
             'prevDate' => (new DeadlineService)->previousOpenDay($season, $date)?->toDateString(),
             'nextDate' => $this->nextOpenDay($season, $date),
