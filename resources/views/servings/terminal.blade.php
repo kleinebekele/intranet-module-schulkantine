@@ -68,8 +68,20 @@
                 ['Y','X','C','V','B','N','M','ß'],
             ],
 
+            // Mindestgröße fürs Terminal-Layout.
+            tooSmall: false,
+            vw: 0,
+            vh: 0,
+
             init() {
                 this.autoFinish = localStorage.getItem('kantineTerminalAutoFinish') === '1';
+                this.checkSize();
+                window.addEventListener('resize', () => this.checkSize());
+            },
+            checkSize() {
+                this.vw = window.innerWidth;
+                this.vh = window.innerHeight;
+                this.tooSmall = this.vw < 1000 || this.vh < 700;
             },
 
             // ---- Preis-Helfer ----
@@ -343,6 +355,18 @@
 </script>
 
 <div x-data="terminal()" x-cloak class="flex h-full flex-col select-none">
+
+    {{-- Zu kleiner Bildschirm: Vollbild-Hinweis (Terminal braucht mind. 1000 × 700). --}}
+    <div x-show="tooSmall" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900 p-8 text-center">
+        <div class="max-w-md">
+            <div class="text-6xl">🖥️</div>
+            <h2 class="mt-4 text-2xl font-bold text-white">Bildschirm zu klein</h2>
+            <p class="mt-3 text-lg text-gray-300">Das Ausgabe-Terminal benötigt mindestens <strong class="text-white">1000 × 700 Pixel</strong>.</p>
+            <p class="mt-2 text-sm text-gray-400">Aktuell: <span x-text="vw"></span> × <span x-text="vh"></span> px</p>
+            <a href="{{ route('module.schulkantine.servings.index') }}"
+               class="mt-6 inline-block rounded-lg bg-indigo-600 px-5 py-3 text-sm font-medium text-white hover:bg-indigo-700">Zur normalen Ausgabe</a>
+        </div>
+    </div>
 
     {{-- ================= INFOZEILE (10%) ================= --}}
     <header class="flex h-[10%] min-h-[72px] w-full items-stretch border-b border-gray-300 bg-white">
