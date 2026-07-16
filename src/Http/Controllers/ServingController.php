@@ -1430,6 +1430,7 @@ class ServingController
                 'category' => $cat,
                 'dishes' => $dishes->map(fn (Dish $d) => [
                     'id' => $d->id, 'name' => $d->name, 'price' => (float) $d->price,
+                    'photo' => $d->photoUrl(),
                 ])->values(),
             ])->values();
     }

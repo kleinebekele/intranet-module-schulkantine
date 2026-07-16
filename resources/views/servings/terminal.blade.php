@@ -502,10 +502,17 @@
                                     <div class="flex items-center justify-center gap-8">
                                         <button type="button" @click="walkinMinus(dish.id)" :disabled="!walkinQty[dish.id]"
                                                 class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-4xl font-bold text-gray-700 shadow-sm disabled:opacity-30">−</button>
-                                        <div class="flex h-16 min-w-[9rem] max-w-[18rem] flex-col items-center justify-center rounded-xl border bg-white px-4 text-center shadow-sm"
+                                        {{-- Artikel-Kachel wie links: Bild (oder Platzhalter) + Name + Preis. --}}
+                                        <div class="flex w-[19rem] items-stretch gap-3 rounded-2xl border-2 bg-white p-2 shadow-sm"
                                              :class="walkinQty[dish.id] ? 'border-indigo-400 ring-2 ring-indigo-200' : 'border-gray-200'">
-                                            <span class="truncate text-lg font-semibold leading-tight text-gray-800" x-text="dish.name"></span>
-                                            <span class="text-sm font-medium text-gray-500" x-text="euro(dish.price)"></span>
+                                            <div class="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-gray-50">
+                                                <template x-if="dish.photo"><img :src="dish.photo" alt="" class="h-20 w-20 object-cover"></template>
+                                                <template x-if="!dish.photo"><x-schulkantine::dish-placeholder /></template>
+                                            </div>
+                                            <div class="flex min-w-0 flex-1 flex-col justify-center pr-1">
+                                                <span class="text-lg font-semibold leading-tight text-gray-800" x-text="dish.name"></span>
+                                                <span class="mt-0.5 text-base font-medium text-gray-500" x-text="euro(dish.price)"></span>
+                                            </div>
                                         </div>
                                         <button type="button" @click="walkinPlus(dish.id)"
                                                 class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-4xl font-bold text-white shadow-sm">+</button>
