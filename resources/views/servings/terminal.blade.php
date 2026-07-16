@@ -33,6 +33,8 @@
             csrf: document.querySelector('meta[name=csrf-token]').content,
             urls: {
                 lookup: @js(route('module.schulkantine.servings.lookup')),
+                lookupEater: @js(route('module.schulkantine.servings.lookup-eater')),
+                search: @js(route('module.schulkantine.servings.terminal.search')),
                 commit: @js(route('module.schulkantine.servings.terminal.commit')),
                 base: @js(route('module.schulkantine.servings.terminal')),
             },
@@ -55,6 +57,10 @@
             scanning: false,
             ctrl: null,
             servedOnLoad: false,   // war beim Stempeln schon etwas gebucht?
+            searchOpen: false,
+            searchQuery: '',
+            searchResults: [],
+            searching: false,
 
             init() {
                 this.autoFinish = localStorage.getItem('kantineTerminalAutoFinish') === '1';
@@ -104,14 +110,19 @@
             },
             stopScan() { if (this.ctrl) this.ctrl.abort(); this.scanning = false; },
 
+            // Offene Transaktion? Je nach Einstellung automatisch buchen oder nur warnen.
+            // Gibt true zurück, wenn die nächste Person geladen werden darf.
+            async guardPending() {
+                if (!this.person || !this.hasSomething) return true;
+                if (this.autoFinish) return await this.commit(true);
+                this.banner = { ok:false, text:'Erst „Bestaetigen" oder „Abbrechen" – dann die naechste Person.' };
+                return false;
+            },
+
             async openFor(uid) {
                 if (!uid) { this.banner = { ok:false, text:'Chip ohne Kennung.' }; return; }
                 if (this.busy) return;
-                // Offene Transaktion? Je nach Einstellung automatisch buchen oder nur warnen.
-                if (this.person && this.hasSomething) {
-                    if (this.autoFinish) { const ok = await this.commit(true); if (!ok) return; }
-                    else { this.banner = { ok:false, text:'Erst „Bestaetigen" oder „Abbrechen" – dann den naechsten Chip.' }; return; }
-                }
+                if (! await this.guardPending()) return;
                 this.busy = true;
                 try {
                     const res = await fetch(this.urls.lookup, {
@@ -124,6 +135,51 @@
                     this.loadPerson(data);
                 } catch (e) {
                     this.banner = { ok:false, text:'Fehler beim Lesen: ' + e };
+                }
+                this.busy = false;
+            },
+
+            // ---- Personen-Suche (Modal) ----
+            openSearch() {
+                this.searchOpen = true;
+                this.searchQuery = '';
+                this.searchResults = [];
+                this.$nextTick(() => this.$refs.searchInput && this.$refs.searchInput.focus());
+            },
+            closeSearch() { this.searchOpen = false; },
+            async doSearch() {
+                const q = this.searchQuery.trim();
+                if (!q) { this.searchResults = []; this.searching = false; return; }
+                this.searching = true;
+                try {
+                    const res = await fetch(this.urls.search, {
+                        method: 'POST',
+                        headers: { 'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': this.csrf },
+                        body: JSON.stringify({ q }),
+                    });
+                    const data = await res.json();
+                    this.searchResults = data.results || [];
+                } catch (e) {
+                    this.banner = { ok:false, text:'Suche fehlgeschlagen: ' + e };
+                }
+                this.searching = false;
+            },
+            async pickSearch(id) {
+                if (this.busy) return;
+                if (! await this.guardPending()) return;
+                this.busy = true;
+                try {
+                    const res = await fetch(this.urls.lookupEater, {
+                        method: 'POST',
+                        headers: { 'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': this.csrf },
+                        body: JSON.stringify({ eater_id: id, date: this.date }),
+                    });
+                    const data = await res.json();
+                    if (!data.found) { this.banner = { ok:false, text:'Person nicht gefunden.' }; this.busy = false; return; }
+                    this.loadPerson(data);
+                    this.closeSearch();
+                } catch (e) {
+                    this.banner = { ok:false, text:'Fehler beim Laden: ' + e };
                 }
                 this.busy = false;
             },
@@ -536,8 +592,36 @@
             </div>
         </div>
 
+        <button @click="openSearch()" class="rounded-full bg-gray-800/80 px-4 py-2 text-sm font-medium text-white shadow-lg hover:bg-gray-700">🔍 Suchen</button>
+
         <a href="{{ route('module.schulkantine.servings.index') }}"
            class="rounded-full bg-gray-800/70 px-4 py-2 text-sm font-medium text-white shadow-lg hover:bg-gray-800">✕ Terminal verlassen</a>
+    </div>
+
+    {{-- Such-Modal: Live-Suche nach Person (max. 3 Treffer, Name + Klasse) --}}
+    <div x-show="searchOpen" x-cloak
+         class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-6 pt-24"
+         @click.self="closeSearch()" @keydown.escape.window="closeSearch()">
+        <div class="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
+            <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-gray-800">Person suchen</h3>
+                <button @click="closeSearch()" class="rounded-lg px-2 py-1 text-gray-400 hover:bg-gray-100">✕</button>
+            </div>
+            <input type="search" x-model="searchQuery" @input.debounce.200ms="doSearch()" x-ref="searchInput"
+                   placeholder="Namen eingeben …"
+                   class="w-full rounded-xl border-gray-300 px-4 py-3 text-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            <div class="mt-3 space-y-2">
+                <template x-for="r in searchResults" :key="r.id">
+                    <button @click="pickSearch(r.id)"
+                            class="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-200 p-4 text-left hover:border-indigo-400 hover:bg-indigo-50">
+                        <span class="truncate text-lg font-semibold text-gray-800" x-text="r.name"></span>
+                        <span class="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-sm font-semibold text-indigo-700" x-text="'Klasse: ' + (r.group || '–')"></span>
+                    </button>
+                </template>
+                <div x-show="searchQuery.trim() && !searchResults.length && !searching" x-cloak class="py-3 text-center text-sm text-gray-400">Keine Treffer.</div>
+                <div x-show="!searchQuery.trim()" x-cloak class="py-3 text-center text-sm text-gray-400">Tippe einen Namen – es werden bis zu drei Treffer angezeigt.</div>
+            </div>
+        </div>
     </div>
 
 </div>

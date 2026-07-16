@@ -1183,6 +1183,39 @@ class ServingController
     }
 
     /**
+     * Live-Suche fürs Terminal: bis zu 3 Personen zu einem Namensteil, mit Gruppe
+     * (als „Klasse"). OGS-Kinder (ja/nein) sind ausgenommen – sie haben keine Chips
+     * und werden am Tagesmenü-Terminal nicht ausgegeben. Antwort als JSON.
+     */
+    public function terminalSearch(Request $request)
+    {
+        abort_unless(Access::canServe($request->user()), 403, 'Kein Zugriff auf das Ausgabe-Terminal.');
+
+        $q = trim((string) $request->input('q', ''));
+        if ($q === '') {
+            return response()->json(['results' => []]);
+        }
+
+        $ogsRoleIds = CustomerGroup::where('ordering_mode', CustomerGroup::MODE_JA_NEIN)->pluck('role_id');
+        $groups = CustomerGroup::all()->keyBy('role_id');
+
+        $users = User::where('name', 'like', '%'.$q.'%')
+            ->whereDoesntHave('roles', fn ($r) => $r->whereIn('roles.role_id', $ogsRoleIds))
+            ->with('roles')
+            ->orderBy('name')
+            ->limit(3)
+            ->get();
+
+        return response()->json([
+            'results' => $users->map(fn (User $u) => [
+                'id' => $u->id,
+                'name' => $u->name,
+                'group' => CustomerGroup::forUser($u, $groups)?->name,
+            ])->values(),
+        ]);
+    }
+
+    /**
      * Bucht eine ganze Terminal-Transaktion atomar: die Menü-Ausgabe des Essers
      * (je Bestellung genommen/Alternative/abgelehnt – wie serveConfirm), spontane
      * Extras (Walk-in) und freie Nachschlag-Beträge. Antwort als JSON inkl. der
