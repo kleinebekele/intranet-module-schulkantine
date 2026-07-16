@@ -1360,6 +1360,7 @@ class ServingController
                         'id' => $m->dish_id,
                         'name' => $m->dish->name,
                         'price' => (float) $m->dish->price,
+                        'photo' => $m->dish->photoUrl(),
                         'is_bundle' => $m->dish->isBundle(),
                         'components' => $m->dish->components->pluck('name')->all(),
                         'ordered' => $o,

@@ -330,18 +330,18 @@
                     </div>
                 </div>
 
-                <div class="space-y-4">
+                <div class="space-y-5">
                     <template x-for="group in planGroups" :key="group.category_id">
-                        <fieldset class="rounded-xl border-2 px-2 pb-2 pt-1"
+                        <fieldset class="rounded-2xl border-2 px-3 pb-3 pt-2"
                                   :style="group.color ? ('border-color:' + group.color + ';background-color:' + group.color + '10') : ''"
                                   :class="group.color ? '' : 'border-gray-200'">
-                            <legend class="px-1 text-xs font-bold uppercase tracking-wide" :style="group.color ? ('color:' + group.color) : ''" x-text="group.category"></legend>
-                            <div class="space-y-2">
+                            <legend class="px-1.5 text-sm font-bold uppercase tracking-wide" :style="group.color ? ('color:' + group.color) : ''" x-text="group.category"></legend>
+                            <div class="space-y-3">
                                 <template x-for="dish in group.dishes" :key="dish.id">
                                     <button type="button"
                                             @click="clickTile(group.category_id, dish.id)"
                                             :disabled="!tileClickable(group.category_id)"
-                                            class="w-full rounded-xl border-2 p-2 text-left transition"
+                                            class="flex w-full items-stretch gap-4 rounded-2xl border-2 p-3 text-left transition"
                                             :class="{
                                                 'border-green-500 bg-green-50 ring-2 ring-green-300': tileState(group.category_id, dish.id)==='taken',
                                                 'border-amber-500 bg-amber-50 ring-2 ring-amber-300': tileState(group.category_id, dish.id)==='alt',
@@ -350,20 +350,28 @@
                                                 'border-gray-200 bg-white': tileState(group.category_id, dish.id)==='idle',
                                                 'cursor-default': !tileClickable(group.category_id)
                                             }">
-                                        {{-- Zähler-Streifen --}}
-                                        <div class="mb-1 flex items-center gap-2 text-sm font-bold">
-                                            <span class="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-gray-100 px-2 text-gray-700" x-text="dish.ordered"></span>
-                                            <span class="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-amber-100 px-2 text-amber-700" x-text="dish.open"></span>
-                                            <span class="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-green-100 px-2 text-green-700" x-text="dish.served"></span>
-                                            <span class="ml-auto text-sm font-semibold text-gray-500" x-text="euro(dish.price)"></span>
+                                        {{-- Bild oder Platzhalter-Illustration --}}
+                                        <div class="h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-gray-50">
+                                            <template x-if="dish.photo"><img :src="dish.photo" alt="" class="h-24 w-24 object-cover"></template>
+                                            <template x-if="!dish.photo"><x-schulkantine::dish-placeholder /></template>
                                         </div>
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-lg font-semibold text-gray-800" x-text="dish.name"></span>
-                                            <span x-show="tileState(group.category_id, dish.id)==='taken'" class="ml-auto text-green-600">✓ wird ausgegeben</span>
-                                            <span x-show="tileState(group.category_id, dish.id)==='alt'" class="ml-auto text-amber-600">✓ Alternative</span>
-                                            <span x-show="tileState(group.category_id, dish.id)==='declined'" class="ml-auto text-red-500">nicht genommen</span>
+                                        {{-- Inhalt --}}
+                                        <div class="flex min-w-0 flex-1 flex-col">
+                                            {{-- Zähler-Streifen --}}
+                                            <div class="mb-1.5 flex items-center gap-2 font-bold">
+                                                <span class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-gray-100 px-2 text-base text-gray-700" x-text="dish.ordered"></span>
+                                                <span class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-amber-100 px-2 text-base text-amber-700" x-text="dish.open"></span>
+                                                <span class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-green-100 px-2 text-base text-green-700" x-text="dish.served"></span>
+                                                <span class="ml-auto text-base font-semibold text-gray-500" x-text="euro(dish.price)"></span>
+                                            </div>
+                                            <span class="text-xl font-bold leading-tight text-gray-800" x-text="dish.name"></span>
+                                            <div x-show="dish.is_bundle" class="text-sm text-teal-700" x-text="dish.components.join(' + ')"></div>
+                                            <div class="mt-auto pt-1 text-base font-semibold">
+                                                <span x-show="tileState(group.category_id, dish.id)==='taken'" class="text-green-600">✓ wird ausgegeben</span>
+                                                <span x-show="tileState(group.category_id, dish.id)==='alt'" class="text-amber-600">✓ Alternative</span>
+                                                <span x-show="tileState(group.category_id, dish.id)==='declined'" class="text-red-500">✗ nicht genommen</span>
+                                            </div>
                                         </div>
-                                        <div x-show="dish.is_bundle" class="text-xs text-teal-700" x-text="dish.components.join(' + ')"></div>
                                     </button>
                                 </template>
                             </div>
