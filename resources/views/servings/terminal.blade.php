@@ -497,11 +497,8 @@
                     </div>
                 </div>
 
-                {{-- Footer: Anzahl + Gesamtpreis + Buchen --}}
-                <div class="flex items-center justify-between gap-4 border-t-2 border-gray-300 bg-white px-4 py-3">
-                    <div class="text-sm text-gray-500">
-                        <span class="text-lg font-bold text-gray-800" x-text="extrasCount"></span> Extra-Dinge gewählt
-                    </div>
+                {{-- Footer: Gesamtpreis + Buchen --}}
+                <div class="flex items-center justify-end gap-4 border-t-2 border-gray-300 bg-white px-4 py-3">
                     <div class="flex items-center gap-5">
                         <div class="text-right">
                             <div class="text-[11px] uppercase tracking-wide text-gray-400">Gesamt (nur Extras)</div>

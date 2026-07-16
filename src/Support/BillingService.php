@@ -264,14 +264,36 @@ class BillingService
             ->where('user_id', $userId)->where('spontaneous', true)
             ->whereBetween('date', [$from, $to])
             ->with('dish.category')->orderBy('date')->get();
-        $spontan = $spontanRows->map(fn (Serving $s) => [
-            'date' => $s->date,
-            // Nachschlag & Co. haben kein Gericht, aber ein Label – so bleibt in der
-            // Abrechnung nachvollziehbar, woraus sich der Betrag zusammensetzt.
-            'dish' => $s->dish?->name ?? $s->label ?? '—',
-            'category' => $s->dish?->category?->name ?? ($s->label ? 'Nachschlag' : '—'),
-            'price' => (float) $s->price_snapshot,
-        ])->all();
+        // Walk-in wird je Artikel gezeigt; der Nachschlag pro Tag zu EINER Zeile
+        // „Nachschlag" mit Gesamtbetrag zusammengefasst – die einzelnen Münz-Stufen
+        // (50 ct / 1 € / 2 €) sind nur ein Hilfsmittel, um den Betrag zu bilden, und
+        // gehören nicht als Einzelposten in die Abrechnung.
+        $spontan = [];
+        $nachschlagByDate = [];
+        foreach ($spontanRows as $s) {
+            if ($s->label !== null) {
+                $ds = $s->date->toDateString();
+                $nachschlagByDate[$ds] ??= ['date' => $s->date, 'sum' => 0.0];
+                $nachschlagByDate[$ds]['sum'] += (float) $s->price_snapshot;
+
+                continue;
+            }
+            $spontan[] = [
+                'date' => $s->date,
+                'dish' => $s->dish?->name ?? '—',
+                'category' => $s->dish?->category?->name ?? '—',
+                'price' => (float) $s->price_snapshot,
+            ];
+        }
+        foreach ($nachschlagByDate as $n) {
+            $spontan[] = [
+                'date' => $n['date'],
+                'dish' => 'Nachschlag',
+                'category' => 'Nachschlag',
+                'price' => round($n['sum'], 2),
+            ];
+        }
+        usort($spontan, fn ($a, $b) => $a['date'] <=> $b['date']);
         $spontanTotal = array_sum(array_column($spontan, 'price'));
 
         // 4) Chip-Pfand – Ausgabe (+) und Rückgabe (−) in diesem Monat.
