@@ -575,23 +575,24 @@
                     <div x-show="!walkinGroups.length" class="text-sm text-gray-400">Heute keine Artikel zur spontanen Mitnahme.</div>
                 </div>
 
-                {{-- Unten: Nachschlag – ein Betrag. 50-ct-Schritte über −/+, oder
-                     „Betrag eingeben" für einen exakten Wert per Zahlen-Tastatur. --}}
+                {{-- Unten: Nachschlag – exakt auf die Walk-in-Zeilen darüber ausgerichtet:
+                     gleiche −/+-Buttons, Münze über die Artikel-Breite zentriert, Preis in
+                     der Preis-Spalte. Der Preis ist klickbar (öffnet die Zahlen-Tastatur). --}}
                 <div class="border-t border-gray-200 bg-white p-3">
                     <div class="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">Nachschlag</div>
-                    <div class="flex items-center justify-center gap-6">
+                    <div class="flex items-center justify-center gap-8">
                         <button type="button" @click="nachschlagMinus()" :disabled="nachschlagTotal <= 0"
-                                class="step-btn flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gray-200 text-5xl font-bold text-gray-700 shadow-sm disabled:opacity-30">−</button>
-                        <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border bg-amber-50 p-1.5 shadow-sm"
+                                class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-4xl font-bold text-gray-700 shadow-sm disabled:opacity-30">−</button>
+                        <div class="flex w-[19rem] items-center justify-center rounded-2xl border-2 bg-amber-50 p-2 shadow-sm"
                              :class="nachschlagTotal > 0 ? 'border-amber-400 ring-2 ring-amber-200' : 'border-amber-200'">
-                            <div class="h-16 w-16"><x-schulkantine::coin value="50c" /></div>
+                            <div class="h-20 w-20"><x-schulkantine::coin value="50c" /></div>
                         </div>
                         <button type="button" @click="nachschlagPlus()"
-                                class="step-btn flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-5xl font-bold text-white shadow-sm">+</button>
-                        <div class="min-w-[6rem] whitespace-nowrap text-2xl font-extrabold"
-                             :class="nachschlagTotal > 0 ? 'text-amber-900' : 'text-gray-300'" x-text="euro(nachschlagTotal)"></div>
+                                class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-4xl font-bold text-white shadow-sm">+</button>
+                        {{-- Preis = klickbar zum Betrag eingeben (dezent gepunktet unterstrichen). --}}
                         <button type="button" @click="openPad()"
-                                class="flex h-16 items-center gap-2 rounded-xl bg-gray-100 px-4 text-base font-semibold text-gray-700 shadow-sm hover:bg-gray-200">⌨ Betrag eingeben</button>
+                                class="min-w-[6.5rem] whitespace-nowrap text-left text-xl font-extrabold underline decoration-dotted underline-offset-4 hover:text-amber-700"
+                                :class="nachschlagTotal > 0 ? 'text-amber-900' : 'text-gray-400'" x-text="euro(nachschlagTotal)"></button>
                     </div>
                 </div>
 
