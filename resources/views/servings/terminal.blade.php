@@ -59,6 +59,8 @@
             ctrl: null,
             servedOnLoad: false,   // war beim Stempeln schon etwas gebucht?
             overviewOpen: false,   // „Übersicht"-Ansicht (Männchen-Button, Inhalt folgt)
+            modalOpen: false,      // Gericht-Detail-Modal
+            modalDish: null,
             searchOpen: false,
             searchQuery: '',
             searchResults: [],
@@ -263,6 +265,21 @@
                     }
                 });
             },
+
+            // ---- Verträglichkeiten / Detail-Modal ----
+            // Kollidiert das Gericht mit der Sonderkost der gestempelten Person?
+            // (Bei Sparmenüs sind die Allergene der Bestandteile bereits eingerechnet.)
+            dishWarn(dish) {
+                if (!this.person || !dish) return false;
+                const pa = this.person.allergenIds || [];
+                const pd = this.person.dietIds || [];
+                return (dish.allergenIds || []).some(id => pa.includes(id))
+                    || (dish.dietIds || []).some(id => pd.includes(id));
+            },
+            allergenHit(id) { return this.person && (this.person.allergenIds || []).includes(id); },
+            dietHit(id) { return this.person && (this.person.dietIds || []).includes(id); },
+            openDishModal(dish) { this.modalDish = dish; this.modalOpen = true; },
+            closeDishModal() { this.modalOpen = false; },
 
             // ---- Linke Spalte (Menue-Auswahl) ----
             catOrdered(catId) { return this.orderMeta[catId] !== undefined; },
@@ -481,22 +498,23 @@
                             <legend class="px-1.5 text-sm font-bold uppercase tracking-wide" :style="group.color ? ('color:' + group.color) : ''" x-text="group.category"></legend>
                             <div class="space-y-3">
                                 <template x-for="dish in group.dishes" :key="dish.id">
-                                    <button type="button"
-                                            @click="clickTile(group.category_id, dish.id)"
-                                            :disabled="!tileClickable(group.category_id)"
-                                            class="flex w-full items-stretch gap-4 rounded-2xl border-2 p-3 text-left transition"
-                                            :class="{
+                                    {{-- Ganze Kachel öffnet das Detail-Modal; die Auswahl läuft
+                                         über den eigenen Button rechts (@click.stop). --}}
+                                    <div @click="openDishModal(dish)"
+                                         class="flex w-full cursor-pointer items-stretch gap-4 rounded-2xl border-2 p-3 text-left transition"
+                                         :class="{
                                                 'border-green-500 bg-green-50 ring-2 ring-green-300': tileState(group.category_id, dish.id)==='taken',
                                                 'border-amber-500 bg-amber-50 ring-2 ring-amber-300': tileState(group.category_id, dish.id)==='alt',
                                                 'border-red-300 bg-red-50 opacity-70': tileState(group.category_id, dish.id)==='declined',
                                                 'border-indigo-300 bg-white hover:border-indigo-500': tileState(group.category_id, dish.id)==='selectable',
-                                                'border-gray-200 bg-white': tileState(group.category_id, dish.id)==='idle',
-                                                'cursor-default': !tileClickable(group.category_id)
+                                                'border-gray-200 bg-white': tileState(group.category_id, dish.id)==='idle'
                                             }">
-                                        {{-- Bild oder Platzhalter-Illustration --}}
-                                        <div class="h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-gray-50">
+                                        {{-- Bild oder Platzhalter + ⚠️ bei Unverträglichkeit --}}
+                                        <div class="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-gray-50">
                                             <template x-if="dish.photo"><img :src="dish.photo" alt="" class="h-24 w-24 object-cover"></template>
                                             <template x-if="!dish.photo"><x-schulkantine::dish-placeholder /></template>
+                                            <div x-show="dishWarn(dish)" x-cloak
+                                                 class="absolute left-0 top-0 flex h-8 w-8 items-center justify-center rounded-br-xl bg-yellow-400 text-lg font-black text-yellow-900 shadow">!</div>
                                         </div>
                                         {{-- Inhalt --}}
                                         <div class="flex min-w-0 flex-1 flex-col">
@@ -507,15 +525,26 @@
                                                 <span class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-green-100 px-2 text-base text-green-700" x-text="dish.served"></span>
                                                 <span class="ml-auto text-base font-semibold text-gray-500" x-text="euro(dish.price)"></span>
                                             </div>
-                                            <span class="text-xl font-bold leading-tight text-gray-800" x-text="dish.name"></span>
+                                            <span class="flex items-center gap-2 text-xl font-bold leading-tight text-gray-800">
+                                                <span x-text="dish.name"></span>
+                                                <span x-show="dishWarn(dish)" x-cloak class="shrink-0 rounded-md bg-yellow-100 px-1.5 text-sm font-bold text-yellow-800">⚠ nicht geeignet</span>
+                                            </span>
                                             <div x-show="dish.is_bundle" class="text-sm text-teal-700" x-text="dish.components.join(' + ')"></div>
-                                            <div class="mt-auto pt-1 text-base font-semibold">
-                                                <span x-show="tileState(group.category_id, dish.id)==='taken'" class="text-green-600">✓ wird ausgegeben</span>
-                                                <span x-show="tileState(group.category_id, dish.id)==='alt'" class="text-amber-600">✓ Alternative</span>
-                                                <span x-show="tileState(group.category_id, dish.id)==='declined'" class="text-red-500">✗ nicht genommen</span>
-                                            </div>
                                         </div>
-                                    </button>
+                                        {{-- Auswahl-Button (nur in einer bestellten Kategorie) --}}
+                                        <button type="button" x-show="tileClickable(group.category_id)" x-cloak
+                                                @click.stop="clickTile(group.category_id, dish.id)"
+                                                class="flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 text-sm font-bold transition"
+                                                :class="{
+                                                    'border-green-500 bg-green-100 text-green-700': tileState(group.category_id, dish.id)==='taken',
+                                                    'border-amber-500 bg-amber-100 text-amber-700': tileState(group.category_id, dish.id)==='alt',
+                                                    'border-red-300 bg-red-100 text-red-600': tileState(group.category_id, dish.id)==='declined',
+                                                    'border-gray-300 bg-white text-gray-400 hover:border-indigo-400': tileState(group.category_id, dish.id)==='selectable'
+                                                }">
+                                            <span class="text-3xl" x-text="['taken','alt'].includes(tileState(group.category_id, dish.id)) ? '✓' : (tileState(group.category_id, dish.id)==='declined' ? '✗' : '○')"></span>
+                                            <span x-text="tileState(group.category_id, dish.id)==='taken' ? 'ausgeben' : (tileState(group.category_id, dish.id)==='alt' ? 'Alternative' : (tileState(group.category_id, dish.id)==='declined' ? 'nein' : 'wählen'))"></span>
+                                        </button>
+                                    </div>
                                 </template>
                             </div>
                         </fieldset>
@@ -555,21 +584,25 @@
                             <div class="space-y-2">
                                 <template x-for="dish in group.dishes" :key="dish.id">
                                     <div class="flex items-center justify-center gap-8">
-                                        <button type="button" @click="walkinMinus(dish.id)" :disabled="!walkinQty[dish.id]"
+                                        <button type="button" @click.stop="walkinMinus(dish.id)" :disabled="!walkinQty[dish.id]"
                                                 class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-4xl font-bold text-gray-700 shadow-sm disabled:opacity-30">−</button>
-                                        {{-- Artikel-Kachel wie links: Bild (oder Platzhalter) + Name + Preis. --}}
-                                        <div class="flex w-[19rem] items-stretch gap-3 rounded-2xl border-2 bg-white p-2 shadow-sm"
+                                        {{-- Artikel-Kachel wie links: klickbar fürs Detail-Modal, Bild + Name + Preis, ⚠️ bei Konflikt. --}}
+                                        <div @click="openDishModal(dish)"
+                                             class="flex w-[19rem] cursor-pointer items-stretch gap-3 rounded-2xl border-2 bg-white p-2 shadow-sm"
                                              :class="walkinQty[dish.id] ? 'border-indigo-400 ring-2 ring-indigo-200' : 'border-gray-200'">
-                                            <div class="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-gray-50">
+                                            <div class="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-gray-50">
                                                 <template x-if="dish.photo"><img :src="dish.photo" alt="" class="h-20 w-20 object-cover"></template>
                                                 <template x-if="!dish.photo"><x-schulkantine::dish-placeholder /></template>
+                                                <div x-show="dishWarn(dish)" x-cloak
+                                                     class="absolute left-0 top-0 flex h-7 w-7 items-center justify-center rounded-br-xl bg-yellow-400 text-base font-black text-yellow-900 shadow">!</div>
                                             </div>
                                             <div class="flex min-w-0 flex-1 flex-col justify-center pr-1">
                                                 <span class="text-lg font-semibold leading-tight text-gray-800" x-text="dish.name"></span>
                                                 <span class="mt-0.5 text-base font-medium text-gray-500" x-text="euro(dish.price)"></span>
+                                                <span x-show="dishWarn(dish)" x-cloak class="mt-0.5 text-xs font-bold text-yellow-700">⚠ nicht geeignet</span>
                                             </div>
                                         </div>
-                                        <button type="button" @click="walkinPlus(dish.id)"
+                                        <button type="button" @click.stop="walkinPlus(dish.id)"
                                                 class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-4xl font-bold text-white shadow-sm">+</button>
                                         <div class="min-w-[6.5rem] whitespace-nowrap text-lg font-bold"
                                              :class="walkinQty[dish.id] ? 'text-gray-900' : 'text-gray-300'">
@@ -734,6 +767,77 @@
                 <button type="button" @click="padConfirm()" class="h-14 flex-[1.5] rounded-xl bg-green-600 text-base font-bold text-white shadow hover:bg-green-700">Übernehmen</button>
             </div>
         </div>
+    </div>
+
+    {{-- Gericht-Detail-Modal: alle Werte, konfliktbehaftete hervorgehoben. --}}
+    <div x-show="modalOpen" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-6"
+         @click.self="closeDishModal()" @keydown.escape.window="closeDishModal()">
+        <template x-if="modalDish">
+            <div class="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
+                <div class="mb-3 flex items-start justify-between gap-3">
+                    <h3 class="text-2xl font-bold text-gray-800" x-text="modalDish.name"></h3>
+                    <button @click="closeDishModal()" class="shrink-0 rounded-lg px-3 py-1 text-xl text-gray-400 hover:bg-gray-100">✕</button>
+                </div>
+
+                {{-- Warnung, wenn es zur Sonderkost der Person nicht passt --}}
+                <div x-show="dishWarn(modalDish)" x-cloak class="mb-3 rounded-xl bg-yellow-100 px-4 py-2 text-base font-bold text-yellow-900">
+                    ⚠ Nicht geeignet für <span x-text="person?.name"></span> – enthält gemiedene Zutaten.
+                </div>
+
+                <div class="flex gap-4">
+                    <div class="h-28 w-28 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-gray-50">
+                        <template x-if="modalDish.photo"><img :src="modalDish.photo" alt="" class="h-28 w-28 object-cover"></template>
+                        <template x-if="!modalDish.photo"><x-schulkantine::dish-placeholder /></template>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-xl font-bold text-gray-800" x-text="euro(modalDish.price)"></div>
+                        <div x-show="modalDish.is_bundle" x-cloak class="mt-1 text-sm font-medium text-teal-700">
+                            Sparmenü: <span x-text="modalDish.components.join(' + ')"></span>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Allergene --}}
+                <div class="mt-4">
+                    <div class="text-xs font-bold uppercase tracking-wide text-gray-400">Allergene</div>
+                    <div class="mt-1 flex flex-wrap gap-1.5">
+                        <template x-for="a in modalDish.allergens" :key="a.id">
+                            <span class="rounded-full px-2.5 py-1 text-sm font-medium"
+                                  :class="allergenHit(a.id) ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700'">
+                                <span x-text="a.code"></span> <span x-text="a.name"></span>
+                            </span>
+                        </template>
+                        <span x-show="!modalDish.allergens.length" class="text-sm text-gray-400">keine</span>
+                    </div>
+                </div>
+
+                {{-- Zusatzstoffe --}}
+                <div class="mt-3">
+                    <div class="text-xs font-bold uppercase tracking-wide text-gray-400">Zusatzstoffe</div>
+                    <div class="mt-1 flex flex-wrap gap-1.5">
+                        <template x-for="a in modalDish.additives" :key="a.id">
+                            <span class="rounded-full bg-gray-100 px-2.5 py-1 text-sm font-medium text-gray-700"><span x-text="a.code"></span> <span x-text="a.name"></span></span>
+                        </template>
+                        <span x-show="!modalDish.additives.length" class="text-sm text-gray-400">keine</span>
+                    </div>
+                </div>
+
+                {{-- Nicht geeignet für (Diäten) --}}
+                <div class="mt-3">
+                    <div class="text-xs font-bold uppercase tracking-wide text-gray-400">Nicht geeignet für</div>
+                    <div class="mt-1 flex flex-wrap gap-1.5">
+                        <template x-for="d in modalDish.unsuitable" :key="d.id">
+                            <span class="rounded-full px-2.5 py-1 text-sm font-medium"
+                                  :class="dietHit(d.id) ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700'" x-text="d.name"></span>
+                        </template>
+                        <span x-show="!modalDish.unsuitable.length" class="text-sm text-gray-400">–</span>
+                    </div>
+                </div>
+
+                <button @click="closeDishModal()" class="mt-5 w-full rounded-xl bg-gray-800 py-3 text-base font-semibold text-white hover:bg-gray-700">Schließen</button>
+            </div>
+        </template>
     </div>
 
     {{-- „Übersicht"-Ansicht (Vollbild). Inhalt folgt – vorerst Platzhalter. --}}

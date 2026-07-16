@@ -394,6 +394,9 @@ class ServingController
             'walkin' => $walkin,
             'allergens' => $eater->kantineAllergens->pluck('name')->all(),
             'diets' => $eater->kantineDiets->pluck('name')->all(),
+            // IDs für den Konflikt-Abgleich der Terminal-Kacheln (Client-seitig).
+            'allergenIds' => $allergenIds->all(),
+            'dietIds' => $dietIds->all(),
             'warn' => collect($dishes)->contains(fn ($d) => ! empty($d['allergenHits']) || ! empty($d['dietHits'])),
         ];
     }
@@ -1370,7 +1373,7 @@ class ServingController
 
         $menus = Menu::where('season_id', $season->id)
             ->whereDate('date', $dateStr)
-            ->with(['dish.category', 'dish.components'])
+            ->with($this->terminalDishRelations())
             ->orderBy('sort_order')->orderBy('id')
             ->get()
             ->filter(fn (Menu $m) => $m->dish && $m->dish->category && $m->dish->category->allows_preorder)
@@ -1395,13 +1398,7 @@ class ServingController
                     $o = (int) ($ordered[$m->dish_id] ?? 0);
                     $s = (int) ($served[$m->dish_id] ?? 0);
 
-                    return [
-                        'id' => $m->dish_id,
-                        'name' => $m->dish->name,
-                        'price' => (float) $m->dish->price,
-                        'photo' => $m->dish->photoUrl(),
-                        'is_bundle' => $m->dish->isBundle(),
-                        'components' => $m->dish->components->pluck('name')->all(),
+                    return $this->terminalDishPayload($m->dish) + [
                         'ordered' => $o,
                         'served' => $s,
                         'open' => max(0, $o - $s),
@@ -1415,7 +1412,7 @@ class ServingController
     {
         return Menu::where('season_id', $season->id)
             ->whereDate('date', $date->toDateString())
-            ->with(['dish.category'])
+            ->with($this->terminalDishRelations())
             ->orderBy('sort_order')->orderBy('id')
             ->get()
             ->map(fn (Menu $m) => $m->dish)
@@ -1424,11 +1421,41 @@ class ServingController
             ->groupBy(fn (Dish $d) => $d->category?->name ?? 'Ohne Kategorie')
             ->map(fn (Collection $dishes, string $cat) => [
                 'category' => $cat,
-                'dishes' => $dishes->map(fn (Dish $d) => [
-                    'id' => $d->id, 'name' => $d->name, 'price' => (float) $d->price,
-                    'photo' => $d->photoUrl(),
-                ])->values(),
+                'dishes' => $dishes->map(fn (Dish $d) => $this->terminalDishPayload($d))->values(),
             ])->values();
+    }
+
+    /** Eager-Load-Pfade für die Gericht-Details (Allergene/Zusatzstoffe/Diäten inkl. Bestandteile). */
+    private function terminalDishRelations(): array
+    {
+        return [
+            'dish.category', 'dish.components',
+            'dish.allergens', 'dish.additives', 'dish.unsuitableDiets',
+            'dish.components.allergens', 'dish.components.additives', 'dish.components.unsuitableDiets',
+        ];
+    }
+
+    /**
+     * Einheitliche Gericht-Daten fürs Terminal (Kachel + Detail-Modal + Warnung).
+     * Nutzt die effective*-Sets, damit Sparmenüs die Allergene ihrer Bestandteile führen.
+     *
+     * @return array<string, mixed>
+     */
+    private function terminalDishPayload(Dish $dish): array
+    {
+        return [
+            'id' => $dish->id,
+            'name' => $dish->name,
+            'price' => (float) $dish->price,
+            'photo' => $dish->photoUrl(),
+            'is_bundle' => $dish->isBundle(),
+            'components' => $dish->components->pluck('name')->all(),
+            'allergens' => $dish->effectiveAllergens()->map(fn ($a) => ['id' => $a->id, 'code' => $a->code, 'name' => $a->name])->values()->all(),
+            'additives' => $dish->effectiveAdditives()->map(fn ($a) => ['id' => $a->id, 'code' => $a->code, 'name' => $a->name])->values()->all(),
+            'unsuitable' => $dish->effectiveUnsuitableDiets()->map(fn ($x) => ['id' => $x->id, 'name' => $x->name])->values()->all(),
+            'allergenIds' => $dish->effectiveAllergens()->pluck('id')->all(),
+            'dietIds' => $dish->effectiveUnsuitableDiets()->pluck('id')->all(),
+        ];
     }
 
     /**
