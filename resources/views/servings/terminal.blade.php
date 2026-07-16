@@ -86,6 +86,16 @@
                 return sum;
             },
             get isOgs() { return this.person && this.person.mode === 'ja_nein'; },
+            // Ist alles im „frischen Stempel"-Zustand? (Menü = bestellt/genommen,
+            // keine Extras.) Dann bringt „Zurück" nichts und wird ausgeblendet.
+            get isDefaultState() {
+                for (const q of Object.values(this.walkinQty)) if (q > 0) return false;
+                for (const q of Object.values(this.coinQty)) if (q > 0) return false;
+                for (const [catId, meta] of Object.entries(this.orderMeta)) {
+                    if (this.choice[catId] !== meta.orderedDishId) return false;
+                }
+                return true;
+            },
             get hasSomething() {
                 if (this.extrasCount > 0) return true;
                 // Menue-Auswahl zaehlt als Buchung, sobald der Esser eine Bestellung hat.
@@ -371,7 +381,7 @@
                 </div>
                 {{-- Aktionsknöpfe --}}
                 <div class="flex shrink-0 items-center gap-2">
-                    <button @click="back()" class="rounded-xl border border-gray-300 bg-white px-4 py-3 text-base font-semibold text-gray-600 hover:bg-gray-50">↺ Zurück</button>
+                    <button @click="back()" x-show="!isDefaultState" x-cloak class="rounded-xl border border-gray-300 bg-white px-4 py-3 text-base font-semibold text-gray-600 hover:bg-gray-50">↺ Zurück</button>
                     <button @click="cancel()" class="rounded-xl border border-gray-300 bg-white px-4 py-3 text-base font-semibold text-gray-600 hover:bg-gray-50">Abbrechen</button>
                     <button @click="commit()" :disabled="busy || !hasSomething"
                             class="rounded-xl bg-green-600 px-7 py-3 text-lg font-bold text-white shadow hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-40">✓ Bestätigen</button>
