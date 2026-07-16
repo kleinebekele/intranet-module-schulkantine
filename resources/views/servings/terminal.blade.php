@@ -438,7 +438,7 @@
         @else
 
         {{-- ---------- LINKS: Menüs (1/3) ---------- --}}
-        <section class="flex w-1/3 min-w-0 flex-col border-r border-gray-300 bg-white">
+        <section class="flex w-1/2 min-w-0 flex-col border-r border-gray-300 bg-white xl:w-1/3">
             <div class="flex items-center justify-between border-b border-gray-200 px-4 py-2">
                 <h2 class="text-lg font-bold text-gray-700">Menüs</h2>
                 <div class="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide">
@@ -511,7 +511,7 @@
         </section>
 
         {{-- ---------- RECHTS: Besonderheiten (2/3) ---------- --}}
-        <section class="flex w-2/3 min-w-0 flex-col bg-gray-50">
+        <section class="flex w-1/2 min-w-0 flex-col bg-gray-50 xl:w-2/3">
             <div class="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2">
                 <h2 class="text-lg font-bold text-gray-700">Besonderheiten</h2>
                 <label class="flex items-center gap-2 text-sm text-gray-500">
