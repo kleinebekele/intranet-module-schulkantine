@@ -235,7 +235,6 @@
         {{-- Links: KW (+ Datum), anklickbar zum Wechseln --}}
         <div class="flex w-[12%] min-w-[120px] flex-col items-center justify-center border-r border-gray-200 bg-gray-50 px-2">
             <label class="cursor-pointer text-center leading-tight">
-                <div class="text-[11px] uppercase tracking-wide text-gray-400">Kalenderwoche</div>
                 <div class="text-2xl font-bold text-indigo-700">KW {{ $week['kw'] }}</div>
                 <div class="mt-0.5 text-xs font-medium text-gray-600" x-show="person">{{ $date->isoFormat('dd, D.M.') }}</div>
                 <input type="date" value="{{ $date->toDateString() }}" @change="gotoDate($event.target.value)"
