@@ -266,8 +266,10 @@ class BillingService
             ->with('dish.category')->orderBy('date')->get();
         $spontan = $spontanRows->map(fn (Serving $s) => [
             'date' => $s->date,
-            'dish' => $s->dish?->name ?? '—',
-            'category' => $s->dish?->category?->name ?? '—',
+            // Nachschlag & Co. haben kein Gericht, aber ein Label – so bleibt in der
+            // Abrechnung nachvollziehbar, woraus sich der Betrag zusammensetzt.
+            'dish' => $s->dish?->name ?? $s->label ?? '—',
+            'category' => $s->dish?->category?->name ?? ($s->label ? 'Nachschlag' : '—'),
             'price' => (float) $s->price_snapshot,
         ])->all();
         $spontanTotal = array_sum(array_column($spontan, 'price'));

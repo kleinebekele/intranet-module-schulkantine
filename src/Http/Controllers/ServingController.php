@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Intranet\Modules\Schulkantine\Models\Budget;
 use Intranet\Modules\Schulkantine\Models\ChildCategoryPermission;
 use Intranet\Modules\Schulkantine\Models\CustomerGroup;
@@ -345,6 +346,8 @@ class ServingController
                 $sv = $existing->get($o->id);
                 $dishes[] = [
                     'order_id' => $o->id,
+                    'dish_id' => $o->dish_id,
+                    'category_id' => $o->category_id,
                     'name' => $dish?->name,
                     'category' => $dish?->category?->name,
                     'price' => (float) $o->price_snapshot,
@@ -1131,5 +1134,308 @@ class ServingController
         $closed = $season->closedDays()->whereDate('date', $date->toDateString())->first();
 
         return $closed->reason ?? 'geschlossen';
+    }
+
+    // ------------------------------------------------- Ausgabe-Terminal (Kiosk)
+
+    /** Feste Nachschlag-Beträge (Münz-Buttons rechts unten). */
+    public const NACHSCHLAG_STEPS = [0.50, 1.00, 2.00];
+
+    /**
+     * Touch-optimierte Vollbild-Ausgabe (eigenes Layout ohne Header/Sidebar).
+     * Liest nur; gebucht wird über terminalCommit(). Der Chip-Stempel läuft im
+     * Frontend über die vorhandene lookup()-Route (UID → Esser + Bestellung).
+     */
+    public function terminal(Request $request)
+    {
+        $user = $request->user();
+        abort_unless(Access::canServe($user), 403, 'Kein Zugriff auf das Ausgabe-Terminal.');
+
+        $season = Season::where('is_active', true)->first();
+        if (! $season) {
+            return view('schulkantine::servings.terminal', ['season' => null]);
+        }
+
+        $date = $this->resolveDate($request, $season);
+        $open = $season->isOpenOn($date);
+
+        // Web-NFC-Fallback: alle aktiven Chips zum Simulieren eines Scans.
+        $simChips = NfcChip::active()->with('user')->get()
+            ->filter(fn ($c) => $c->user !== null)
+            ->map(fn ($c) => ['uid' => $c->uid, 'name' => $c->user->name])
+            ->sortBy('name')->values();
+
+        return view('schulkantine::servings.terminal', [
+            'season' => $season,
+            'date' => $date,
+            'open' => $open,
+            'closedReason' => $open ? null : $this->closedReason($season, $date),
+            'planGroups' => $open ? $this->terminalPlanDishes($season, $date) : collect(),
+            'walkinGroups' => $open ? $this->terminalWalkinGroups($season, $date) : collect(),
+            'week' => $this->terminalWeek($season, $date),
+            'coins' => self::NACHSCHLAG_STEPS,
+            'simChips' => $simChips,
+            'prevDate' => (new DeadlineService)->previousOpenDay($season, $date)?->toDateString(),
+            'nextDate' => $this->nextOpenDay($season, $date),
+        ]);
+    }
+
+    /**
+     * Bucht eine ganze Terminal-Transaktion atomar: die Menü-Ausgabe des Essers
+     * (je Bestellung genommen/Alternative/abgelehnt – wie serveConfirm), spontane
+     * Extras (Walk-in) und freie Nachschlag-Beträge. Antwort als JSON inkl. der
+     * aktualisierten Tages-Zähler, damit die linke Spalte sofort nachzieht.
+     */
+    public function terminalCommit(Request $request)
+    {
+        $user = $request->user();
+        abort_unless(Access::canServe($user), 403, 'Du darfst die Ausgabe nicht erfassen.');
+
+        $data = $request->validate([
+            'eater_id' => ['required', 'integer', 'exists:users,id'],
+            'date' => ['required', 'date'],
+            'menu' => ['array'],
+            'menu.*.order_id' => ['required', 'integer'],
+            'menu.*.outcome' => ['required', 'in:taken,alternative,declined'],
+            'walkin' => ['array'],
+            'walkin.*.dish_id' => ['required', 'integer', 'exists:kantine_dishes,id'],
+            'walkin.*.qty' => ['required', 'integer', 'min:1', 'max:50'],
+            'nachschlag' => ['array'],
+            'nachschlag.*.amount' => ['required', 'numeric', 'min:0.01', 'max:99'],
+            'nachschlag.*.qty' => ['required', 'integer', 'min:1', 'max:50'],
+        ]);
+
+        $season = Season::where('is_active', true)->firstOrFail();
+        $eater = User::findOrFail($data['eater_id']);
+        $date = Carbon::parse($data['date'])->startOfDay();
+
+        $fail = fn (string $msg) => response()->json(['ok' => false, 'error' => $msg], 200);
+
+        if (! $season->isOpenOn($date)) {
+            return $fail('An diesem Tag hat die Kantine nicht geöffnet.');
+        }
+
+        $menu = $data['menu'] ?? [];
+        $walkinIn = $data['walkin'] ?? [];
+        $nachschlag = $data['nachschlag'] ?? [];
+
+        // OGS (ja/nein) ist vom Spontankauf/Nachschlag ausgeschlossen – Sicherheitsnetz
+        // zur UI, die die rechte Seite für OGS ohnehin sperrt.
+        $isOgs = CustomerGroup::forUser($eater)?->ordering_mode === CustomerGroup::MODE_JA_NEIN;
+        if ($isOgs && ($walkinIn || $nachschlag)) {
+            return $fail($eater->name.' gehört zur OGS-Gruppe – dafür sind keine Extras möglich.');
+        }
+
+        // Walk-in-Gerichte prüfen (Kategorie erlaubt Spontan? Eltern-Freigabe?).
+        $walkinDishes = [];
+        foreach ($walkinIn as $w) {
+            $dish = Dish::with('category')->find($w['dish_id']);
+            if (! $dish || ! $dish->category || ! $dish->category->allows_walkin) {
+                return $fail('Ein gewähltes Extra ist nicht für spontane Abholung freigegeben.');
+            }
+            if (! ChildCategoryPermission::canWalkin($eater->id, $dish->category_id)) {
+                return $fail('Für '.$eater->name.' ist der Spontankauf der Kategorie „'.$dish->category->name.'" nicht freigegeben.');
+            }
+            $walkinDishes[] = ['dish' => $dish, 'qty' => (int) $w['qty']];
+        }
+
+        // Wochenbudget prüfen (Walk-in + Nachschlag zusammen).
+        $extraSum = 0.0;
+        foreach ($walkinDishes as $wd) {
+            $extraSum += (float) $wd['dish']->price * $wd['qty'];
+        }
+        foreach ($nachschlag as $n) {
+            $extraSum += (float) $n['amount'] * (int) $n['qty'];
+        }
+        $budget = Budget::weeklyAmount($eater->id);
+        if ($budget !== null && $extraSum > 0) {
+            $weekStart = $date->copy()->startOfWeek(Carbon::MONDAY);
+            $spent = (float) Serving::where('user_id', $eater->id)->where('spontaneous', true)
+                ->whereBetween('date', [$weekStart->toDateString(), $weekStart->copy()->addDays(6)->toDateString()])
+                ->sum('price_snapshot');
+            if ($spent + $extraSum > $budget + 0.001) {
+                return $fail($eater->name.': Wochenbudget für Extras erreicht (Limit '
+                    .number_format($budget, 2, ',', '.').' €, diese Woche schon '
+                    .number_format($spent, 2, ',', '.').' € genutzt).');
+            }
+        }
+
+        DB::transaction(function () use ($season, $eater, $date, $user, $menu, $walkinDishes, $nachschlag) {
+            // 1) Menü-Ausgabe – ersetzt die bisherigen nicht-spontanen Zeilen (wie serveConfirm).
+            if ($menu) {
+                $orders = Order::where('season_id', $season->id)->where('user_id', $eater->id)
+                    ->whereDate('date', $date->toDateString())->whereNotNull('category_id')
+                    ->where('status', Order::STATUS_ORDERED)->get()->keyBy('id');
+
+                Serving::where('season_id', $season->id)->where('user_id', $eater->id)
+                    ->whereDate('date', $date->toDateString())->where('spontaneous', false)->delete();
+
+                foreach ($menu as $item) {
+                    $order = $orders->get((int) $item['order_id']);
+                    if (! $order) {
+                        continue;
+                    }
+                    $outcome = $item['outcome'];
+                    Serving::create([
+                        'season_id' => $season->id, 'user_id' => $eater->id, 'date' => $date->toDateString(),
+                        'order_id' => $order->id, 'dish_id' => $order->dish_id, 'category_id' => $order->category_id,
+                        'price_snapshot' => $order->price_snapshot, 'spontaneous' => false,
+                        'declined' => $outcome === 'declined',
+                        'decline_reason' => $outcome === 'declined' ? 'nicht genommen' : null,
+                        'alternative' => $outcome === 'alternative',
+                        'served_by' => $user->id,
+                    ]);
+                }
+            }
+
+            // 2) Walk-in (spontan) – je Menge eine Zeile.
+            foreach ($walkinDishes as $wd) {
+                for ($i = 0; $i < $wd['qty']; $i++) {
+                    Serving::create([
+                        'season_id' => $season->id, 'user_id' => $eater->id, 'date' => $date->toDateString(),
+                        'order_id' => null, 'dish_id' => $wd['dish']->id, 'category_id' => $wd['dish']->category_id,
+                        'price_snapshot' => $wd['dish']->price, 'spontaneous' => true, 'served_by' => $user->id,
+                    ]);
+                }
+            }
+
+            // 3) Nachschlag – Betrag ohne Gericht, mit Label (für die Abrechnung).
+            foreach ($nachschlag as $n) {
+                for ($i = 0; $i < (int) $n['qty']; $i++) {
+                    Serving::create([
+                        'season_id' => $season->id, 'user_id' => $eater->id, 'date' => $date->toDateString(),
+                        'order_id' => null, 'dish_id' => null, 'category_id' => null, 'label' => 'Nachschlag',
+                        'price_snapshot' => (float) $n['amount'], 'spontaneous' => true, 'served_by' => $user->id,
+                    ]);
+                }
+            }
+        });
+
+        return response()->json([
+            'ok' => true,
+            'name' => $eater->name,
+            // Aktualisierte Tages-Zähler, damit die linke Spalte ohne Reload nachzieht.
+            'plan' => $this->terminalPlanDishes($season, $date),
+        ]);
+    }
+
+    /**
+     * Vorbestellbare Gerichte des Tages, nach Kategorie gruppiert, je mit den drei
+     * Zählern bestellt / offen / ausgegeben. Basis der linken Terminal-Spalte.
+     *
+     * @return Collection<int, array>
+     */
+    private function terminalPlanDishes(Season $season, Carbon $date): Collection
+    {
+        $dateStr = $date->toDateString();
+
+        $menus = Menu::where('season_id', $season->id)
+            ->whereDate('date', $dateStr)
+            ->with(['dish.category', 'dish.components'])
+            ->orderBy('sort_order')->orderBy('id')
+            ->get()
+            ->filter(fn (Menu $m) => $m->dish && $m->dish->category && $m->dish->category->allows_preorder)
+            ->unique(fn (Menu $m) => $m->dish_id)
+            ->values();
+
+        // Zähler je Gericht: bestellt = aktive Vorbestellungen; ausgegeben =
+        // nicht-spontane, nicht abgelehnte Ausgabe-Zeilen.
+        $ordered = Order::where('season_id', $season->id)->whereDate('date', $dateStr)
+            ->whereNotNull('category_id')->where('status', Order::STATUS_ORDERED)
+            ->selectRaw('dish_id, COUNT(*) as c')->groupBy('dish_id')->pluck('c', 'dish_id');
+        $served = Serving::where('season_id', $season->id)->whereDate('date', $dateStr)
+            ->where('spontaneous', false)->where('declined', false)->whereNotNull('dish_id')
+            ->selectRaw('dish_id, COUNT(*) as c')->groupBy('dish_id')->pluck('c', 'dish_id');
+
+        return $menus->groupBy(fn (Menu $m) => $m->dish->category?->name ?? 'Ohne Kategorie')
+            ->map(fn (Collection $group, string $cat) => [
+                'category' => $cat,
+                'category_id' => $group->first()->dish->category_id,
+                'color' => $group->first()->dish->category?->color,
+                'dishes' => $group->map(function (Menu $m) use ($ordered, $served) {
+                    $o = (int) ($ordered[$m->dish_id] ?? 0);
+                    $s = (int) ($served[$m->dish_id] ?? 0);
+
+                    return [
+                        'id' => $m->dish_id,
+                        'name' => $m->dish->name,
+                        'price' => (float) $m->dish->price,
+                        'is_bundle' => $m->dish->isBundle(),
+                        'components' => $m->dish->components->pluck('name')->all(),
+                        'ordered' => $o,
+                        'served' => $s,
+                        'open' => max(0, $o - $s),
+                    ];
+                })->values(),
+            ])->values();
+    }
+
+    /** Walk-in-Gerichte des Tages, gruppiert (rechte Terminal-Spalte oben). */
+    private function terminalWalkinGroups(Season $season, Carbon $date): Collection
+    {
+        return Menu::where('season_id', $season->id)
+            ->whereDate('date', $date->toDateString())
+            ->with(['dish.category'])
+            ->orderBy('sort_order')->orderBy('id')
+            ->get()
+            ->map(fn (Menu $m) => $m->dish)
+            ->filter(fn (?Dish $d) => $d && $d->category && $d->category->allows_walkin)
+            ->unique('id')
+            ->groupBy(fn (Dish $d) => $d->category?->name ?? 'Ohne Kategorie')
+            ->map(fn (Collection $dishes, string $cat) => [
+                'category' => $cat,
+                'dishes' => $dishes->map(fn (Dish $d) => [
+                    'id' => $d->id, 'name' => $d->name, 'price' => (float) $d->price,
+                ])->values(),
+            ])->values();
+    }
+
+    /**
+     * Wochenüberblick für die Infozeile: Öffnungstage der ISO-Woche mit ihren
+     * vorbestellbaren Gerichten und der jeweiligen Bestellanzahl.
+     *
+     * @return array{kw:int, days:array<int,array>}
+     */
+    private function terminalWeek(Season $season, Carbon $date): array
+    {
+        $monday = $date->copy()->startOfWeek(Carbon::MONDAY);
+        $days = [];
+        for ($i = 0; $i < 7; $i++) {
+            $d = $monday->copy()->addDays($i);
+            if (! $season->isOpenOn($d)) {
+                continue;
+            }
+            $ordered = Order::where('season_id', $season->id)->whereDate('date', $d->toDateString())
+                ->whereNotNull('category_id')->where('status', Order::STATUS_ORDERED)
+                ->selectRaw('dish_id, COUNT(*) as c')->groupBy('dish_id')->pluck('c', 'dish_id');
+
+            $dishes = Menu::where('season_id', $season->id)->whereDate('date', $d->toDateString())
+                ->with('dish.category')->orderBy('sort_order')->orderBy('id')->get()
+                ->filter(fn (Menu $m) => $m->dish && $m->dish->category && $m->dish->category->allows_preorder)
+                ->unique(fn (Menu $m) => $m->dish_id)
+                ->map(fn (Menu $m) => ['name' => $m->dish->name, 'ordered' => (int) ($ordered[$m->dish_id] ?? 0)])
+                ->values()->all();
+
+            $days[] = [
+                'date' => $d->toDateString(),
+                'weekday' => ucfirst($d->isoFormat('dd')),
+                'dayLabel' => $d->format('d.m.'),
+                'isWorking' => $d->toDateString() === $date->toDateString(),
+                'dishes' => $dishes,
+            ];
+        }
+
+        return ['kw' => $date->isoWeek(), 'days' => $days];
+    }
+
+    /** Nächster Öffnungstag ab (exklusive) date – oder null. */
+    private function nextOpenDay(Season $season, Carbon $date): ?string
+    {
+        $next = $date->copy()->addDay();
+        while ($next->lte($season->end_date) && ! $season->isOpenOn($next)) {
+            $next->addDay();
+        }
+
+        return ($next->lte($season->end_date) && $season->isOpenOn($next)) ? $next->toDateString() : null;
     }
 }

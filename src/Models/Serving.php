@@ -22,6 +22,7 @@ class Serving extends Model
         'order_id',
         'dish_id',
         'category_id',
+        'label',
         'spontaneous',
         'declined',
         'decline_reason',

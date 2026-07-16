@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="de" class="h-full">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Ausgabe-Terminal · Schulkantine</title>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>
+        [x-cloak] { display: none !important; }
+        html, body { height: 100%; overscroll-behavior: none; }
+        /* Grosse, touch-taugliche Stepper-Buttons. */
+        .step-btn { user-select: none; -webkit-tap-highlight-color: transparent; }
+    </style>
+</head>
+<body class="h-full bg-gray-100 font-sans antialiased text-gray-800">
+
+@if (! $season)
+    <div class="flex h-full items-center justify-center p-10 text-center">
+        <div>
+            <div class="text-2xl font-semibold text-gray-700">Keine aktive Saison</div>
+            <p class="mt-2 text-gray-500">Es ist keine Saison aktiv – das Terminal kann nichts anzeigen.</p>
+            <a href="{{ route('module.schulkantine.servings.index') }}" class="mt-6 inline-block rounded-lg bg-indigo-600 px-5 py-3 text-white">Zur normalen Ausgabe</a>
+        </div>
+    </div>
+@else
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('terminal', () => ({
+            // --- Serverdaten ---
+            date: @js($date->toDateString()),
+            csrf: document.querySelector('meta[name=csrf-token]').content,
+            urls: {
+                lookup: @js(route('module.schulkantine.servings.lookup')),
+                commit: @js(route('module.schulkantine.servings.terminal.commit')),
+                base: @js(route('module.schulkantine.servings.terminal')),
+            },
+            open: @js($open),
+            planGroups: @js($planGroups),
+            walkinGroups: @js($walkinGroups),
+            coins: @js(array_map('floatval', $coins)),
+            simChips: @js($simChips),
+            ogsPrice: @js((float) ($season->ogs_price ?? 0)),
+
+            // --- Zustand ---
+            person: null,          // eingelesener Esser (null = Leerlauf)
+            choice: {},            // category_id -> dish_id | 'declined'
+            orderMeta: {},         // category_id -> { order_id, orderedDishId }
+            walkinQty: {},         // dish_id -> Anzahl
+            coinQty: {},           // Betrag(String) -> Anzahl
+            autoFinish: false,     // beim naechsten Chip automatisch buchen
+            busy: false,
+            banner: null,          // { ok, text }
+            scanning: false,
+            ctrl: null,
+
+            init() {
+                this.autoFinish = localStorage.getItem('kantineTerminalAutoFinish') === '1';
+            },
+
+            // ---- Preis-Helfer ----
+            euro(v) { return (Math.round(v * 100) / 100).toFixed(2).replace('.', ',') + ' €'; },
+            get walkinPrices() {
+                const m = {};
+                this.walkinGroups.forEach(g => g.dishes.forEach(d => { m[d.id] = d.price; }));
+                return m;
+            },
+            get extrasCount() {
+                let n = 0;
+                Object.values(this.walkinQty).forEach(q => n += q);
+                Object.values(this.coinQty).forEach(q => n += q);
+                return n;
+            },
+            get extrasTotal() {
+                let sum = 0;
+                for (const [id, q] of Object.entries(this.walkinQty)) sum += (this.walkinPrices[id] || 0) * q;
+                for (const [amt, q] of Object.entries(this.coinQty)) sum += parseFloat(amt) * q;
+                return sum;
+            },
+            get isOgs() { return this.person && this.person.mode === 'ja_nein'; },
+            get hasSomething() {
+                if (this.extrasCount > 0) return true;
+                // Menue-Auswahl zaehlt als Buchung, sobald der Esser eine Bestellung hat.
+                return this.person && this.person.hasOrder;
+            },
+
+            // ---- Chip / Scan ----
+            async startScan() {
+                if (!('NDEFReader' in window)) { this.banner = { ok:false, text:'Dieses Geraet unterstuetzt kein Web-NFC. Bitte Simulation nutzen.' }; return; }
+                try {
+                    const reader = new NDEFReader();
+                    this.ctrl = new AbortController();
+                    await reader.scan({ signal: this.ctrl.signal });
+                    this.scanning = true;
+                    reader.onreading = (e) => { this.openFor(e.serialNumber || ''); };
+                } catch (err) {
+                    this.scanning = false;
+                    this.banner = { ok:false, text:'Scan nicht moeglich: ' + (err && err.message ? err.message : err) };
+                }
+            },
+            stopScan() { if (this.ctrl) this.ctrl.abort(); this.scanning = false; },
+
+            async openFor(uid) {
+                if (!uid) { this.banner = { ok:false, text:'Chip ohne Kennung.' }; return; }
+                if (this.busy) return;
+                // Offene Transaktion? Je nach Einstellung automatisch buchen oder nur warnen.
+                if (this.person && this.hasSomething) {
+                    if (this.autoFinish) { const ok = await this.commit(true); if (!ok) return; }
+                    else { this.banner = { ok:false, text:'Erst „Bestaetigen" oder „Abbrechen" – dann den naechsten Chip.' }; return; }
+                }
+                this.busy = true;
+                try {
+                    const res = await fetch(this.urls.lookup, {
+                        method: 'POST',
+                        headers: { 'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': this.csrf },
+                        body: JSON.stringify({ uid, date: this.date }),
+                    });
+                    const data = await res.json();
+                    if (!data.found) { this.banner = { ok:false, text:'Chip unbekannt oder zurueckgegeben.' }; this.busy = false; return; }
+                    this.loadPerson(data);
+                } catch (e) {
+                    this.banner = { ok:false, text:'Fehler beim Lesen: ' + e };
+                }
+                this.busy = false;
+            },
+
+            loadPerson(data) {
+                this.person = data;
+                this.banner = null;
+                this.resetSelection();
+            },
+
+            // Setzt die Auswahl auf den „frischen Stempel"-Zustand: Menue vorausgewaehlt
+            // (alles genommen), rechts alles auf null.
+            resetSelection() {
+                this.choice = {};
+                this.orderMeta = {};
+                this.walkinQty = {};
+                this.coinQty = {};
+                if (this.person && this.person.hasOrder) {
+                    this.person.dishes.forEach(d => {
+                        if (d.category_id == null) return;
+                        this.orderMeta[d.category_id] = { order_id: d.order_id, orderedDishId: d.dish_id };
+                        this.choice[d.category_id] = d.dish_id; // Vorauswahl = wie bestellt (genommen)
+                    });
+                }
+            },
+
+            // ---- Linke Spalte (Menue-Auswahl) ----
+            catOrdered(catId) { return this.orderMeta[catId] !== undefined; },
+            tileState(catId, dishId) {
+                // Nur relevant, wenn eine Person mit Bestellung in dieser Kategorie da ist.
+                if (!this.person || !this.person.hasOrder || !this.catOrdered(catId)) return 'idle';
+                const ch = this.choice[catId];
+                const ordered = this.orderMeta[catId].orderedDishId;
+                if (ch === 'declined') return dishId === ordered ? 'declined' : 'idle';
+                if (ch === dishId) return dishId === ordered ? 'taken' : 'alt';
+                return 'selectable';
+            },
+            tileClickable(catId) {
+                return this.person && this.person.hasOrder && this.catOrdered(catId) && !this.busy;
+            },
+            clickTile(catId, dishId) {
+                if (!this.tileClickable(catId)) return;
+                // Auf die aktuell gewaehlte Kachel tippen = abwaehlen (declined).
+                this.choice[catId] = (this.choice[catId] === dishId) ? 'declined' : dishId;
+            },
+
+            // ---- Rechte Spalte (Extras) ----
+            rightEnabled() { return this.person && !this.isOgs; },
+            walkinPlus(id) { if (!this.rightEnabled()) return; this.walkinQty[id] = (this.walkinQty[id] || 0) + 1; },
+            walkinMinus(id) { if (!this.walkinQty[id]) return; this.walkinQty[id] = Math.max(0, this.walkinQty[id] - 1); if (!this.walkinQty[id]) delete this.walkinQty[id]; },
+            coinPlus(amt) { if (!this.rightEnabled()) return; const k = String(amt); this.coinQty[k] = (this.coinQty[k] || 0) + 1; },
+            coinMinus(amt) { const k = String(amt); if (!this.coinQty[k]) return; this.coinQty[k] = Math.max(0, this.coinQty[k] - 1); if (!this.coinQty[k]) delete this.coinQty[k]; },
+
+            // ---- Aktionen ----
+            cancel() { this.person = null; this.resetSelection(); this.banner = null; },
+            back() { this.resetSelection(); this.banner = null; }, // zurueck = frischer Stempel-Zustand
+
+            toggleAutoFinish() {
+                this.autoFinish = !this.autoFinish;
+                localStorage.setItem('kantineTerminalAutoFinish', this.autoFinish ? '1' : '0');
+            },
+
+            buildPayload() {
+                const menu = [];
+                for (const [catId, meta] of Object.entries(this.orderMeta)) {
+                    const ch = this.choice[catId];
+                    let outcome = 'taken';
+                    if (ch === 'declined') outcome = 'declined';
+                    else if (ch !== meta.orderedDishId) outcome = 'alternative';
+                    menu.push({ order_id: meta.order_id, outcome });
+                }
+                const walkin = Object.entries(this.walkinQty).map(([dish_id, qty]) => ({ dish_id: Number(dish_id), qty }));
+                const nachschlag = Object.entries(this.coinQty).map(([amount, qty]) => ({ amount: parseFloat(amount), qty }));
+                return { eater_id: this.person.user_id, date: this.date, menu, walkin, nachschlag };
+            },
+
+            async commit(silent = false) {
+                if (!this.person) return false;
+                if (this.busy) return false;
+                this.busy = true;
+                try {
+                    const res = await fetch(this.urls.commit, {
+                        method: 'POST',
+                        headers: { 'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': this.csrf },
+                        body: JSON.stringify(this.buildPayload()),
+                    });
+                    const data = await res.json();
+                    if (!data.ok) { this.banner = { ok:false, text: data.error || 'Buchung fehlgeschlagen.' }; this.busy = false; return false; }
+                    if (data.plan) this.planGroups = data.plan; // Zaehler aktualisieren
+                    if (!silent) this.banner = { ok:true, text: 'Gebucht: ' + data.name + (this.extrasTotal > 0 ? ' · Extras ' + this.euro(this.extrasTotal) : '') };
+                    this.person = null;
+                    this.resetSelection();
+                    this.busy = false;
+                    return true;
+                } catch (e) {
+                    this.banner = { ok:false, text:'Fehler beim Buchen: ' + e };
+                    this.busy = false;
+                    return false;
+                }
+            },
+
+            gotoDate(d) { if (d) window.location = this.urls.base + '?date=' + d; },
+        }));
+    });
+</script>
+
+<div x-data="terminal()" x-cloak class="flex h-full flex-col select-none">
+
+    {{-- ================= INFOZEILE (10%) ================= --}}
+    <header class="flex h-[10%] min-h-[72px] w-full items-stretch border-b border-gray-300 bg-white">
+
+        {{-- Links: KW (+ Datum), anklickbar zum Wechseln --}}
+        <div class="flex w-[12%] min-w-[120px] flex-col items-center justify-center border-r border-gray-200 bg-gray-50 px-2">
+            <label class="cursor-pointer text-center leading-tight">
+                <div class="text-[11px] uppercase tracking-wide text-gray-400">Kalenderwoche</div>
+                <div class="text-2xl font-bold text-indigo-700">KW {{ $week['kw'] }}</div>
+                <div class="mt-0.5 text-xs font-medium text-gray-600" x-show="person">{{ $date->isoFormat('dd, D.M.') }}</div>
+                <input type="date" value="{{ $date->toDateString() }}" @change="gotoDate($event.target.value)"
+                       class="mt-1 w-full cursor-pointer rounded border-gray-300 text-[11px]">
+            </label>
+        </div>
+
+        {{-- Rechts: Wochenüberblick ODER Person --}}
+        <div class="relative flex-1 overflow-hidden">
+            {{-- Wochenüberblick (Leerlauf) --}}
+            <div x-show="!person" class="flex h-full items-stretch divide-x divide-gray-100 overflow-x-auto">
+                @foreach ($week['days'] as $wd)
+                    <div class="flex min-w-[9rem] flex-1 flex-col px-3 py-1 {{ $wd['isWorking'] ? 'bg-indigo-50/60' : '' }}">
+                        <div class="flex items-baseline justify-between">
+                            <span class="text-sm font-semibold {{ $wd['isWorking'] ? 'text-indigo-700' : 'text-gray-700' }}">{{ $wd['weekday'] }} {{ $wd['dayLabel'] }}</span>
+                        </div>
+                        <div class="mt-0.5 space-y-0.5 overflow-hidden text-[11px] leading-tight text-gray-500">
+                            @forelse ($wd['dishes'] as $d)
+                                <div class="flex justify-between gap-2">
+                                    <span class="truncate">{{ $d['name'] }}</span>
+                                    <span class="shrink-0 font-semibold text-gray-700">{{ $d['ordered'] }}×</span>
+                                </div>
+                            @empty
+                                <div class="text-gray-300">–</div>
+                            @endforelse
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+
+            {{-- Person (nach Stempeln) --}}
+            <div x-show="person" x-cloak class="flex h-full items-center justify-between gap-4 px-5">
+                <div class="min-w-0">
+                    <div class="flex items-center gap-3">
+                        <span class="truncate text-3xl font-bold text-gray-800" x-text="person?.name"></span>
+                        <span class="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-lg font-semibold text-indigo-700" x-text="'Klasse: ' + (person?.group || '–')"></span>
+                        <span x-show="person?.warn" x-cloak class="shrink-0 rounded-full bg-red-600 px-3 py-1 text-base font-bold text-white">⚠️ Verträglichkeiten prüfen</span>
+                    </div>
+                    <div class="mt-0.5 text-sm text-gray-500" x-show="person && (person.allergens.length || person.diets.length)">
+                        <span x-show="person?.allergens.length">Allergien: <span x-text="person?.allergens.join(', ')"></span>. </span>
+                        <span x-show="person?.diets.length">Diäten: <span x-text="person?.diets.join(', ')"></span>.</span>
+                    </div>
+                    <div class="mt-0.5 text-sm font-medium text-amber-600" x-show="person && !person.hasOrder">Keine Vorbestellung – bitte rechts erfassen.</div>
+                </div>
+                {{-- Aktionsknöpfe --}}
+                <div class="flex shrink-0 items-center gap-2">
+                    <button @click="back()" class="rounded-xl border border-gray-300 bg-white px-4 py-3 text-base font-semibold text-gray-600 hover:bg-gray-50">↺ Zurück</button>
+                    <button @click="cancel()" class="rounded-xl border border-gray-300 bg-white px-4 py-3 text-base font-semibold text-gray-600 hover:bg-gray-50">Abbrechen</button>
+                    <button @click="commit()" :disabled="busy || !hasSomething"
+                            class="rounded-xl bg-green-600 px-7 py-3 text-lg font-bold text-white shadow hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-40">✓ Bestätigen</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    {{-- Banner (Fehler/Erfolg) --}}
+    <div x-show="banner" x-cloak
+         class="absolute left-1/2 top-[11%] z-40 -translate-x-1/2 rounded-xl px-6 py-3 text-lg font-semibold shadow-lg"
+         :class="banner?.ok ? 'bg-green-600 text-white' : 'bg-red-600 text-white'"
+         @click="banner=null" x-text="banner?.text"></div>
+
+    {{-- ================= ARBEITSZEILE (90%) ================= --}}
+    <main class="flex min-h-0 flex-1">
+
+        @if (! $open)
+            <div class="flex flex-1 items-center justify-center text-center">
+                <div>
+                    <div class="text-2xl font-semibold text-amber-700">🔒 Heute geschlossen</div>
+                    <p class="mt-2 text-gray-500">{{ $closedReason }}</p>
+                </div>
+            </div>
+        @else
+
+        {{-- ---------- LINKS: Menüs (1/3) ---------- --}}
+        <section class="flex w-1/3 min-w-0 flex-col border-r border-gray-300 bg-white">
+            <div class="flex items-center justify-between border-b border-gray-200 px-4 py-2">
+                <h2 class="text-lg font-bold text-gray-700">Menüs</h2>
+                <div class="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide">
+                    <span class="text-gray-500">bestellt</span>
+                    <span class="text-amber-600">offen</span>
+                    <span class="text-green-600">ausgeg.</span>
+                </div>
+            </div>
+
+            <div class="relative flex-1 overflow-y-auto p-3">
+                {{-- Sperr-Overlay, wenn Person ohne Vorbestellung --}}
+                <div x-show="person && !person.hasOrder" x-cloak
+                     class="absolute inset-0 z-20 flex items-center justify-center bg-gray-100/80 backdrop-blur-[1px]">
+                    <div class="rounded-xl bg-white px-6 py-4 text-center shadow">
+                        <div class="text-lg font-bold text-gray-700">Keine Vorbestellung</div>
+                        <div class="mt-1 text-sm text-gray-500">Ausgabe nur über die rechte Seite.</div>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <template x-for="group in planGroups" :key="group.category_id">
+                        <fieldset class="rounded-xl border-2 px-2 pb-2 pt-1"
+                                  :style="group.color ? ('border-color:' + group.color + ';background-color:' + group.color + '10') : ''"
+                                  :class="group.color ? '' : 'border-gray-200'">
+                            <legend class="px-1 text-xs font-bold uppercase tracking-wide" :style="group.color ? ('color:' + group.color) : ''" x-text="group.category"></legend>
+                            <div class="space-y-2">
+                                <template x-for="dish in group.dishes" :key="dish.id">
+                                    <button type="button"
+                                            @click="clickTile(group.category_id, dish.id)"
+                                            :disabled="!tileClickable(group.category_id)"
+                                            class="w-full rounded-xl border-2 p-2 text-left transition"
+                                            :class="{
+                                                'border-green-500 bg-green-50 ring-2 ring-green-300': tileState(group.category_id, dish.id)==='taken',
+                                                'border-amber-500 bg-amber-50 ring-2 ring-amber-300': tileState(group.category_id, dish.id)==='alt',
+                                                'border-red-300 bg-red-50 opacity-70': tileState(group.category_id, dish.id)==='declined',
+                                                'border-indigo-300 bg-white hover:border-indigo-500': tileState(group.category_id, dish.id)==='selectable',
+                                                'border-gray-200 bg-white': tileState(group.category_id, dish.id)==='idle',
+                                                'cursor-default': !tileClickable(group.category_id)
+                                            }">
+                                        {{-- Zähler-Streifen --}}
+                                        <div class="mb-1 flex items-center gap-2 text-sm font-bold">
+                                            <span class="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-gray-100 px-2 text-gray-700" x-text="dish.ordered"></span>
+                                            <span class="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-amber-100 px-2 text-amber-700" x-text="dish.open"></span>
+                                            <span class="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-green-100 px-2 text-green-700" x-text="dish.served"></span>
+                                            <span class="ml-auto text-sm font-semibold text-gray-500" x-text="euro(dish.price)"></span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-lg font-semibold text-gray-800" x-text="dish.name"></span>
+                                            <span x-show="tileState(group.category_id, dish.id)==='taken'" class="ml-auto text-green-600">✓ wird ausgegeben</span>
+                                            <span x-show="tileState(group.category_id, dish.id)==='alt'" class="ml-auto text-amber-600">✓ Alternative</span>
+                                            <span x-show="tileState(group.category_id, dish.id)==='declined'" class="ml-auto text-red-500">nicht genommen</span>
+                                        </div>
+                                        <div x-show="dish.is_bundle" class="text-xs text-teal-700" x-text="dish.components.join(' + ')"></div>
+                                    </button>
+                                </template>
+                            </div>
+                        </fieldset>
+                    </template>
+                    <div x-show="!planGroups.length" class="py-10 text-center text-gray-400">Kein vorbestellbares Menü heute.</div>
+                </div>
+            </div>
+        </section>
+
+        {{-- ---------- RECHTS: Besonderheiten (2/3) ---------- --}}
+        <section class="flex w-2/3 min-w-0 flex-col bg-gray-50">
+            <div class="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2">
+                <h2 class="text-lg font-bold text-gray-700">Besonderheiten</h2>
+                <label class="flex items-center gap-2 text-sm text-gray-500">
+                    <input type="checkbox" :checked="autoFinish" @change="toggleAutoFinish()" class="rounded border-gray-300 text-indigo-600">
+                    beim nächsten Chip automatisch buchen
+                </label>
+            </div>
+
+            {{-- Inhalt: gesperrt, solange keine Person / OGS --}}
+            <div class="relative flex min-h-0 flex-1 flex-col">
+                <div x-show="!rightEnabled()" x-cloak
+                     class="absolute inset-0 z-20 flex items-center justify-center bg-gray-100/70 backdrop-blur-[1px]">
+                    <div class="rounded-xl bg-white px-6 py-4 text-center shadow">
+                        <template x-if="!person"><div class="text-lg font-bold text-gray-600">Chip vorhalten oder simulieren</div></template>
+                        <template x-if="isOgs"><div class="text-lg font-bold text-gray-600">OGS – keine Extras</div></template>
+                    </div>
+                </div>
+
+                {{-- Oben: Walk-in-Artikel --}}
+                <div class="min-h-0 flex-1 overflow-y-auto p-3">
+                    <div class="mb-1 text-xs font-bold uppercase tracking-wide text-gray-400">Spontan mitnehmen</div>
+                    <template x-for="group in walkinGroups" :key="group.category">
+                        <div class="mb-3">
+                            <div class="mb-1 text-xs font-semibold text-gray-500" x-text="group.category"></div>
+                            <div class="grid grid-cols-2 gap-2 xl:grid-cols-3">
+                                <template x-for="dish in group.dishes" :key="dish.id">
+                                    <div class="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-2">
+                                        <div class="min-w-0 flex-1">
+                                            <div class="truncate text-base font-semibold text-gray-800" x-text="dish.name"></div>
+                                            <div class="text-sm text-gray-500" x-text="euro(dish.price)"></div>
+                                        </div>
+                                        <button type="button" @click="walkinMinus(dish.id)" :disabled="!walkinQty[dish.id]"
+                                                class="step-btn flex h-12 w-12 items-center justify-center rounded-lg bg-gray-200 text-2xl font-bold text-gray-700 disabled:opacity-30">−</button>
+                                        <span class="w-8 text-center text-xl font-bold" x-text="walkinQty[dish.id] || 0"></span>
+                                        <button type="button" @click="walkinPlus(dish.id)"
+                                                class="step-btn flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-600 text-2xl font-bold text-white">+</button>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="!walkinGroups.length" class="text-sm text-gray-400">Heute keine Artikel zur spontanen Mitnahme.</div>
+                </div>
+
+                {{-- Unten: Nachschlag (Münzen) --}}
+                <div class="border-t border-gray-200 bg-white p-3">
+                    <div class="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">Nachschlag</div>
+                    <div class="grid grid-cols-3 gap-3">
+                        <template x-for="amt in coins" :key="amt">
+                            <div class="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2">
+                                {{-- „Münze" --}}
+                                <div class="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full border-2 border-amber-400 bg-amber-100 leading-none">
+                                    <span class="text-base font-extrabold text-amber-800" x-text="amt < 1 ? (amt*100)+'' : amt+''"></span>
+                                    <span class="text-[9px] font-bold text-amber-700" x-text="amt < 1 ? 'Cent' : 'Euro'"></span>
+                                </div>
+                                <button type="button" @click="coinMinus(amt)" :disabled="!coinQty[String(amt)]"
+                                        class="step-btn flex h-14 w-14 items-center justify-center rounded-lg bg-gray-200 text-3xl font-bold text-gray-700 disabled:opacity-30">−</button>
+                                <span class="w-8 text-center text-2xl font-bold" x-text="coinQty[String(amt)] || 0"></span>
+                                <button type="button" @click="coinPlus(amt)"
+                                        class="step-btn flex h-14 w-14 items-center justify-center rounded-lg bg-amber-500 text-3xl font-bold text-white">+</button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                {{-- Footer: Anzahl + Gesamtpreis + Buchen --}}
+                <div class="flex items-center justify-between gap-4 border-t-2 border-gray-300 bg-white px-4 py-3">
+                    <div class="text-sm text-gray-500">
+                        <span class="text-lg font-bold text-gray-800" x-text="extrasCount"></span> Extra-Dinge gewählt
+                    </div>
+                    <div class="flex items-center gap-5">
+                        <div class="text-right">
+                            <div class="text-[11px] uppercase tracking-wide text-gray-400">Gesamt (nur Extras)</div>
+                            <div class="text-3xl font-extrabold text-gray-900" x-text="euro(extrasTotal)"></div>
+                        </div>
+                        <button @click="commit()" :disabled="busy || !hasSomething"
+                                class="rounded-2xl bg-green-600 px-8 py-4 text-xl font-bold text-white shadow hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-40">✓ Bestätigen</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+        @endif
+    </main>
+
+    {{-- Chip-Simulation (nur wenn kein NFC / zum Testen) --}}
+    <div class="fixed bottom-3 left-3 z-30" x-data="{ openSim: false }">
+        <button @click="openSim = !openSim" class="rounded-full bg-gray-800/80 px-4 py-2 text-sm font-medium text-white shadow-lg">
+            <span x-show="!scanning">🔌 Chip</span>
+            <span x-show="scanning" x-cloak>📡 Scan aktiv</span>
+        </button>
+        <div x-show="openSim" x-cloak @click.outside="openSim=false"
+             class="absolute bottom-12 left-0 max-h-[60vh] w-72 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 shadow-2xl">
+            <div class="mb-2 flex items-center gap-2">
+                <button x-show="!scanning" @click="startScan()" class="flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white">NFC-Scan starten</button>
+                <button x-show="scanning" x-cloak @click="stopScan()" class="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white">Scan stoppen</button>
+            </div>
+            <div class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Chip simulieren</div>
+            <div class="space-y-1">
+                <template x-for="c in simChips" :key="c.uid">
+                    <button @click="openFor(c.uid); openSim=false" class="block w-full truncate rounded-lg px-2 py-1.5 text-left text-sm text-gray-700 hover:bg-indigo-50" x-text="c.name"></button>
+                </template>
+                <div x-show="!simChips.length" class="px-2 py-1 text-xs text-gray-400">Keine aktiven Chips.</div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Ausgang zurück zur normalen Ansicht --}}
+    <a href="{{ route('module.schulkantine.servings.index') }}"
+       class="fixed bottom-3 right-3 z-30 rounded-full bg-gray-800/70 px-4 py-2 text-sm font-medium text-white shadow-lg hover:bg-gray-800">✕ Terminal verlassen</a>
+
+</div>
+@endif
+</body>
+</html>

@@ -87,6 +87,9 @@ Route::middleware(['web', 'auth'])
 
         // Ausgabe & Betrieb (Phase 4) – Küchen-/Ausgabepersonal (Zugriff im Controller geprüft).
         Route::get('ausgabe', [ServingController::class, 'index'])->name('servings.index');
+        // Touch-optimiertes Vollbild-Terminal (eigenes Layout ohne Chrome).
+        Route::get('ausgabe-terminal', [ServingController::class, 'terminal'])->name('servings.terminal');
+        Route::post('ausgabe-terminal/buchen', [ServingController::class, 'terminalCommit'])->name('servings.terminal.commit');
         Route::get('ausgabe/mengen', [ServingController::class, 'quantities'])->name('servings.quantities');
         Route::get('ausgabe/mengen/pdf', [ServingController::class, 'mengenPdf'])->name('servings.mengen.pdf');
         Route::get('ausgabe/no-shows', [ServingController::class, 'noShows'])->name('servings.noshows');
