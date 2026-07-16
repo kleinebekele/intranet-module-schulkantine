@@ -410,17 +410,17 @@
                             <div class="mb-1 text-xs font-semibold text-gray-500" x-text="group.category"></div>
                             <div class="space-y-2">
                                 <template x-for="dish in group.dishes" :key="dish.id">
-                                    <div class="flex items-center gap-2">
+                                    <div class="flex items-center justify-center gap-8">
                                         <button type="button" @click="walkinMinus(dish.id)" :disabled="!walkinQty[dish.id]"
                                                 class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-4xl font-bold text-gray-700 shadow-sm disabled:opacity-30">−</button>
-                                        <div class="flex h-16 min-w-[9rem] max-w-[18rem] flex-col justify-center rounded-xl border bg-white px-4 shadow-sm"
+                                        <div class="flex h-16 min-w-[9rem] max-w-[18rem] flex-col items-center justify-center rounded-xl border bg-white px-4 text-center shadow-sm"
                                              :class="walkinQty[dish.id] ? 'border-indigo-400 ring-2 ring-indigo-200' : 'border-gray-200'">
                                             <span class="truncate text-lg font-semibold leading-tight text-gray-800" x-text="dish.name"></span>
                                             <span class="text-sm font-medium text-gray-500" x-text="euro(dish.price)"></span>
                                         </div>
                                         <button type="button" @click="walkinPlus(dish.id)"
                                                 class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-4xl font-bold text-white shadow-sm">+</button>
-                                        <div class="ml-1 min-w-[6.5rem] whitespace-nowrap text-lg font-bold"
+                                        <div class="min-w-[6.5rem] whitespace-nowrap text-lg font-bold"
                                              :class="walkinQty[dish.id] ? 'text-gray-900' : 'text-gray-300'">
                                             <span x-text="walkinQty[dish.id] || 0"></span>×
                                             <span class="text-sm font-medium" x-text="euro((walkinQty[dish.id] || 0) * dish.price)"></span>
@@ -439,7 +439,7 @@
                     <div class="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">Nachschlag</div>
                     <div class="space-y-2">
                         <template x-for="amt in coins" :key="amt">
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center justify-center gap-8">
                                 <button type="button" @click="coinMinus(amt)" :disabled="!coinQty[String(amt)]"
                                         class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-4xl font-bold text-gray-700 shadow-sm disabled:opacity-30">−</button>
                                 {{-- Münz-Kachel --}}
@@ -453,7 +453,7 @@
                                 </div>
                                 <button type="button" @click="coinPlus(amt)"
                                         class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-4xl font-bold text-white shadow-sm">+</button>
-                                <div class="ml-1 min-w-[6.5rem] whitespace-nowrap text-lg font-bold"
+                                <div class="min-w-[6.5rem] whitespace-nowrap text-lg font-bold"
                                      :class="coinQty[String(amt)] ? 'text-amber-900' : 'text-gray-300'">
                                     <span x-text="coinQty[String(amt)] || 0"></span>×
                                     <span class="text-sm font-medium" x-text="euro((coinQty[String(amt)] || 0) * amt)"></span>
