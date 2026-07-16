@@ -60,6 +60,7 @@
             scanning: false,
             ctrl: null,
             servedOnLoad: false,   // war beim Stempeln schon etwas gebucht?
+            mode: 'vorbesteller',  // 'vorbesteller' | 'ogs' (OGS-Ansicht folgt separat)
             overviewOpen: false,   // „Übersicht"-Ansicht (Männchen-Button, Inhalt folgt)
             modalOpen: false,      // Gericht-Detail-Modal
             modalDish: null,
@@ -425,7 +426,7 @@
     </div>
 
     {{-- ================= INFOZEILE (10%) ================= --}}
-    <header class="flex h-[10%] min-h-[72px] w-full items-stretch border-b border-gray-300 bg-white">
+    <header x-show="mode === 'vorbesteller'" class="flex h-[10%] min-h-[72px] w-full items-stretch border-b border-gray-300 bg-white">
 
         {{-- Links: KW (+ Datum), anklickbar zum Wechseln --}}
         {{-- Ganzer Kasten = großer Touch-Button, öffnet den Kalender. --}}
@@ -489,8 +490,17 @@
          :class="banner?.ok ? 'bg-green-600 text-white' : 'bg-red-600 text-white'"
          @click="banner=null" x-text="banner?.text"></div>
 
+    {{-- OGS-Ansicht (komplett anderer Aufbau – folgt in einer eigenen Session). --}}
+    <main x-show="mode === 'ogs'" x-cloak class="flex min-h-0 flex-1 items-center justify-center bg-gray-50 text-center">
+        <div>
+            <div class="text-6xl">🍽️</div>
+            <h2 class="mt-4 text-2xl font-bold text-gray-700">OGS-Ansicht</h2>
+            <p class="mt-2 text-gray-400">Eigener Aufbau – folgt.</p>
+        </div>
+    </main>
+
     {{-- ================= ARBEITSZEILE (90%) ================= --}}
-    <main class="flex min-h-0 flex-1">
+    <main x-show="mode === 'vorbesteller'" class="flex min-h-0 flex-1">
 
         @if (! $open)
             <div class="flex flex-1 items-center justify-center text-center">
@@ -718,6 +728,11 @@
         </div>
 
         <button @click="openSearch()" class="rounded-full bg-gray-800/80 px-4 py-2 text-sm font-medium text-white shadow-lg hover:bg-gray-700">🔍 Suchen</button>
+
+        {{-- Umschalten Vorbesteller ⇄ OGS. Label = Ansicht, zu der gewechselt wird. --}}
+        <button @click="mode = (mode === 'ogs' ? 'vorbesteller' : 'ogs')"
+                class="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg hover:bg-indigo-700"
+                x-text="mode === 'ogs' ? '↔ Vorbesteller' : '↔ OGS'"></button>
 
         <a href="{{ route('module.schulkantine.servings.index') }}"
            class="rounded-full bg-gray-800/70 px-4 py-2 text-sm font-medium text-white shadow-lg hover:bg-gray-800">✕ Terminal verlassen</a>
