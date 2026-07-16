@@ -231,14 +231,10 @@
                                                                         // gesperrten Kategorie liegt, gar nicht erst anbieten –
                                                                         // sonst käme der gesperrte Nachtisch durchs Hintertürchen.
                                                                         // (Der Controller lehnt es zusätzlich serverseitig ab.)
+                                                                        // Ein „nur spontan"-Bestandteil blockiert das Sparmenü NICHT:
+                                                                        // vorbestellbar ist es über seine eigene Sparmenü-Kategorie.
                                                                         $occupied = $m->dish->occupiedCategoryIds();
-                                                                        // Dasselbe Hintertürchen für „nur spontan": Ein Sparmenü darf
-                                                                        // keinen Bestandteil aus einer nicht vorbestellbaren Kategorie
-                                                                        // vorbestellbar machen.
-                                                                        $hatNurSpontanTeil = $m->dish->components
-                                                                            ->contains(fn ($p) => $p->category && ! $p->category->allows_preorder);
                                                                     @endphp
-                                                                    @continue($hatNurSpontanTeil)
                                                                     @continue(array_intersect($occupied, $e['blockedCats'] ?? []) !== [])
                                                                     @php
                                                                         $isSel = (string) $cur === (string) $m->dish_id;

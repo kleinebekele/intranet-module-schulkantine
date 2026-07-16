@@ -360,7 +360,7 @@ class OrderController
         $menu = Menu::where('season_id', $season->id)
             ->whereDate('date', $date->toDateString())
             ->where('dish_id', (int) $data['dish_id'])
-            ->with('dish.components')
+            ->with(['dish.components', 'dish.category'])
             ->first();
 
         abort_if(! $menu, 422, 'Dieses Gericht steht an dem Tag nicht auf dem Speiseplan.');
@@ -371,27 +371,28 @@ class OrderController
         }
 
         // Die Kategorien, die diese Bestellung belegt. Bei einem Sparmenü sind das
-        // auch die Kategorien seiner Bestandteile – daran hängen beide Regeln unten.
+        // auch die Kategorien seiner Bestandteile – Basis für Eltern-Sperre & Verdrängung.
         $occupied = $menu->dish->occupiedCategoryIds();
 
-        // Zwei Hürden je belegter Kategorie. Beide laufen über $occupied, greifen
-        // dadurch auch für Sparmenüs (deren Bestandteile zählen mit).
+        // 1. Vorbestellbar? Es zählt die EIGENE Kategorie des Gerichts. Ein Sparmenü
+        //    wird über seine (vorbestellbare) Sparmenü-Kategorie bestellt – dass ein
+        //    Bestandteil aus einer „nur spontan"-Kategorie stammt, blockiert das Bündel
+        //    NICHT (die Küche gibt die Bestandteile aus, einzeln bleiben sie spontan).
+        $ownCategory = $menu->dish->category;
+        if ($ownCategory && ! $ownCategory->allows_preorder) {
+            return back()->withErrors(['bestellung' =>
+                '„'.$ownCategory->name.'" kann nicht vorbestellt werden – nur spontan bei der Ausgabe.']);
+        }
+
+        // 2. Kategorie-Freigabe: Eltern können die Vorbestellung einzelner Kategorien
+        //    für ihre Kinder sperren (z. B. keinen Nachtisch). Bei einem Sparmenü muss
+        //    JEDE belegte Kategorie frei sein – sonst käme der gesperrte Nachtisch als
+        //    Teil des Sparmenüs doch durch.
         $categories = Category::whereIn('id', $occupied)->get()->keyBy('id');
         foreach ($occupied as $catId) {
-            // 1. Kategorie überhaupt vorbestellbar? „Nur spontan"-Kategorien stehen
-            //    zwar auf dem Speiseplan (für die Ausgabe), sind aber nicht vorab
-            //    wählbar – auch nicht als Teil eines Sparmenüs.
-            $category = $categories->get($catId);
-            if ($category && ! $category->allows_preorder) {
-                return back()->withErrors(['bestellung' =>
-                    '„'.$category->name.'" kann nicht vorbestellt werden – nur spontan bei der Ausgabe.']);
-            }
-
-            // 2. Kategorie-Freigabe: Eltern können die Vorbestellung einzelner
-            //    Kategorien für ihre Kinder sperren (z. B. keinen Nachtisch). Bei
-            //    einem Sparmenü muss JEDE belegte Kategorie frei sein – sonst käme
-            //    der gesperrte Nachtisch als Teil des Sparmenüs doch durch.
             if (! ChildCategoryPermission::canPreorder($eater->id, $catId)) {
+                $category = $categories->get($catId);
+
                 return back()->withErrors(['bestellung' =>
                     'Für '.$eater->name.' ist die Vorbestellung nicht freigegeben'
                     .($category ? ' (Kategorie „'.$category->name.'")' : '').'.']);
