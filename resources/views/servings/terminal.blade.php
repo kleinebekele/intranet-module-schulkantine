@@ -448,7 +448,9 @@
                 </div>
             </div>
 
-            <div class="relative flex-1 overflow-y-auto p-3">
+            {{-- Bei „keine Vorbestellung" das Scrollen sperren, damit das Overlay den
+                 ganzen sichtbaren Bereich abdeckt und unten nicht das Grau wegscrollt. --}}
+            <div class="relative flex-1 p-3" :class="(person && !person.hasOrder) ? 'overflow-hidden' : 'overflow-y-auto'">
                 {{-- Sperr-Overlay, wenn Person ohne Vorbestellung --}}
                 <div x-show="person && !person.hasOrder" x-cloak
                      class="absolute inset-0 z-20 flex items-center justify-center bg-gray-100/80 backdrop-blur-[1px]">
