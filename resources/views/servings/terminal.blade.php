@@ -174,7 +174,8 @@
             keyClear() { this.searchQuery = ''; this.searchResults = []; clearTimeout(this.searchDebounce); },
             async doSearch() {
                 const q = this.searchQuery.trim();
-                if (!q) { this.searchResults = []; this.searching = false; return; }
+                // Erst ab dem 3. Buchstaben suchen (spart Anfragen, gezieltere Treffer).
+                if (q.length < 3) { this.searchResults = []; this.searching = false; return; }
                 this.searching = true;
                 try {
                     const res = await fetch(this.urls.search, {
@@ -640,7 +641,9 @@
                    placeholder="Namen eingeben …" readonly
                    class="w-full rounded-xl border-gray-300 px-4 py-3 text-xl shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
 
-            <div class="mt-3 min-h-[4rem] space-y-2">
+            {{-- Feste Höhe für bis zu drei Trefferzeilen, damit die Tastatur darunter
+                 nicht springt, wenn Treffer erscheinen oder verschwinden. --}}
+            <div class="mt-3 h-[13.5rem] space-y-2 overflow-hidden">
                 <template x-for="r in searchResults" :key="r.id">
                     <button @click="pickSearch(r.id)"
                             class="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-200 p-4 text-left hover:border-indigo-400 hover:bg-indigo-50">
@@ -648,8 +651,11 @@
                         <span class="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-base font-semibold text-indigo-700" x-text="'Klasse: ' + (r.group || '–')"></span>
                     </button>
                 </template>
-                <div x-show="searchQuery.trim() && !searchResults.length && !searching" x-cloak class="py-3 text-center text-sm text-gray-400">Keine Treffer.</div>
-                <div x-show="!searchQuery.trim()" x-cloak class="py-3 text-center text-sm text-gray-400">Namen über die Tastatur eingeben – bis zu drei Treffer.</div>
+                <div x-show="searchQuery.trim().length >= 3 && !searchResults.length && !searching" x-cloak class="py-3 text-center text-sm text-gray-400">Keine Treffer.</div>
+                <div x-show="searchQuery.trim().length < 3" x-cloak class="py-3 text-center text-sm text-gray-400">
+                    <span x-show="searchQuery.trim().length === 0">Namen eingeben – ab dem 3. Buchstaben wird gesucht.</span>
+                    <span x-show="searchQuery.trim().length > 0" x-cloak>Noch <span x-text="3 - searchQuery.trim().length"></span> Buchstabe<span x-show="(3 - searchQuery.trim().length) !== 1">n</span> …</span>
+                </div>
             </div>
 
             {{-- Bildschirmtastatur (QWERTZ) --}}
