@@ -91,6 +91,7 @@ Route::middleware(['web', 'auth'])
         Route::get('ausgabe-terminal', [ServingController::class, 'terminal'])->name('servings.terminal');
         Route::post('ausgabe-terminal/buchen', [ServingController::class, 'terminalCommit'])->name('servings.terminal.commit');
         Route::post('ausgabe-terminal/suchen', [ServingController::class, 'terminalSearch'])->name('servings.terminal.search');
+        Route::post('ausgabe-terminal/ogs-abhaken', [ServingController::class, 'terminalOgsToggle'])->name('servings.terminal.ogs-toggle');
         Route::get('ausgabe/mengen', [ServingController::class, 'quantities'])->name('servings.quantities');
         Route::get('ausgabe/mengen/pdf', [ServingController::class, 'mengenPdf'])->name('servings.mengen.pdf');
         Route::get('ausgabe/no-shows', [ServingController::class, 'noShows'])->name('servings.noshows');
@@ -109,8 +110,8 @@ Route::middleware(['web', 'auth'])
         Route::get('auswertung/csv', [ReportController::class, 'csv'])->name('reports.csv');
         Route::get('auswertung/person/{user}', [ReportController::class, 'show'])->name('reports.show');
         Route::get('auswertung/pdf', [ReportController::class, 'pdf'])->name('reports.pdf');
-        Route::post('auswertung/{user}/bezahlt', [ReportController::class, 'markPaid'])->name('reports.paid');
-        Route::delete('auswertung/{user}/bezahlt', [ReportController::class, 'unmarkPaid'])->name('reports.unpaid');
+        // Kein manuelles „bezahlt": der Bezahlt-Status kommt ausschließlich aus dem
+        // externen Zahlungs-Import (folgt). Darum keine markPaid/unmarkPaid-Routen mehr.
 
         // Bewertung / Feedback (Phase 6).
         // „Essen bewerten": jeder Nutzer bewertet sich + seine Kinder (Daumen, jederzeit änderbar).

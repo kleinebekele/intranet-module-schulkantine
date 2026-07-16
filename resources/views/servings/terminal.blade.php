@@ -36,11 +36,18 @@
                 lookupEater: @js(route('module.schulkantine.servings.lookup-eater')),
                 search: @js(route('module.schulkantine.servings.terminal.search')),
                 commit: @js(route('module.schulkantine.servings.terminal.commit')),
+                ogsToggle: @js(route('module.schulkantine.servings.terminal.ogs-toggle')),
                 base: @js(route('module.schulkantine.servings.terminal')),
             },
             open: @js($open),
             planGroups: @js($planGroups),
             walkinGroups: @js($walkinGroups),
+            ogsEaters: @js($ogsEaters),   // OGS-Ansicht: heute essende OGS-Kinder (+ served/declined)
+            ogsBusy: false,
+            ogsPressTimer: null,   // Long-Press-Erkennung (öffnet Detail-Modal)
+            ogsLongFired: false,
+            ogsModalOpen: false,   // OGS-Detail-Modal (Unverträglichkeiten + abgeholt/abgelehnt)
+            ogsModalEater: null,
             simChips: @js($simChips),
             openDates: @js($openDates),   // alle Öffnungstage der Saison (Touch-Kalender)
             today: @js($today),
@@ -196,7 +203,8 @@
                     const res = await fetch(this.urls.search, {
                         method: 'POST',
                         headers: { 'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': this.csrf },
-                        body: JSON.stringify({ q }),
+                        // mode/date: im OGS-Modus die heute essenden OGS-Kinder finden.
+                        body: JSON.stringify({ q, mode: this.mode, date: this.date }),
                     });
                     const data = await res.json();
                     this.searchResults = data.results || [];
@@ -206,6 +214,35 @@
                 this.searching = false;
             },
             async pickSearch(id) {
+                // OGS-Modus: Treffer direkt als abgeholt buchen (kein Menü-/Chip-Fluss).
+                // Auch ein heute nicht angemeldetes OGS-Kind kann so spontan mitessen –
+                // der Server legt die Anwesenheit an und liefert den Board-Eintrag zurück.
+                if (this.mode === 'ogs') {
+                    this.closeSearch();
+                    const existing = this.ogsEaters.find(x => x.user_id === id);
+                    if (existing && existing.served) { this.banner = { ok:true, text: existing.name + ' ist bereits abgeholt.' }; return; }
+                    if (this.ogsBusy) return;
+                    this.ogsBusy = true;
+                    try {
+                        const res = await fetch(this.urls.ogsToggle, {
+                            method: 'POST',
+                            headers: { 'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': this.csrf },
+                            body: JSON.stringify({ eater_id: id, date: this.date }),
+                        });
+                        const data = await res.json();
+                        if (!data.ok) { this.banner = { ok:false, text: data.error || 'Buchung fehlgeschlagen.' }; this.ogsBusy = false; return; }
+                        if (existing) {
+                            existing.served = data.served;
+                        } else if (data.eater) {
+                            this.ogsEaters.push(data.eater); // spontan dazugekommenes Kind aufs Board
+                        }
+                        this.banner = { ok:true, text: (existing?.name || data.eater?.name || 'Kind') + ' als abgeholt gebucht.' };
+                    } catch (err) {
+                        this.banner = { ok:false, text:'Fehler beim Buchen: ' + err };
+                    }
+                    this.ogsBusy = false;
+                    return;
+                }
                 if (this.busy) return;
                 if (! await this.guardPending()) return;
                 this.busy = true;
@@ -379,6 +416,76 @@
 
             gotoDate(d) { if (d) window.location = this.urls.base + '?date=' + d; },
 
+            // ---- OGS-Ansicht ----
+            // Nach Vorname sortiert (Umlaut-tolerant); bei Gleichstand nach vollem Namen.
+            get ogsSorted() {
+                return [...this.ogsEaters].sort((a, b) =>
+                    (a.first || '').localeCompare(b.first || '', 'de', { sensitivity: 'base' })
+                    || (a.name || '').localeCompare(b.name || '', 'de'));
+            },
+            // Offene zuerst, erledigte (abgeholt=grün / abgelehnt=rot) ans Ende – beide
+            // je nach Vorname sortiert. So sinken erledigte in den Spalten nach unten.
+            get ogsActive() { return this.ogsSorted.filter(e => !e.served); },
+            get ogsPicked() { return this.ogsSorted.filter(e => e.served); },
+            get ogsOrdered() { return [...this.ogsActive, ...this.ogsPicked]; },
+            get ogsServedCount() { return this.ogsEaters.filter(e => e.served && !e.declined).length; },
+            get ogsDeclinedCount() { return this.ogsEaters.filter(e => e.served && e.declined).length; },
+            ogsSonderkost(e) { return [...(e.allergens || []), ...(e.diets || [])]; },
+
+            // Long-Press öffnet das Detail-Modal (Unverträglichkeiten + abgeholt/abgelehnt);
+            // ein kurzer Tipp schaltet abgeholt ⇄ offen. Der Timer unterscheidet beides.
+            ogsPressStart(id) {
+                this.ogsLongFired = false;
+                clearTimeout(this.ogsPressTimer);
+                this.ogsPressTimer = setTimeout(() => { this.ogsLongFired = true; this.openOgsModal(id); }, 500);
+            },
+            ogsPressEnd() { clearTimeout(this.ogsPressTimer); },
+            ogsTileClick(id) {
+                if (this.ogsLongFired) { this.ogsLongFired = false; return; } // war ein Long-Press
+                this.ogsToggle(id);
+            },
+
+            openOgsModal(id) {
+                const e = this.ogsEaters.find(x => x.user_id === id);
+                if (!e) return;
+                this.ogsModalEater = e;
+                this.ogsModalOpen = true;
+            },
+            closeOgsModal() { this.ogsModalOpen = false; },
+            // Aus dem Modal: ausdrücklich abgeholt / abgelehnt / offen setzen.
+            async ogsSet(outcome) {
+                const e = this.ogsModalEater;
+                this.closeOgsModal();
+                if (e) await this.ogsToggle(e.user_id, outcome);
+            },
+
+            // outcome: null = Tap-Umschalter (abgeholt ⇄ offen); sonst served|declined|open.
+            async ogsToggle(id, outcome = null) {
+                if (this.ogsBusy) return;
+                const e = this.ogsEaters.find(x => x.user_id === id);
+                if (!e) return;
+                this.ogsBusy = true;
+                try {
+                    const res = await fetch(this.urls.ogsToggle, {
+                        method: 'POST',
+                        headers: { 'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': this.csrf },
+                        body: JSON.stringify({ eater_id: id, date: this.date, outcome }),
+                    });
+                    const data = await res.json();
+                    if (!data.ok) { this.banner = { ok:false, text: data.error || 'Buchung fehlgeschlagen.' }; this.ogsBusy = false; return; }
+                    // Spontan Dazugekommener beim Zurücknehmen komplett vom Board nehmen.
+                    if (data.removed) {
+                        this.ogsEaters = this.ogsEaters.filter(x => x.user_id !== id);
+                    } else {
+                        e.served = data.served;
+                        e.declined = data.declined;
+                    }
+                } catch (err) {
+                    this.banner = { ok:false, text:'Fehler beim Buchen: ' + err };
+                }
+                this.ogsBusy = false;
+            },
+
             // ---- Touch-Kalender ----
             get openSet() { return new Set(this.openDates); },
             get calLabel() {
@@ -426,7 +533,9 @@
     </div>
 
     {{-- ================= INFOZEILE (10%) ================= --}}
-    <header x-show="mode === 'vorbesteller'" class="flex h-[10%] min-h-[72px] w-full items-stretch border-b border-gray-300 bg-white">
+    {{-- Gleicher Header in beiden Modi. Im Wochenüberblick zeigt der Vorbesteller-
+         Modus die Menüs je Tag, der OGS-Modus nur die Zahl der Vorbestellungen. --}}
+    <header class="flex h-[10%] min-h-[72px] w-full items-stretch border-b border-gray-300 bg-white">
 
         {{-- Links: KW (+ Datum), anklickbar zum Wechseln --}}
         {{-- Ganzer Kasten = großer Touch-Button, öffnet den Kalender. --}}
@@ -446,7 +555,8 @@
                         <div class="flex items-baseline justify-between">
                             <span class="text-sm font-semibold {{ $wd['isWorking'] ? 'text-indigo-700' : 'text-gray-700' }}">{{ $wd['weekday'] }} {{ $wd['dayLabel'] }}</span>
                         </div>
-                        <div class="mt-0.5 space-y-0.5 overflow-hidden text-[11px] leading-tight text-gray-500">
+                        {{-- Vorbesteller: Menüs des Tages mit Bestellanzahl --}}
+                        <div x-show="mode === 'vorbesteller'" class="mt-0.5 space-y-0.5 overflow-hidden text-[11px] leading-tight text-gray-500">
                             @forelse ($wd['dishes'] as $d)
                                 <div class="flex justify-between gap-2">
                                     <span class="truncate">{{ $d['name'] }}</span>
@@ -455,6 +565,11 @@
                             @empty
                                 <div class="text-gray-300">–</div>
                             @endforelse
+                        </div>
+                        {{-- OGS: nur die Anzahl der Vorbestellungen (essende OGS-Kinder) --}}
+                        <div x-show="mode === 'ogs'" x-cloak class="mt-0.5 flex items-baseline gap-1 leading-tight">
+                            <span class="text-2xl font-bold {{ $wd['ogsCount'] ? 'text-indigo-700' : 'text-gray-300' }}">{{ $wd['ogsCount'] }}</span>
+                            <span class="text-[11px] font-medium text-gray-400">essen</span>
                         </div>
                     </div>
                 @endforeach
@@ -490,13 +605,77 @@
          :class="banner?.ok ? 'bg-green-600 text-white' : 'bg-red-600 text-white'"
          @click="banner=null" x-text="banner?.text"></div>
 
-    {{-- OGS-Ansicht (komplett anderer Aufbau – folgt in einer eigenen Session). --}}
-    <main x-show="mode === 'ogs'" x-cloak class="flex min-h-0 flex-1 items-center justify-center bg-gray-50 text-center">
-        <div>
-            <div class="text-6xl">🍽️</div>
-            <h2 class="mt-4 text-2xl font-bold text-gray-700">OGS-Ansicht</h2>
-            <p class="mt-2 text-gray-400">Eigener Aufbau – folgt.</p>
-        </div>
+    {{-- ================= OGS-ANSICHT ================= --}}
+    {{-- Keine Menüs/Spalten-Trennung: jedes heute essende OGS-Kind ist eine
+         klickbare Kachel (Tipp = abgeholt). Spaltenweise nach Vorname (CSS-
+         Mehrspalten füllt Spalte für Spalte → automatisch A–C | D–K | …).
+         Abgeholte springen ins grüne Band unten; erneuter Tipp nimmt zurück. --}}
+    <main x-show="mode === 'ogs'" x-cloak class="flex min-h-0 flex-1 flex-col bg-gray-50">
+        @if (! $open)
+            <div class="flex flex-1 items-center justify-center text-center">
+                <div>
+                    <div class="text-2xl font-semibold text-amber-700">🔒 Heute geschlossen</div>
+                    <p class="mt-2 text-gray-500">{{ $closedReason }}</p>
+                </div>
+            </div>
+        @else
+            {{-- Kopfzeile: Fortschritt abgeholt / offen / gesamt --}}
+            <div class="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2">
+                <h2 class="text-lg font-bold text-gray-700">OGS – Essen abholen</h2>
+                <div class="flex items-center gap-2 text-sm font-semibold">
+                    <span class="rounded-full bg-green-100 px-3 py-1 text-green-700"><span x-text="ogsServedCount"></span> abgeholt</span>
+                    <span x-show="ogsDeclinedCount" x-cloak class="rounded-full bg-red-100 px-3 py-1 text-red-700"><span x-text="ogsDeclinedCount"></span> abgelehnt</span>
+                    <span class="rounded-full bg-gray-100 px-3 py-1 text-gray-600"><span x-text="ogsActive.length"></span> offen</span>
+                    <span class="text-gray-400">von <span x-text="ogsEaters.length"></span></span>
+                </div>
+            </div>
+
+            {{-- Leerfall: heute isst kein OGS-Kind --}}
+            <div x-show="!ogsEaters.length" x-cloak class="flex flex-1 items-center justify-center text-center">
+                <div>
+                    <div class="text-6xl">🧑‍🍳</div>
+                    <p class="mt-4 text-xl font-medium text-gray-400">Heute essen keine OGS-Kinder.</p>
+                </div>
+            </div>
+
+            {{-- Alle Kinder in EINER Spaltenliste: offene oben, abgeholte grün ans Ende
+                 (sinken unten in die Spalten). Tipp schaltet abgeholt ⇄ offen um.
+                 Extra Abstand unten, damit die fixierte Fußleiste (Chip/Suchen/…) die
+                 letzte Zeile nicht verdeckt. --}}
+            <div x-show="ogsEaters.length" x-cloak class="min-h-0 flex-1 overflow-y-auto p-3 pb-20">
+                <div class="columns-2 gap-3 md:columns-3 xl:columns-4">
+                    <template x-for="e in ogsOrdered" :key="e.user_id">
+                        {{-- Kurzer Tipp = abgeholt ⇄ offen; Long-Press = Detail-Modal
+                             (Unverträglichkeiten + abgeholt/abgelehnt). Drei Zustände:
+                             offen (weiß ○) · abgeholt (grün ✓) · abgelehnt (rot ✗). --}}
+                        <button type="button" :disabled="ogsBusy"
+                                @click="ogsTileClick(e.user_id)"
+                                @pointerdown="ogsPressStart(e.user_id)"
+                                @pointerup="ogsPressEnd()" @pointerleave="ogsPressEnd()" @pointercancel="ogsPressEnd()"
+                                @contextmenu.prevent
+                                class="mb-3 flex w-full select-none break-inside-avoid items-center gap-3 rounded-2xl border-2 p-3 text-left shadow-sm transition disabled:opacity-60"
+                                :class="!e.served ? 'border-gray-200 bg-white hover:border-indigo-400 active:bg-indigo-50'
+                                        : (e.declined ? 'border-red-400 bg-red-50 hover:border-red-500 active:bg-red-100'
+                                                      : 'border-green-400 bg-green-50 hover:border-green-500 active:bg-green-100')">
+                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl font-bold"
+                                 :class="!e.served ? 'bg-indigo-100 text-indigo-700'
+                                         : (e.declined ? 'bg-red-200 text-red-800' : 'bg-green-200 text-green-800')"
+                                 x-text="(e.first || '?').slice(0,1)"></div>
+                            <div class="min-w-0 flex-1">
+                                <div class="truncate text-lg font-bold leading-tight"
+                                     :class="!e.served ? 'text-gray-800' : (e.declined ? 'text-red-900' : 'text-green-900')" x-text="e.name"></div>
+                                <div x-show="ogsSonderkost(e).length" x-cloak class="truncate text-xs font-semibold text-amber-700">
+                                    ⚠ <span x-text="ogsSonderkost(e).join(', ')"></span>
+                                </div>
+                            </div>
+                            <span class="shrink-0 text-3xl"
+                                  :class="!e.served ? 'text-gray-300' : (e.declined ? 'text-red-600' : 'text-green-600')"
+                                  x-text="!e.served ? '○' : (e.declined ? '✗' : '✓')"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+        @endif
     </main>
 
     {{-- ================= ARBEITSZEILE (90%) ================= --}}
@@ -816,6 +995,54 @@
                 <button type="button" @click="padConfirm()" class="h-14 flex-[1.5] rounded-xl bg-green-600 text-base font-bold text-white shadow hover:bg-green-700">Übernehmen</button>
             </div>
         </div>
+    </div>
+
+    {{-- OGS-Detail-Modal (Long-Press auf ein OGS-Kind): alle Unverträglichkeiten,
+         dann ausdrücklich abgeholt / abgelehnt / offen wählen. --}}
+    <div x-show="ogsModalOpen" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-6"
+         @click.self="closeOgsModal()" @keydown.escape.window="closeOgsModal()">
+        <template x-if="ogsModalEater">
+            <div class="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+                <div class="mb-3 flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <h3 class="truncate text-2xl font-bold text-gray-800" x-text="ogsModalEater.name"></h3>
+                        <div class="mt-0.5 text-sm font-medium"
+                             :class="!ogsModalEater.served ? 'text-gray-400' : (ogsModalEater.declined ? 'text-red-600' : 'text-green-600')"
+                             x-text="!ogsModalEater.served ? 'Status: offen' : (ogsModalEater.declined ? 'Status: abgelehnt' : 'Status: abgeholt')"></div>
+                    </div>
+                    <button @click="closeOgsModal()" class="shrink-0 rounded-lg px-3 py-1 text-xl text-gray-400 hover:bg-gray-100">✕</button>
+                </div>
+
+                {{-- Unverträglichkeiten --}}
+                <div class="rounded-xl bg-gray-50 p-3">
+                    <div class="text-xs font-bold uppercase tracking-wide text-gray-400">Unverträglichkeiten</div>
+                    <div class="mt-1.5 flex flex-wrap gap-1.5">
+                        <template x-for="a in (ogsModalEater.allergens || [])" :key="'a'+a">
+                            <span class="rounded-full bg-amber-100 px-2.5 py-1 text-sm font-semibold text-amber-800" x-text="a"></span>
+                        </template>
+                        <template x-for="d in (ogsModalEater.diets || [])" :key="'d'+d">
+                            <span class="rounded-full bg-purple-100 px-2.5 py-1 text-sm font-semibold text-purple-800" x-text="d"></span>
+                        </template>
+                        <span x-show="!ogsSonderkost(ogsModalEater).length" x-cloak class="text-sm text-gray-400">keine hinterlegt</span>
+                    </div>
+                </div>
+
+                {{-- Aktionen: abgeholt / abgelehnt (+ zurücknehmen, wenn schon erledigt) --}}
+                <div class="mt-4 grid grid-cols-2 gap-2">
+                    <button type="button" @click="ogsSet('served')" :disabled="ogsBusy"
+                            class="flex items-center justify-center gap-2 rounded-xl bg-green-600 py-4 text-lg font-bold text-white shadow hover:bg-green-700 disabled:opacity-60">
+                        <span class="text-2xl">✓</span> Abgeholt
+                    </button>
+                    <button type="button" @click="ogsSet('declined')" :disabled="ogsBusy"
+                            class="flex items-center justify-center gap-2 rounded-xl bg-red-600 py-4 text-lg font-bold text-white shadow hover:bg-red-700 disabled:opacity-60">
+                        <span class="text-2xl">✗</span> Abgelehnt
+                    </button>
+                </div>
+                <button type="button" x-show="ogsModalEater.served" x-cloak @click="ogsSet('open')" :disabled="ogsBusy"
+                        class="mt-2 w-full rounded-xl border border-gray-300 bg-white py-3 text-base font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-60">↺ Zurücknehmen (offen)</button>
+            </div>
+        </template>
     </div>
 
     {{-- Gericht-Detail-Modal: alle Werte, konfliktbehaftete hervorgehoben. --}}

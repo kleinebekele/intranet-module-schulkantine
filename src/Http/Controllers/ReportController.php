@@ -82,40 +82,10 @@ class ReportController
     }
 
     // ------------------------------------------------------ Bezahlt-Status
-
-    public function markPaid(Request $request, User $user)
-    {
-        $this->authorizeAdmin($request);
-        $season = Season::where('is_active', true)->firstOrFail();
-        [$year, $month] = $this->resolveMonth($request, $season);
-
-        // Betrag zum Zeitpunkt der Markierung festhalten (Audit-Snapshot).
-        $line = (new BillingService)->forMonth($season, $year, $month)->get($user->id);
-        $amount = $line['total'] ?? 0.0;
-
-        Settlement::updateOrCreate(
-            ['user_id' => $user->id, 'year' => $year, 'month' => $month],
-            [
-                'season_id' => $season->id,
-                'amount' => $amount,
-                'paid_at' => Carbon::now(),
-                'marked_by' => $request->user()->id,
-            ]
-        );
-
-        return back()->with('status', $user->name.' – '.$this->monthLabel($year, $month).' als bezahlt markiert.');
-    }
-
-    public function unmarkPaid(Request $request, User $user)
-    {
-        $this->authorizeAdmin($request);
-        $season = Season::where('is_active', true)->firstOrFail();
-        [$year, $month] = $this->resolveMonth($request, $season);
-
-        Settlement::where('user_id', $user->id)->where('year', $year)->where('month', $month)->delete();
-
-        return back()->with('status', 'Bezahlt-Markierung für '.$user->name.' zurückgenommen.');
-    }
+    //
+    // Bewusst KEIN manuelles „als bezahlt markieren" mehr: Der Bezahlt-Status
+    // (Tabelle kantine_settlements) kommt ausschließlich aus dem externen
+    // Zahlungs-Import (folgt). Die Auswertung zeigt den Status nur noch an.
 
     // ------------------------------------------------------------- Exporte
 

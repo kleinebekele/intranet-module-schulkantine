@@ -226,8 +226,11 @@ class BillingService
         $menuTotal = array_sum(array_column($menu, 'price'));
 
         // 2) OGS – teilgenommene Tage (Abo minus Abbestellungen bzw. bestellte Tage).
+        // Jeder gebuchte Tag wird berechnet („gebucht ist gebucht"); zusätzlich zeigen
+        // wir den Ausgabe-Stand je Tag: abgeholt / abgelehnt / nicht abgeholt (Default).
         $ogsPrice = (float) ($season->ogs_price ?? 0);
-        $ogs = ['days' => 0, 'price' => $ogsPrice, 'total' => 0.0, 'dates' => [], 'cancelled' => [], 'subscribed' => false];
+        $ogs = ['days' => 0, 'price' => $ogsPrice, 'total' => 0.0, 'dates' => [], 'cancelled' => [],
+            'subscribed' => false, 'picked' => 0, 'declined' => 0, 'noshow' => 0];
         if ($ogsPrice > 0 && ! empty($openDays)) {
             $subscribed = Subscription::where('season_id', $season->id)
                 ->where('user_id', $userId)->where('active', true)->exists();
@@ -235,6 +238,18 @@ class BillingService
                 ->where('user_id', $userId)->whereNull('category_id')
                 ->whereBetween('date', [$from, $to])->get(['date', 'status']);
             $ogs['subscribed'] = $subscribed;
+
+            // Ausgabe-Stand je OGS-Tag: nicht-spontane Zeile ohne Gericht = OGS-Essen.
+            // vorhanden + declined = abgelehnt · vorhanden = abgeholt · fehlt = nicht abgeholt.
+            $ogsServed = Serving::where('season_id', $season->id)->where('user_id', $userId)
+                ->where('spontaneous', false)->whereNull('dish_id')
+                ->whereBetween('date', [$from, $to])->get()
+                ->keyBy(fn (Serving $s) => $s->date->toDateString());
+            $statusFor = function (string $ds) use ($ogsServed) {
+                $sv = $ogsServed->get($ds);
+
+                return $sv === null ? 'none' : ($sv->declined ? 'declined' : 'taken');
+            };
 
             if ($subscribed) {
                 $cancelled = $ogsRows->where('status', Order::STATUS_CANCELLED)
@@ -244,7 +259,7 @@ class BillingService
                     if ($cancelled->has($ds)) {
                         $ogs['cancelled'][] = Carbon::parse($ds);
                     } else {
-                        $ogs['dates'][] = Carbon::parse($ds);
+                        $ogs['dates'][] = ['date' => Carbon::parse($ds), 'status' => $statusFor($ds)];
                     }
                 }
             } elseif ($ogsRows->isNotEmpty()) {
@@ -252,11 +267,14 @@ class BillingService
                     ->map(fn ($r) => $r->date->toDateString())
                     ->filter(fn ($ds) => isset($openDays[$ds]))->unique()->sort();
                 foreach ($ordered as $ds) {
-                    $ogs['dates'][] = Carbon::parse($ds);
+                    $ogs['dates'][] = ['date' => Carbon::parse($ds), 'status' => $statusFor($ds)];
                 }
             }
             $ogs['days'] = count($ogs['dates']);
             $ogs['total'] = $ogs['days'] * $ogsPrice;
+            $ogs['picked'] = collect($ogs['dates'])->where('status', 'taken')->count();
+            $ogs['declined'] = collect($ogs['dates'])->where('status', 'declined')->count();
+            $ogs['noshow'] = collect($ogs['dates'])->where('status', 'none')->count();
         }
 
         // 3) Spontane Abholungen.

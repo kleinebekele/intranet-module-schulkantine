@@ -36,6 +36,7 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 \Intranet\Modules\Schulkantine\Console\Commands\SeedTestUsers::class,
+                \Intranet\Modules\Schulkantine\Console\Commands\SeedOgsTestkinder::class,
                 \Intranet\Modules\Schulkantine\Console\Commands\SeedDishes::class,
             ]);
         }

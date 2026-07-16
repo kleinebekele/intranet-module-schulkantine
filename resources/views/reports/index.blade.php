@@ -129,35 +129,14 @@
                                                 {{ $l['pfand_net'] != 0 ? $euro($l['pfand_net']) : '–' }}
                                             </td>
                                             <td class="px-3 py-2 text-right font-semibold tabular-nums text-gray-900">{{ $euro($l['total']) }}</td>
+                                            {{-- Nur-Anzeige: Bezahlt-Status kommt aus dem externen
+                                                 Zahlungs-Import (folgt), nicht manuell setzbar. --}}
                                             <td class="px-4 py-2 text-center">
-                                                @if ($isAdmin)
-                                                    @if ($m['paid'])
-                                                        <form method="POST" action="{{ route('module.schulkantine.reports.unpaid', $m['user']) }}" class="inline">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <input type="hidden" name="monat" value="{{ $monthValue }}">
-                                                            <button type="submit"
-                                                                    title="Als bezahlt am {{ optional($m['settlement']->paid_at)->format('d.m.Y') }} – klicken zum Zurücknehmen"
-                                                                    class="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-200">
-                                                                ✓ Bezahlt
-                                                            </button>
-                                                        </form>
-                                                    @else
-                                                        <form method="POST" action="{{ route('module.schulkantine.reports.paid', $m['user']) }}" class="inline">
-                                                            @csrf
-                                                            <input type="hidden" name="monat" value="{{ $monthValue }}">
-                                                            <button type="submit"
-                                                                    class="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50">
-                                                                als bezahlt
-                                                            </button>
-                                                        </form>
-                                                    @endif
+                                                @if ($m['paid'])
+                                                    <span class="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700"
+                                                          @if ($m['settlement']?->paid_at) title="Bezahlt am {{ $m['settlement']->paid_at->format('d.m.Y') }}" @endif>✓ Bezahlt</span>
                                                 @else
-                                                    @if ($m['paid'])
-                                                        <span class="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">✓ Bezahlt</span>
-                                                    @else
-                                                        <span class="text-xs font-medium text-amber-600">offen</span>
-                                                    @endif
+                                                    <span class="text-xs font-medium text-amber-600">offen</span>
                                                 @endif
                                             </td>
                                         </tr>

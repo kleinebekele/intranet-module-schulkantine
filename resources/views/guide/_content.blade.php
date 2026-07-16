@@ -174,10 +174,10 @@ php artisan kantine:seed-dishes</pre>
 <ul>
     <li>Menü „<strong>Auswertung</strong>": monatliche Übersicht je Haushalt – Menü, OGS, Spontan, Pfand,
         Summe und Bezahlt-Status.</li>
-    <li>Über die Personen-Detailseite „<strong>Als bezahlt markieren</strong>" (bzw. rückgängig).</li>
     <li>Export als <strong>CSV</strong> (Excel) und <strong>PDF</strong>.</li>
-    <li>Die eigentliche Zahlung läuft <strong>extern</strong> – das System hält nur fest, was als bezahlt
-        markiert wurde.</li>
+    <li>Die eigentliche Zahlung läuft <strong>extern</strong>. Der <strong>Bezahlt-Status</strong> wird
+        <strong>nicht manuell</strong> gesetzt, sondern kommt ausschließlich aus dem externen
+        <strong>Zahlungs-Import</strong> (folgt) – die Auswertung zeigt ihn nur an.</li>
 </ul>
 
 <h2>5. Testszenarien</h2>
@@ -268,10 +268,10 @@ php artisan kantine:seed-dishes</pre>
     <p><strong>Als:</strong> admin@kantine.test</p>
     <ol>
         <li>„Auswertung" öffnen, den passenden Monat wählen.</li>
-        <li>Eine Person „Als bezahlt markieren", danach CSV/PDF exportieren.</li>
+        <li>Eine Person öffnen, die Aufstellung prüfen, danach CSV/PDF exportieren.</li>
     </ol>
-    <p class="exp"><strong>Erwartet:</strong> Beträge je Haushalt stimmen; die Person ist als bezahlt
-        markiert; CSV/PDF werden heruntergeladen.</p>
+    <p class="exp"><strong>Erwartet:</strong> Beträge je Haushalt stimmen; CSV/PDF werden
+        heruntergeladen. (Der Bezahlt-Status ist nur Anzeige – er kommt aus dem externen Import.)</p>
 </div>
 
 <div class="scenario">

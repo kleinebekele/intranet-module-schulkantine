@@ -1056,6 +1056,25 @@ class ServingController
      */
     private function attendingOgs(Season $season, Carbon $date): Collection
     {
+        $attendingIds = $this->attendingOgsIds($season, $date);
+
+        if ($attendingIds->isEmpty()) {
+            return collect();
+        }
+
+        return User::whereIn('id', $attendingIds)
+            ->with(['kantineAllergens', 'kantineDiets'])
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * IDs der heute essenden OGS-Kinder (Abo minus Abbestellung ODER Einzelbestellung).
+     * Basis für attendingOgs() und den reinen Zähler (Wochenüberblick) – ohne die
+     * User zu hydratisieren.
+     */
+    private function attendingOgsIds(Season $season, Carbon $date): Collection
+    {
         $dateStr = $date->toDateString();
 
         $subscribed = Subscription::where('season_id', $season->id)
@@ -1074,16 +1093,7 @@ class ServingController
             ->where('status', Order::STATUS_ORDERED)
             ->pluck('user_id');
 
-        $attendingIds = $subscribed->diff($cancelled)->merge($ordered)->unique();
-
-        if ($attendingIds->isEmpty()) {
-            return collect();
-        }
-
-        return User::whereIn('id', $attendingIds)
-            ->with(['kantineAllergens', 'kantineDiets'])
-            ->orderBy('name')
-            ->get();
+        return $subscribed->diff($cancelled)->merge($ordered)->unique()->values();
     }
 
     /** Standard-Tag (heute → nächster Öffnungstag) bzw. der per ?date gewählte. */
@@ -1174,6 +1184,7 @@ class ServingController
             'closedReason' => $open ? null : $this->closedReason($season, $date),
             'planGroups' => $open ? $this->terminalPlanDishes($season, $date) : collect(),
             'walkinGroups' => $open ? $this->terminalWalkinGroups($season, $date) : collect(),
+            'ogsEaters' => $open ? $this->terminalOgsEaters($season, $date) : collect(),
             'week' => $this->terminalWeek($season, $date),
             'simChips' => $simChips,
             'openDates' => $this->seasonOpenDates($season),
@@ -1207,8 +1218,12 @@ class ServingController
 
     /**
      * Live-Suche fürs Terminal: bis zu 3 Personen zu einem Namensteil, mit Gruppe
-     * (als „Klasse"). OGS-Kinder (ja/nein) sind ausgenommen – sie haben keine Chips
-     * und werden am Tagesmenü-Terminal nicht ausgegeben. Antwort als JSON.
+     * (als „Klasse"). Zwei Modi:
+     *  - Vorbesteller (Standard): Esser MIT Menü-Bestellung; OGS-Kinder (ja/nein)
+     *    sind ausgenommen (haben keine Chips, laufen nicht über den Menü-Fluss).
+     *  - OGS (mode=ogs): genau die HEUTE essenden OGS-Kinder (damit sie sich per
+     *    Suche schnell finden und direkt abhaken lassen).
+     * Antwort als JSON.
      */
     public function terminalSearch(Request $request)
     {
@@ -1217,6 +1232,26 @@ class ServingController
         $q = trim((string) $request->input('q', ''));
         if ($q === '') {
             return response()->json(['results' => []]);
+        }
+
+        // OGS-Modus: ALLE OGS-Kinder (nach Rolle) – auch heute nicht angemeldete,
+        // damit ein spontan erschienenes Kind gefunden und abgehakt werden kann.
+        if ($request->input('mode') === 'ogs') {
+            $ogsRoleIds = CustomerGroup::where('ordering_mode', CustomerGroup::MODE_JA_NEIN)->pluck('role_id');
+
+            $users = User::where('name', 'like', '%'.$q.'%')
+                ->whereHas('roles', fn ($r) => $r->whereIn('roles.role_id', $ogsRoleIds))
+                ->orderBy('name')
+                ->limit(3)
+                ->get();
+
+            return response()->json([
+                'results' => $users->map(fn (User $u) => [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'group' => 'OGS',
+                ])->values(),
+            ]);
         }
 
         $ogsRoleIds = CustomerGroup::where('ordering_mode', CustomerGroup::MODE_JA_NEIN)->pluck('role_id');
@@ -1386,6 +1421,164 @@ class ServingController
     }
 
     /**
+     * OGS-Ansicht des Terminals: alle heute essenden OGS-Kinder mit Ausgabe-Status.
+     * Sortiert wird clientseitig nach Vorname (springt beim Abholen nach unten),
+     * darum hier nur die Rohliste (inkl. Vorname zum Sortieren + Sonderkost-Info).
+     *
+     * @return Collection<int, array>
+     */
+    private function terminalOgsEaters(Season $season, Carbon $date): Collection
+    {
+        $attending = $this->attendingOgs($season, $date);
+        if ($attending->isEmpty()) {
+            return collect();
+        }
+
+        // Ausgabe-Zeilen (nicht-spontan) je Kind – für Status abgeholt/abgelehnt.
+        $servings = Serving::where('season_id', $season->id)
+            ->whereDate('date', $date->toDateString())
+            ->where('spontaneous', false)
+            ->whereIn('user_id', $attending->pluck('id'))
+            ->get()
+            ->keyBy('user_id');
+
+        return $attending->map(fn (User $u) => [
+            'user_id' => $u->id,
+            'name' => $u->name,
+            'first' => \Illuminate\Support\Str::of($u->name)->trim()->explode(' ')->first(),
+            'served' => $servings->has($u->id),
+            'declined' => (bool) optional($servings->get($u->id))->declined,
+            'allergens' => $u->kantineAllergens->pluck('name')->all(),
+            'diets' => $u->kantineDiets->pluck('name')->all(),
+        ])->values();
+    }
+
+    /**
+     * OGS-Kind im Terminal buchen. Drei Ausgänge über `outcome`:
+     *  - 'served'   → abgeholt (Ausgabe-Zeile, declined=false)
+     *  - 'declined' → abgelehnt (Ausgabe-Zeile, declined=true)   [Long-Press-Modal]
+     *  - 'open'     → zurücknehmen (Ausgabe-Zeile weg; spontane Anwesenheit ganz raus)
+     * Ohne `outcome` verhält sich der Aufruf als Tap-Umschalter (abgeholt ⇄ offen).
+     * Abgeholt/abgelehnt legen bei nicht angemeldeten Kindern die Anwesenheit spontan
+     * an (am Ausgabetag erlaubt). Antwort als JSON mit dem neuen Status.
+     */
+    public function terminalOgsToggle(Request $request)
+    {
+        $user = $request->user();
+        abort_unless(Access::canServe($user), 403, 'Du darfst die Ausgabe nicht erfassen.');
+
+        $data = $request->validate([
+            'eater_id' => ['required', 'integer', 'exists:users,id'],
+            'date' => ['required', 'date'],
+            'outcome' => ['nullable', 'in:served,declined,open'],
+        ]);
+
+        $season = Season::where('is_active', true)->firstOrFail();
+        $eater = User::findOrFail($data['eater_id']);
+        $date = Carbon::parse($data['date'])->startOfDay();
+
+        $fail = fn (string $msg) => response()->json(['ok' => false, 'error' => $msg], 200);
+
+        if (! $season->isOpenOn($date)) {
+            return $fail('An diesem Tag hat die Kantine nicht geöffnet.');
+        }
+        if (CustomerGroup::forUser($eater)?->ordering_mode !== CustomerGroup::MODE_JA_NEIN) {
+            return $fail($eater->name.' gehört nicht zur OGS-Gruppe (ja/nein).');
+        }
+
+        // Ohne ausdrücklichen Ausgang: Tap-Umschalter (abgeholt ⇄ offen).
+        $outcome = $data['outcome'] ?? ($this->isServed($season, $eater, $date) ? 'open' : 'served');
+
+        // Zurücknehmen → Ausgabe-Zeile weg; spontane Anwesenheit (kein Abo) ganz raus.
+        if ($outcome === 'open') {
+            Serving::where('season_id', $season->id)->where('user_id', $eater->id)
+                ->whereDate('date', $date->toDateString())->where('spontaneous', false)->delete();
+
+            // Nur spontan dabei (kein aktives Abo)? Dann Anwesenheit ganz entfernen –
+            // weg vom Board, keine Berechnung. Kommt es doch, erneut über die Suche.
+            // Abonnierte bleiben angemeldet (ihre Anwesenheit ist das Abo).
+            $removed = false;
+            $subscribed = Subscription::where('season_id', $season->id)
+                ->where('user_id', $eater->id)->where('active', true)->exists();
+            if (! $subscribed) {
+                Order::where('season_id', $season->id)->where('user_id', $eater->id)
+                    ->whereDate('date', $date->toDateString())->whereNull('category_id')->delete();
+                $removed = true;
+            }
+
+            return response()->json(['ok' => true, 'served' => false, 'declined' => false, 'removed' => $removed]);
+        }
+
+        // Abgeholt oder abgelehnt: Anwesenheit sicherstellen (spontan, ohne Frist –
+        // es wird jetzt real ausgegeben; sonst zählt der Tag nicht in der Abrechnung,
+        // die OGS-Tage über die Order/Abo bucht), dann die Ausgabe-Zeile setzen.
+        $declined = $outcome === 'declined';
+        DB::transaction(function () use ($season, $eater, $date, $user, $declined) {
+            if (! $this->isOgsAttending($season, $eater, $date)) {
+                Order::where('season_id', $season->id)->where('user_id', $eater->id)
+                    ->whereDate('date', $date->toDateString())->whereNull('category_id')
+                    ->where('status', Order::STATUS_CANCELLED)->delete();
+                if (! $this->isOgsAttending($season, $eater, $date)) {
+                    Order::create([
+                        'season_id' => $season->id,
+                        'user_id' => $eater->id,
+                        'date' => $date->toDateString(),
+                        'status' => Order::STATUS_ORDERED,
+                    ]);
+                }
+            }
+
+            // Bisherige (nicht-spontane) OGS-Zeile ersetzen – so ist ein Wechsel
+            // abgeholt ⇄ abgelehnt jederzeit möglich.
+            Serving::where('season_id', $season->id)->where('user_id', $eater->id)
+                ->whereDate('date', $date->toDateString())->where('spontaneous', false)->delete();
+
+            $order = Order::where('season_id', $season->id)->where('user_id', $eater->id)
+                ->whereDate('date', $date->toDateString())->whereNull('category_id')
+                ->where('status', Order::STATUS_ORDERED)->first();
+
+            Serving::create([
+                'season_id' => $season->id,
+                'user_id' => $eater->id,
+                'date' => $date->toDateString(),
+                'order_id' => $order?->id,
+                'price_snapshot' => $season->ogs_price,
+                'spontaneous' => false,
+                'declined' => $declined,
+                'decline_reason' => $declined ? 'nicht genommen' : null,
+                'served_by' => $user->id,
+            ]);
+        });
+
+        return response()->json([
+            'ok' => true,
+            'served' => true,
+            'declined' => $declined,
+            // Board-Eintrag, damit ein spontan dazugekommenes Kind ohne Reload erscheint.
+            'eater' => $this->terminalOgsEaterPayload($season, $eater, $date),
+        ]);
+    }
+
+    /** Board-Eintrag eines einzelnen OGS-Kindes (Form wie in terminalOgsEaters()). */
+    private function terminalOgsEaterPayload(Season $season, User $eater, Carbon $date): array
+    {
+        $eater->loadMissing(['kantineAllergens', 'kantineDiets']);
+
+        $sv = Serving::where('season_id', $season->id)->where('user_id', $eater->id)
+            ->whereDate('date', $date->toDateString())->where('spontaneous', false)->first();
+
+        return [
+            'user_id' => $eater->id,
+            'name' => $eater->name,
+            'first' => \Illuminate\Support\Str::of($eater->name)->trim()->explode(' ')->first(),
+            'served' => $sv !== null,
+            'declined' => $sv ? (bool) $sv->declined : false,
+            'allergens' => $eater->kantineAllergens->pluck('name')->all(),
+            'diets' => $eater->kantineDiets->pluck('name')->all(),
+        ];
+    }
+
+    /**
      * Vorbestellbare Gerichte des Tages, nach Kategorie gruppiert, je mit den drei
      * Zählern bestellt / offen / ausgegeben. Basis der linken Terminal-Spalte.
      *
@@ -1514,6 +1707,8 @@ class ServingController
                 'dayLabel' => $d->format('d.m.'),
                 'isWorking' => $d->toDateString() === $date->toDateString(),
                 'dishes' => $dishes,
+                // Für die OGS-Ansicht: Anzahl heute essender OGS-Kinder (statt Menüs).
+                'ogsCount' => $this->attendingOgsIds($season, $d)->count(),
             ];
         }
 
