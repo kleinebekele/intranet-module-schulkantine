@@ -3,6 +3,7 @@
 namespace Intranet\Modules\Schulkantine\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Intranet\Modules\Schulkantine\Models\Category;
 
 /**
@@ -24,7 +25,9 @@ class CategoryController
         $this->authorizeAdmin($request);
 
         return view('schulkantine::categories.form', [
-            'category' => new Category(['is_active' => true, 'sort_order' => 0]),
+            // Vorbestellbar ist der Normalfall – sonst legt man aus Versehen eine
+            // Kategorie an, die in der Vorbestellung gar nicht auftaucht.
+            'category' => new Category(['is_active' => true, 'sort_order' => 0, 'allows_preorder' => true]),
         ]);
     }
 
@@ -79,9 +82,23 @@ class CategoryController
             'color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
         ]);
 
+        $walkin = $request->boolean('allows_walkin');
+        $preorder = $request->boolean('allows_preorder');
+
+        // Wäre weder vorbestellbar noch am Tresen zu haben: Die Gerichte dieser
+        // Kategorie könnten dann von niemandem mehr bezogen werden – ein Zustand,
+        // den man nur aus Versehen erzeugt.
+        if (! $walkin && ! $preorder) {
+            throw ValidationException::withMessages([
+                'allows_preorder' => 'Eine Kategorie muss mindestens auf einem Weg erhältlich sein: '
+                    .'vorbestellbar und/oder spontane Abholung.',
+            ]);
+        }
+
         return [
             'name' => $request->string('name')->toString(),
-            'allows_walkin' => $request->boolean('allows_walkin'),
+            'allows_walkin' => $walkin,
+            'allows_preorder' => $preorder,
             'sort_order' => (int) $request->input('sort_order', 0),
             'color' => $request->input('color') ?: null,
             'is_active' => $request->boolean('is_active'),

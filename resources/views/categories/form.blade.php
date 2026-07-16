@@ -37,14 +37,48 @@
                 <x-input-error :messages="$errors->get('color')" class="mt-2" />
             </div>
 
-            <label class="flex items-start gap-2 text-sm text-gray-700">
-                <input type="checkbox" name="allows_walkin" value="1" @checked(old('allows_walkin', $category->allows_walkin))
-                       class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                <span>
-                    Spontane Abholung erlaubt
-                    <span class="block text-xs text-gray-400">z. B. Getränke &amp; Eis ja; Hauptmenü nein (muss vorbestellt/gekocht werden).</span>
-                </span>
-            </label>
+            {{-- Woher darf ein Gericht dieser Kategorie kommen? Die beiden Flags gehören
+                 zusammen; „nur spontan" ist schlicht: vorbestellbar aus, spontan an. --}}
+            <fieldset class="rounded-lg border border-gray-200 p-4"
+                      x-data="{
+                          preorder: {{ Illuminate\Support\Js::from((bool) old('allows_preorder', $category->allows_preorder ?? true)) }},
+                          walkin: {{ Illuminate\Support\Js::from((bool) old('allows_walkin', $category->allows_walkin)) }},
+                      }">
+                <legend class="px-1 text-sm font-medium text-gray-700">Erhältlich über</legend>
+
+                <div class="space-y-3">
+                    <label class="flex items-start gap-2 text-sm text-gray-700">
+                        <input type="checkbox" name="allows_preorder" value="1" x-model="preorder"
+                               class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        <span>
+                            Vorbestellung
+                            <span class="block text-xs text-gray-400">Erscheint unter „Essen bestellen" und kann vorab gewählt werden.</span>
+                        </span>
+                    </label>
+
+                    <label class="flex items-start gap-2 text-sm text-gray-700">
+                        <input type="checkbox" name="allows_walkin" value="1" x-model="walkin"
+                               class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        <span>
+                            Spontane Abholung
+                            <span class="block text-xs text-gray-400">Kann bei der Ausgabe direkt am Tresen geholt werden (z. B. Getränke &amp; Eis).</span>
+                        </span>
+                    </label>
+                </div>
+
+                {{-- Klartext, was die gewählte Kombination bedeutet. --}}
+                <p class="mt-3 border-t border-gray-100 pt-2 text-xs" x-cloak
+                   :class="(! preorder && ! walkin) ? 'text-red-700 font-medium' : 'text-gray-500'"
+                   x-text="(! preorder && ! walkin)
+                            ? '⚠️ So wäre diese Kategorie nirgends erhältlich – bitte mindestens einen Weg wählen.'
+                            : (preorder && walkin)
+                                ? 'Wird vorbestellt und ist zusätzlich spontan am Tresen zu haben.'
+                                : (preorder
+                                    ? 'Muss vorbestellt werden – am Tresen gibt es sie nicht spontan (z. B. Hauptmenü).'
+                                    : 'Nur spontan: steht auf dem Speiseplan und ist bei der Ausgabe zu haben, taucht aber in der Vorbestellung nicht auf.')"></p>
+
+                <x-input-error :messages="$errors->get('allows_preorder')" class="mt-2" />
+            </fieldset>
 
             <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                 <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $category->is_active))

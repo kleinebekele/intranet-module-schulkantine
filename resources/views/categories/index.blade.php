@@ -24,7 +24,7 @@
                             <tr class="border-b border-gray-200 text-left text-xs font-medium uppercase tracking-wide text-gray-400">
                                 <th class="px-3 py-2">Reihenfolge</th>
                                 <th class="px-3 py-2">Name</th>
-                                <th class="px-3 py-2">Spontane Abholung</th>
+                                <th class="px-3 py-2">Erhältlich über</th>
                                 <th class="px-3 py-2">Status</th>
                                 <th class="px-3 py-2 text-right">Aktion</th>
                             </tr>
@@ -39,12 +39,21 @@
                                             {{ $category->name }}
                                         </span>
                                     </td>
+                                    {{-- Beide Wege zusammen: „möglich/nur Vorbestellung" allein könnte
+                                         den Fall „nur spontan" nicht ausdrücken. --}}
                                     <td class="px-3 py-2">
-                                        @if ($category->allows_walkin)
-                                            <span class="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">möglich</span>
-                                        @else
-                                            <span class="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">nur Vorbestellung</span>
-                                        @endif
+                                        <div class="flex flex-wrap gap-1">
+                                            @if ($category->allows_preorder)
+                                                <span class="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">Vorbestellung</span>
+                                            @endif
+                                            @if ($category->allows_walkin)
+                                                <span class="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">spontan</span>
+                                            @endif
+                                            @if ($category->isWalkinOnly())
+                                                <span class="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
+                                                      title="Steht auf dem Speiseplan und ist bei der Ausgabe zu haben, kann aber nicht vorbestellt werden.">nur spontan</span>
+                                            @endif
+                                        </div>
                                     </td>
                                     <td class="px-3 py-2">
                                         @if ($category->is_active)

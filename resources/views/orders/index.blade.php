@@ -201,7 +201,17 @@
                                                 @else
                                                     {{-- Menü-Modus: pro Kategorie auswählbare Gericht-Karten --}}
                                                     @foreach ($items->groupBy(fn ($m) => $m->dish->category?->name ?? 'Ohne Kategorie') as $catName => $catItems)
-                                                        @php $catId = $catItems->first()->dish->category_id; @endphp
+                                                        @php
+                                                            $catId = $catItems->first()->dish->category_id;
+                                                            $category = $catItems->first()->dish->category;
+                                                        @endphp
+                                                        {{-- „Nur spontan"-Kategorien stehen auf dem Speiseplan (damit sie bei der
+                                                             Ausgabe am Tresen erscheinen), sind hier aber nicht vorbestellbar.
+                                                             ENTSCHEIDUNG OFFEN: vorerst komplett ausblenden. Sollen sie später
+                                                             sichtbar-aber-gesperrt erscheinen („gibt es heute spontan"), genügt es,
+                                                             dieses @continue durch eine Deaktivierung der Karten zu ersetzen –
+                                                             der Controller lehnt die Bestellung ohnehin ab. --}}
+                                                        @continue($category && ! $category->allows_preorder)
                                                         {{-- Kategorien, die Eltern für dieses Kind gesperrt haben, ausblenden. --}}
                                                         @continue(in_array($catId, $e['blockedCats'] ?? []))
                                                         @php
@@ -222,7 +232,13 @@
                                                                         // sonst käme der gesperrte Nachtisch durchs Hintertürchen.
                                                                         // (Der Controller lehnt es zusätzlich serverseitig ab.)
                                                                         $occupied = $m->dish->occupiedCategoryIds();
+                                                                        // Dasselbe Hintertürchen für „nur spontan": Ein Sparmenü darf
+                                                                        // keinen Bestandteil aus einer nicht vorbestellbaren Kategorie
+                                                                        // vorbestellbar machen.
+                                                                        $hatNurSpontanTeil = $m->dish->components
+                                                                            ->contains(fn ($p) => $p->category && ! $p->category->allows_preorder);
                                                                     @endphp
+                                                                    @continue($hatNurSpontanTeil)
                                                                     @continue(array_intersect($occupied, $e['blockedCats'] ?? []) !== [])
                                                                     @php
                                                                         $isSel = (string) $cur === (string) $m->dish_id;

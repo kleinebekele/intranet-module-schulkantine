@@ -374,17 +374,27 @@ class OrderController
         // auch die Kategorien seiner Bestandteile – daran hängen beide Regeln unten.
         $occupied = $menu->dish->occupiedCategoryIds();
 
-        // Kategorie-Freigabe: Eltern können die Vorbestellung einzelner Kategorien
-        // für ihre Kinder sperren (z. B. keinen Nachtisch). Bei einem Sparmenü muss
-        // JEDE belegte Kategorie frei sein – sonst käme der gesperrte Nachtisch als
-        // Teil des Sparmenüs doch durch.
+        // Zwei Hürden je belegter Kategorie. Beide laufen über $occupied, greifen
+        // dadurch auch für Sparmenüs (deren Bestandteile zählen mit).
+        $categories = Category::whereIn('id', $occupied)->get()->keyBy('id');
         foreach ($occupied as $catId) {
-            if (! ChildCategoryPermission::canPreorder($eater->id, $catId)) {
-                $catName = Category::find($catId)?->name;
+            // 1. Kategorie überhaupt vorbestellbar? „Nur spontan"-Kategorien stehen
+            //    zwar auf dem Speiseplan (für die Ausgabe), sind aber nicht vorab
+            //    wählbar – auch nicht als Teil eines Sparmenüs.
+            $category = $categories->get($catId);
+            if ($category && ! $category->allows_preorder) {
+                return back()->withErrors(['bestellung' =>
+                    '„'.$category->name.'" kann nicht vorbestellt werden – nur spontan bei der Ausgabe.']);
+            }
 
+            // 2. Kategorie-Freigabe: Eltern können die Vorbestellung einzelner
+            //    Kategorien für ihre Kinder sperren (z. B. keinen Nachtisch). Bei
+            //    einem Sparmenü muss JEDE belegte Kategorie frei sein – sonst käme
+            //    der gesperrte Nachtisch als Teil des Sparmenüs doch durch.
+            if (! ChildCategoryPermission::canPreorder($eater->id, $catId)) {
                 return back()->withErrors(['bestellung' =>
                     'Für '.$eater->name.' ist die Vorbestellung nicht freigegeben'
-                    .($catName ? ' (Kategorie „'.$catName.'")' : '').'.']);
+                    .($category ? ' (Kategorie „'.$category->name.'")' : '').'.']);
             }
         }
 
