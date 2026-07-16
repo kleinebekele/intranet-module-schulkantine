@@ -61,6 +61,12 @@
             searchQuery: '',
             searchResults: [],
             searching: false,
+            searchDebounce: null,
+            keyboardRows: [
+                ['Q','W','E','R','T','Z','U','I','O','P','Ü'],
+                ['A','S','D','F','G','H','J','K','L','Ö','Ä'],
+                ['Y','X','C','V','B','N','M','ß'],
+            ],
 
             init() {
                 this.autoFinish = localStorage.getItem('kantineTerminalAutoFinish') === '1';
@@ -157,6 +163,15 @@
                 this.$nextTick(() => this.$refs.searchInput && this.$refs.searchInput.focus());
             },
             closeSearch() { this.searchOpen = false; },
+            // Entprellte Suche – auch für die Bildschirmtastatur, die searchQuery
+            // programmatisch ändert (dabei feuert kein input-Event).
+            queueSearch() {
+                clearTimeout(this.searchDebounce);
+                this.searchDebounce = setTimeout(() => this.doSearch(), 180);
+            },
+            keyPress(ch) { this.searchQuery += (ch === ' ' ? ' ' : ch.toLowerCase()); this.queueSearch(); },
+            keyBackspace() { this.searchQuery = this.searchQuery.slice(0, -1); this.queueSearch(); },
+            keyClear() { this.searchQuery = ''; this.searchResults = []; clearTimeout(this.searchDebounce); },
             async doSearch() {
                 const q = this.searchQuery.trim();
                 if (!q) { this.searchResults = []; this.searching = false; return; }
@@ -610,28 +625,49 @@
            class="rounded-full bg-gray-800/70 px-4 py-2 text-sm font-medium text-white shadow-lg hover:bg-gray-800">✕ Terminal verlassen</a>
     </div>
 
-    {{-- Such-Modal: Live-Suche nach Person (max. 3 Treffer, Name + Klasse) --}}
+    {{-- Such-Modal: Live-Suche nach Person (max. 3 Treffer, Name + Klasse) mit
+         eingebauter Bildschirmtastatur (Touch). --}}
     <div x-show="searchOpen" x-cloak
-         class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-6 pt-24"
+         class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-6 pt-16"
          @click.self="closeSearch()" @keydown.escape.window="closeSearch()">
-        <div class="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
+        <div class="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl">
             <div class="mb-3 flex items-center justify-between">
                 <h3 class="text-lg font-bold text-gray-800">Person suchen</h3>
-                <button @click="closeSearch()" class="rounded-lg px-2 py-1 text-gray-400 hover:bg-gray-100">✕</button>
+                <button @click="closeSearch()" class="rounded-lg px-3 py-1 text-xl text-gray-400 hover:bg-gray-100">✕</button>
             </div>
-            <input type="search" x-model="searchQuery" @input.debounce.200ms="doSearch()" x-ref="searchInput"
-                   placeholder="Namen eingeben …"
-                   class="w-full rounded-xl border-gray-300 px-4 py-3 text-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-            <div class="mt-3 space-y-2">
+            {{-- inputmode=none: die OS-Tastatur bleibt aus, es zählt die Bildschirmtastatur unten. --}}
+            <input type="search" x-model="searchQuery" @input="queueSearch()" x-ref="searchInput" inputmode="none"
+                   placeholder="Namen eingeben …" readonly
+                   class="w-full rounded-xl border-gray-300 px-4 py-3 text-xl shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+
+            <div class="mt-3 min-h-[4rem] space-y-2">
                 <template x-for="r in searchResults" :key="r.id">
                     <button @click="pickSearch(r.id)"
                             class="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-200 p-4 text-left hover:border-indigo-400 hover:bg-indigo-50">
-                        <span class="truncate text-lg font-semibold text-gray-800" x-text="r.name"></span>
-                        <span class="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-sm font-semibold text-indigo-700" x-text="'Klasse: ' + (r.group || '–')"></span>
+                        <span class="truncate text-xl font-semibold text-gray-800" x-text="r.name"></span>
+                        <span class="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-base font-semibold text-indigo-700" x-text="'Klasse: ' + (r.group || '–')"></span>
                     </button>
                 </template>
                 <div x-show="searchQuery.trim() && !searchResults.length && !searching" x-cloak class="py-3 text-center text-sm text-gray-400">Keine Treffer.</div>
-                <div x-show="!searchQuery.trim()" x-cloak class="py-3 text-center text-sm text-gray-400">Tippe einen Namen – es werden bis zu drei Treffer angezeigt.</div>
+                <div x-show="!searchQuery.trim()" x-cloak class="py-3 text-center text-sm text-gray-400">Namen über die Tastatur eingeben – bis zu drei Treffer.</div>
+            </div>
+
+            {{-- Bildschirmtastatur (QWERTZ) --}}
+            <div class="mt-4 select-none space-y-2 border-t border-gray-100 pt-4">
+                <template x-for="(row, i) in keyboardRows" :key="i">
+                    <div class="flex justify-center gap-1.5">
+                        <template x-for="k in row" :key="k">
+                            <button type="button" @click="keyPress(k)"
+                                    class="h-14 min-w-[3rem] flex-1 rounded-lg bg-gray-100 text-xl font-semibold text-gray-800 shadow-sm hover:bg-gray-200 active:bg-indigo-200"
+                                    x-text="k"></button>
+                        </template>
+                    </div>
+                </template>
+                <div class="flex justify-center gap-1.5">
+                    <button type="button" @click="keyPress(' ')" class="h-14 flex-[3] rounded-lg bg-gray-100 text-base font-semibold text-gray-700 shadow-sm hover:bg-gray-200 active:bg-indigo-200">Leerzeichen</button>
+                    <button type="button" @click="keyBackspace()" class="h-14 flex-1 rounded-lg bg-amber-100 text-2xl font-bold text-amber-800 shadow-sm hover:bg-amber-200">⌫</button>
+                    <button type="button" @click="keyClear()" class="h-14 flex-1 rounded-lg bg-red-100 text-base font-bold text-red-700 shadow-sm hover:bg-red-200">Löschen</button>
+                </div>
             </div>
         </div>
     </div>
