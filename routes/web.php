@@ -92,6 +92,7 @@ Route::middleware(['web', 'auth'])
         Route::post('ausgabe-terminal/buchen', [ServingController::class, 'terminalCommit'])->name('servings.terminal.commit');
         Route::post('ausgabe-terminal/suchen', [ServingController::class, 'terminalSearch'])->name('servings.terminal.search');
         Route::post('ausgabe-terminal/ogs-abhaken', [ServingController::class, 'terminalOgsToggle'])->name('servings.terminal.ogs-toggle');
+        Route::get('ausgabe-terminal/uebersicht', [ServingController::class, 'terminalOverview'])->name('servings.terminal.overview');
         Route::get('ausgabe/mengen', [ServingController::class, 'quantities'])->name('servings.quantities');
         Route::get('ausgabe/mengen/pdf', [ServingController::class, 'mengenPdf'])->name('servings.mengen.pdf');
         Route::get('ausgabe/no-shows', [ServingController::class, 'noShows'])->name('servings.noshows');

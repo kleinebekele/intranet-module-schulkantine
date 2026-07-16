@@ -37,6 +37,8 @@
                 search: @js(route('module.schulkantine.servings.terminal.search')),
                 commit: @js(route('module.schulkantine.servings.terminal.commit')),
                 ogsToggle: @js(route('module.schulkantine.servings.terminal.ogs-toggle')),
+                overview: @js(route('module.schulkantine.servings.terminal.overview')),
+                reportPerson: @js(url('modules/schulkantine/auswertung/person')),
                 base: @js(route('module.schulkantine.servings.terminal')),
             },
             open: @js($open),
@@ -67,8 +69,14 @@
             scanning: false,
             ctrl: null,
             servedOnLoad: false,   // war beim Stempeln schon etwas gebucht?
-            mode: 'vorbesteller',  // 'vorbesteller' | 'ogs' (OGS-Ansicht folgt separat)
-            overviewOpen: false,   // „Übersicht"-Ansicht (Männchen-Button, Inhalt folgt)
+            mode: 'vorbesteller',  // 'vorbesteller' | 'ogs' | 'overview'
+            hasOgs: @js($hasOgs ?? false),   // gibt/gab es OGS in der Saison? (steuert den Umschalter)
+            // „Übersicht"-Ansicht (Männchen-Button): Wochen-Matrix aller Esser.
+            ovLoaded: false, ovLoading: false, ovPeople: [], ovDays: [],
+            ovSearchOpen: false, ovQuery: '',
+            ovReturnMode: 'vorbesteller',  // Ansicht, aus der die Übersicht geöffnet wurde
+            sbw: 0,   // Scrollleisten-Breite (für die bündige Übersicht-Matrix)
+            rcw: 80,  // Breite der rechten Header-Steuerung (› + Übersicht-Button)
             modalOpen: false,      // Gericht-Detail-Modal
             modalDish: null,
             dateModalOpen: false,  // Touch-Kalender
@@ -92,9 +100,33 @@
 
             init() {
                 this.autoFinish = localStorage.getItem('kantineTerminalAutoFinish') === '1';
+                this.sbw = this.measureScrollbar();
                 this.checkSize();
-                window.addEventListener('resize', () => this.checkSize());
+                this.$nextTick(() => this.measureRight());
+                window.addEventListener('resize', () => { this.checkSize(); this.measureRight(); });
+
+                // Aktuelle Ansicht im URL-Anker halten, damit F5 sie wiederherstellt.
+                this.$watch('mode', (m) => {
+                    history.replaceState(null, '', location.pathname + location.search + '#' + this.hashForMode(m));
+                });
+                const h = (location.hash || '').replace('#', '');
+                if (h === 'ogs' && this.hasOgs) this.mode = 'ogs';
+                else if (h === 'uebersicht' || h === 'overview') { this.mode = 'overview'; this.loadOverview(); }
             },
+            hashForMode(m) { return ({ vorbesteller: 'vorbesteller', ogs: 'ogs', overview: 'uebersicht' })[m] || 'vorbesteller'; },
+            // Breite der vertikalen Scrollleiste – damit die Übersicht-Matrix (scrollt)
+            // und der Header (scrollt nicht) rechtsbündig bleiben. 0 bei Overlay-Leisten.
+            measureScrollbar() {
+                const d = document.createElement('div');
+                d.style.cssText = 'overflow:scroll;width:100px;height:100px;position:absolute;top:-9999px';
+                document.body.appendChild(d);
+                const w = d.offsetWidth - d.clientWidth;
+                document.body.removeChild(d);
+                return w;
+            },
+            // Breite der rechten Header-Steuerung (› + Übersicht-Button) – als rechter
+            // Abstand der Übersicht-Matrix, damit die Tages-Spalten bündig darunter enden.
+            measureRight() { if (this.$refs.ovRight) this.rcw = this.$refs.ovRight.offsetWidth; },
             checkSize() {
                 this.vw = window.innerWidth;
                 this.vh = window.innerHeight;
@@ -414,7 +446,34 @@
                 }
             },
 
-            gotoDate(d) { if (d) window.location = this.urls.base + '?date=' + d; },
+            // Tageswechsel: Modus-Anker mitnehmen, damit die Ansicht erhalten bleibt.
+            gotoDate(d) { if (d) window.location = this.urls.base + '?date=' + d + '#' + this.hashForMode(this.mode); },
+
+            // ---- KW-Navigation (Woche zurück / vor) ----
+            mondayOf(d) { const x = new Date(d); const wd = (x.getDay() + 6) % 7; x.setDate(x.getDate() - wd); x.setHours(0, 0, 0, 0); return x; },
+            ymd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); },
+            get hasPrevKw() {
+                const mon = this.mondayOf(new Date(this.date + 'T00:00:00'));
+                return this.openDates.some(ds => new Date(ds + 'T00:00:00') < mon);
+            },
+            get hasNextKw() {
+                const sun = this.mondayOf(new Date(this.date + 'T00:00:00')); sun.setDate(sun.getDate() + 6);
+                return this.openDates.some(ds => new Date(ds + 'T00:00:00') > sun);
+            },
+            // Springt zur vorigen/nächsten KW immer auf den Wochenstart (Montag bzw. den
+            // ersten Öffnungstag der Woche, falls Montag geschlossen). Überspringt Wochen
+            // ganz ohne Öffnungstage.
+            kwStep(dir) {
+                const curMon = this.mondayOf(new Date(this.date + 'T00:00:00'));
+                const set = this.openSet;
+                for (let i = 1; i <= 60; i++) {
+                    const mon = new Date(curMon); mon.setDate(mon.getDate() + dir * 7 * i);
+                    const week = [];
+                    for (let k = 0; k < 7; k++) { const dd = new Date(mon); dd.setDate(dd.getDate() + k); week.push(this.ymd(dd)); }
+                    const openInWeek = week.filter(ds => set.has(ds));
+                    if (openInWeek.length) { this.gotoDate(openInWeek[0]); return; }
+                }
+            },
 
             // ---- OGS-Ansicht ----
             // Nach Vorname sortiert (Umlaut-tolerant); bei Gleichstand nach vollem Namen.
@@ -486,6 +545,45 @@
                 this.ogsBusy = false;
             },
 
+            // ---- Übersicht (Wochen-Matrix) ----
+            // Merkt sich, aus welcher Ansicht die Übersicht geöffnet wurde (#vorbesteller/#ogs),
+            // damit das rote X wieder genau dorthin zurückführt.
+            openOverview() {
+                if (this.mode !== 'overview') this.ovReturnMode = this.mode;
+                this.mode = 'overview';
+                this.loadOverview();
+            },
+            // Männchen-Button: rein in die Übersicht bzw. (rotes X) zurück zur Herkunfts-Ansicht.
+            toggleOverview() { this.mode === 'overview' ? (this.mode = this.ovReturnMode) : this.openOverview(); },
+            async loadOverview() {
+                if (this.ovLoaded || this.ovLoading) return;
+                this.ovLoading = true;
+                try {
+                    const res = await fetch(this.urls.overview + '?date=' + this.date, { headers: { 'Accept':'application/json' } });
+                    const data = await res.json();
+                    this.ovDays = data.days || [];
+                    this.ovPeople = data.people || [];
+                    this.ovLoaded = true;
+                } catch (e) {
+                    this.banner = { ok:false, text:'Übersicht konnte nicht geladen werden: ' + e };
+                }
+                this.ovLoading = false;
+            },
+            // Such-Overlay (kein Modal): tippen filtert die Liste ab dem 3. Buchstaben.
+            toggleOvSearch() { this.ovSearchOpen = !this.ovSearchOpen; },
+            ovKey(ch) { this.ovQuery += (ch === ' ' ? ' ' : ch.toLowerCase()); },
+            ovBackspace() { this.ovQuery = this.ovQuery.slice(0, -1); },
+            ovClear() { this.ovQuery = ''; },
+            get ovFiltered() {
+                const q = this.ovQuery.trim().toLowerCase();
+                if (q.length < 3) return this.ovPeople;
+                return this.ovPeople.filter(p => (p.name || '').toLowerCase().includes(q));
+            },
+            // Raster: Namensspalte 16rem (wie die KW-Box), dann je Öffnungstag eine
+            // gleich breite Spalte – bündig zu den Header-Tagen.
+            get ovGridStyle() { return 'grid-template-columns: 16rem repeat(' + this.ovDays.length + ', minmax(0, 1fr))'; },
+            reportUrl(id) { return this.urls.reportPerson + '/' + id; },
+
             // ---- Touch-Kalender ----
             get openSet() { return new Set(this.openDates); },
             get calLabel() {
@@ -533,30 +631,43 @@
     </div>
 
     {{-- ================= INFOZEILE (10%) ================= --}}
-    {{-- Gleicher Header in beiden Modi. Im Wochenüberblick zeigt der Vorbesteller-
-         Modus die Menüs je Tag, der OGS-Modus nur die Zahl der Vorbestellungen. --}}
-    <header class="flex h-[10%] min-h-[72px] w-full items-stretch border-b border-gray-300 bg-white">
+    {{-- Gleicher Header in allen Modi. Im Übersicht-Modus wird die KW-Box so breit
+         wie die Namensspalte und der untere Rand entfällt, damit Header und Matrix
+         nahtlos ineinander übergehen (Tage/KW stehen dann nur oben, nicht doppelt). --}}
+    <header class="flex h-[10%] min-h-[72px] w-full items-stretch bg-white"
+            :class="mode === 'overview' ? '' : 'border-b border-gray-300'"
+            :style="mode === 'overview' ? ('padding-right:' + sbw + 'px') : ''">
 
-        {{-- Links: KW (+ Datum), anklickbar zum Wechseln --}}
-        {{-- Ganzer Kasten = großer Touch-Button, öffnet den Kalender. --}}
-        <button type="button" @click="openDateModal()"
-                class="flex w-[12%] min-w-[120px] flex-col items-center justify-center gap-0.5 border-r border-gray-200 bg-gray-50 px-2 leading-tight hover:bg-gray-100">
-            <div class="text-2xl font-bold text-indigo-700">KW {{ $week['kw'] }}</div>
-            <div class="text-sm font-semibold text-gray-700">{{ $date->isoFormat('dd, D.M.') }}</div>
-            <div class="text-[10px] font-medium text-gray-400">📅 Tag wählen</div>
-        </button>
+        {{-- Links: ‹ Woche zurück + KW/Datum (Kalender). Der ›-Button (Woche vor) steht
+             bewusst RECHTS nach den Tagen. In der Übersicht so breit wie die Namensspalte
+             (16rem), damit die Spalten zusammenpassen. --}}
+        <div class="flex items-stretch border-r border-gray-200 bg-gray-50"
+             :class="mode === 'overview' ? 'w-64 shrink-0' : 'w-[13%] min-w-[168px]'">
+            {{-- Woche zurück --}}
+            <button type="button" @click="kwStep(-1)" :disabled="!hasPrevKw" title="Woche zurück"
+                    class="flex w-8 shrink-0 items-center justify-center border-r border-gray-200 text-3xl font-bold text-gray-500 hover:bg-gray-100 disabled:opacity-30">‹</button>
+            {{-- Mitte: KW + Datum, öffnet den Kalender --}}
+            <button type="button" @click="openDateModal()"
+                    class="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 leading-tight hover:bg-gray-100">
+                <div class="text-2xl font-bold text-indigo-700">KW {{ $week['kw'] }}</div>
+                <div class="text-sm font-semibold text-gray-700">{{ $date->isoFormat('dd, D.M.') }}</div>
+                <div class="text-[10px] font-medium text-gray-400">📅 Tag wählen</div>
+            </button>
+        </div>
 
         {{-- Rechts: Wochenüberblick ODER Person --}}
         <div class="relative flex-1 overflow-hidden">
             {{-- Wochenüberblick (Leerlauf) --}}
             <div x-show="!person" class="flex h-full items-stretch divide-x divide-gray-100 overflow-x-auto">
                 @foreach ($week['days'] as $wd)
-                    <div class="flex min-w-[9rem] flex-1 flex-col px-3 py-1 {{ $wd['isWorking'] ? 'bg-indigo-50/60' : '' }}">
+                    {{-- Ganze Tages-Zelle klickbar: springt auf diesen Tag (wie Kalenderauswahl). --}}
+                    <button type="button" @click="gotoDate('{{ $wd['date'] }}')"
+                            class="flex min-w-[9rem] flex-1 flex-col px-3 py-1 text-left transition hover:bg-indigo-100/70 {{ $wd['isWorking'] ? 'bg-indigo-50/60' : '' }}">
                         <div class="flex items-baseline justify-between">
                             <span class="text-sm font-semibold {{ $wd['isWorking'] ? 'text-indigo-700' : 'text-gray-700' }}">{{ $wd['weekday'] }} {{ $wd['dayLabel'] }}</span>
                         </div>
-                        {{-- Vorbesteller: Menüs des Tages mit Bestellanzahl --}}
-                        <div x-show="mode === 'vorbesteller'" class="mt-0.5 space-y-0.5 overflow-hidden text-[11px] leading-tight text-gray-500">
+                        {{-- Vorbesteller/Übersicht: Menüs des Tages mit Bestellanzahl --}}
+                        <div x-show="mode !== 'ogs'" class="mt-0.5 space-y-0.5 overflow-hidden text-[11px] leading-tight text-gray-500">
                             @forelse ($wd['dishes'] as $d)
                                 <div class="flex justify-between gap-2">
                                     <span class="truncate">{{ $d['name'] }}</span>
@@ -571,7 +682,7 @@
                             <span class="text-2xl font-bold {{ $wd['ogsCount'] ? 'text-indigo-700' : 'text-gray-300' }}">{{ $wd['ogsCount'] }}</span>
                             <span class="text-[11px] font-medium text-gray-400">essen</span>
                         </div>
-                    </div>
+                    </button>
                 @endforeach
             </div>
 
@@ -590,12 +701,23 @@
             </div>
         </div>
 
-        {{-- Ganz rechts: „Übersicht"-Ansicht (Inhalt folgt) --}}
-        <div class="flex items-center border-l border-gray-200 bg-gray-50 px-3">
-            <button type="button" @click="overviewOpen = true" title="Übersicht"
-                    class="flex h-14 w-14 items-center justify-center rounded-xl bg-white text-indigo-600 shadow-sm hover:bg-indigo-50">
-                <svg viewBox="0 0 24 24" fill="currentColor" class="h-8 w-8"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z"/></svg>
-            </button>
+        {{-- Rechts (nach den Tagen): › Woche vor + Übersicht-Button. Als Block gemessen
+             (x-ref="ovRight"), damit die Übersicht-Matrix rechtsbündig darunter passt. --}}
+        <div x-ref="ovRight" class="flex items-stretch">
+            {{-- Woche vor – steht nach den Tagen der aktuellen Woche --}}
+            <button type="button" @click="kwStep(1)" :disabled="!hasNextKw" title="Woche vor"
+                    class="flex w-8 shrink-0 items-center justify-center border-l border-gray-200 bg-gray-50 text-3xl font-bold text-gray-500 hover:bg-gray-100 disabled:opacity-30">›</button>
+            {{-- Übersicht öffnen (Männchen) bzw. schließen (rotes X → zurück zur Herkunft) --}}
+            <div class="flex items-center border-l border-gray-200 bg-gray-50 px-3">
+                <button type="button" @click="toggleOverview()" :title="mode === 'overview' ? 'Übersicht schließen' : 'Übersicht'"
+                        class="flex h-14 w-14 items-center justify-center rounded-xl shadow-sm transition"
+                        :class="mode === 'overview' ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-white text-indigo-600 hover:bg-indigo-50'">
+                    {{-- Übersicht offen: weißes X zum Schließen --}}
+                    <svg x-show="mode === 'overview'" x-cloak viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="h-8 w-8"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                    {{-- sonst: Männchen --}}
+                    <svg x-show="mode !== 'overview'" viewBox="0 0 24 24" fill="currentColor" class="h-8 w-8"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z"/></svg>
+                </button>
+            </div>
         </div>
     </header>
 
@@ -621,7 +743,11 @@
         @else
             {{-- Kopfzeile: Fortschritt abgeholt / offen / gesamt --}}
             <div class="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2">
-                <h2 class="text-lg font-bold text-gray-700">OGS – Essen abholen</h2>
+                <div class="flex items-center gap-3">
+                    <h2 class="text-lg font-bold text-gray-700">OGS – Essen abholen</h2>
+                    <button type="button" @click="mode = 'vorbesteller'"
+                            class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700">↔ zu den Vorbestellern wechseln</button>
+                </div>
                 <div class="flex items-center gap-2 text-sm font-semibold">
                     <span class="rounded-full bg-green-100 px-3 py-1 text-green-700"><span x-text="ogsServedCount"></span> abgeholt</span>
                     <span x-show="ogsDeclinedCount" x-cloak class="rounded-full bg-red-100 px-3 py-1 text-red-700"><span x-text="ogsDeclinedCount"></span> abgelehnt</span>
@@ -678,6 +804,57 @@
         @endif
     </main>
 
+    {{-- ================= ÜBERSICHT (Wochen-Matrix) ================= --}}
+    {{-- Geht nahtlos aus dem Header hervor: KW/Tage stehen bereits oben. Jede Zeile
+         ist ein Raster, dessen Spalten exakt zu Header (KW-Box + Tages-Spalten)
+         passen: Namensspalte = 16rem (wie KW-Box), Tage gleich breit, rechter
+         Abstand = Männchen-Button (pr-20). Name verlinkt auf die Personen-Auswertung. --}}
+    <main x-show="mode === 'overview'" x-cloak class="flex min-h-0 flex-1 flex-col bg-gray-50">
+        <div class="min-h-0 flex-1 overflow-y-scroll overflow-x-hidden pb-20" :style="'padding-right:' + rcw + 'px'">
+            <div x-show="ovLoading" x-cloak class="py-10 text-center text-gray-400">Lädt …</div>
+            <div x-show="!ovLoading && !ovDays.length" x-cloak class="py-10 text-center text-gray-400">In dieser Woche sind keine Öffnungstage.</div>
+
+            <template x-if="!ovLoading && ovDays.length">
+                <div class="text-sm">
+                    <template x-for="p in ovFiltered" :key="p.user_id">
+                        <div class="grid border-b border-gray-100" :style="ovGridStyle">
+                            {{-- Name (Spalte = KW-Box-Breite) --}}
+                            <div class="border-r border-gray-200 px-3 py-2" :class="p.mode === 'ogs' ? 'bg-indigo-50/50' : ''">
+                                <a :href="reportUrl(p.user_id)" target="_blank" rel="noopener"
+                                   class="font-semibold text-indigo-700 hover:underline" x-text="p.name"></a>
+                                <span class="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-gray-500" x-text="p.group"></span>
+                            </div>
+                            {{-- Tages-Spalten (bündig unter den Header-Tagen) --}}
+                            <template x-for="d in ovDays" :key="d.date">
+                                <div class="border-r border-gray-100 px-3 py-2" :class="p.mode === 'ogs' ? 'bg-indigo-50/20' : ''">
+                                    {{-- OGS: teilgenommen ja/nein --}}
+                                    <template x-if="p.mode === 'ogs'">
+                                        <span class="text-sm font-bold" :class="p.days[d.date] && p.days[d.date].ogs ? 'text-green-600' : 'text-gray-300'"
+                                              x-text="p.days[d.date] && p.days[d.date].ogs ? '✓ isst' : '–'"></span>
+                                    </template>
+                                    {{-- Vorbesteller: die vorbestellten Gerichte --}}
+                                    <template x-if="p.mode !== 'ogs'">
+                                        <div>
+                                            <template x-if="p.days[d.date] && p.days[d.date].dishes.length">
+                                                <div class="space-y-0.5">
+                                                    <template x-for="name in p.days[d.date].dishes" :key="name">
+                                                        <div class="text-gray-700" x-text="name"></div>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                            <span x-show="!p.days[d.date] || !p.days[d.date].dishes.length" x-cloak class="text-gray-300">–</span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                    <div x-show="!ovFiltered.length" x-cloak class="px-3 py-10 text-center text-gray-400">Keine Treffer.</div>
+                </div>
+            </template>
+        </div>
+    </main>
+
     {{-- ================= ARBEITSZEILE (90%) ================= --}}
     <main x-show="mode === 'vorbesteller'" class="flex min-h-0 flex-1">
 
@@ -693,7 +870,13 @@
         {{-- ---------- LINKS: Menüs (1/3) ---------- --}}
         <section class="flex w-1/2 min-w-0 flex-col border-r border-gray-300 bg-white xl:w-1/3">
             <div class="flex items-center justify-between border-b border-gray-200 px-4 py-2">
-                <h2 class="text-lg font-bold text-gray-700">Menüs</h2>
+                <div class="flex items-center gap-3">
+                    <h2 class="text-lg font-bold text-gray-700">Menüs</h2>
+                    @if ($hasOgs)
+                        <button type="button" @click="mode = 'ogs'"
+                                class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700">↔ zur OGS wechseln</button>
+                    @endif
+                </div>
                 <div class="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide">
                     <span class="text-gray-500">bestellt</span>
                     <span class="text-amber-600">offen</span>
@@ -906,15 +1089,41 @@
             </div>
         </div>
 
-        <button @click="openSearch()" class="rounded-full bg-gray-800/80 px-4 py-2 text-sm font-medium text-white shadow-lg hover:bg-gray-700">🔍 Suchen</button>
-
-        {{-- Umschalten Vorbesteller ⇄ OGS. Label = Ansicht, zu der gewechselt wird. --}}
-        <button @click="mode = (mode === 'ogs' ? 'vorbesteller' : 'ogs')"
-                class="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg hover:bg-indigo-700"
-                x-text="mode === 'ogs' ? '↔ Vorbesteller' : '↔ OGS'"></button>
+        <button @click="mode === 'overview' ? toggleOvSearch() : openSearch()"
+                class="rounded-full px-4 py-2 text-sm font-medium text-white shadow-lg"
+                :class="(mode === 'overview' && ovSearchOpen) ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-800/80 hover:bg-gray-700'">🔍 Suchen</button>
 
         <a href="{{ route('module.schulkantine.servings.index') }}"
            class="rounded-full bg-gray-800/70 px-4 py-2 text-sm font-medium text-white shadow-lg hover:bg-gray-800">✕ Terminal verlassen</a>
+    </div>
+
+    {{-- Übersicht-Such-Overlay: KEIN Modal – nur eine schwebende Tastatur; die Liste
+         im mittleren Bereich filtert live (ab dem 3. Buchstaben). --}}
+    <div x-show="mode === 'overview' && ovSearchOpen" x-cloak
+         class="fixed bottom-16 left-1/2 z-40 w-full max-w-2xl -translate-x-1/2 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-2xl backdrop-blur">
+        <div class="mb-3 flex items-center gap-2">
+            <div class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-lg">
+                <span x-show="ovQuery" x-text="ovQuery"></span>
+                <span x-show="!ovQuery" x-cloak class="text-gray-400">Name eingeben – ab dem 3. Buchstaben filtert die Liste …</span>
+            </div>
+            <button type="button" @click="toggleOvSearch()" class="rounded-xl px-3 py-2 text-xl text-gray-400 hover:bg-gray-100">✕</button>
+        </div>
+        <div class="select-none space-y-2">
+            <template x-for="(row, i) in keyboardRows" :key="'ov'+i">
+                <div class="flex justify-center gap-1.5">
+                    <template x-for="k in row" :key="'ov'+k">
+                        <button type="button" @click="ovKey(k)"
+                                class="h-12 min-w-[2.75rem] flex-1 rounded-lg bg-gray-100 text-lg font-semibold text-gray-800 shadow-sm hover:bg-gray-200 active:bg-indigo-200"
+                                x-text="k"></button>
+                    </template>
+                </div>
+            </template>
+            <div class="flex justify-center gap-1.5">
+                <button type="button" @click="ovKey(' ')" class="h-12 flex-[3] rounded-lg bg-gray-100 text-base font-semibold text-gray-700 shadow-sm hover:bg-gray-200 active:bg-indigo-200">Leerzeichen</button>
+                <button type="button" @click="ovBackspace()" class="h-12 flex-1 rounded-lg bg-amber-100 text-2xl font-bold text-amber-800 shadow-sm hover:bg-amber-200">⌫</button>
+                <button type="button" @click="ovClear()" class="h-12 flex-1 rounded-lg bg-red-100 text-base font-bold text-red-700 shadow-sm hover:bg-red-200">Löschen</button>
+            </div>
+        </div>
     </div>
 
     {{-- Such-Modal: Live-Suche nach Person (max. 3 Treffer, Name + Klasse) mit
@@ -1151,19 +1360,6 @@
         </div>
     </div>
 
-    {{-- „Übersicht"-Ansicht (Vollbild). Inhalt folgt – vorerst Platzhalter. --}}
-    <div x-show="overviewOpen" x-cloak class="fixed inset-0 z-[55] flex flex-col bg-white">
-        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-            <h2 class="text-2xl font-bold text-gray-800">Übersicht</h2>
-            <button @click="overviewOpen = false" class="rounded-xl border border-gray-300 bg-white px-5 py-3 text-base font-semibold text-gray-600 hover:bg-gray-50">✕ Schließen</button>
-        </div>
-        <div class="flex flex-1 items-center justify-center text-center text-gray-400">
-            <div>
-                <div class="text-5xl">🧑‍🤝‍🧑</div>
-                <p class="mt-4 text-xl font-medium">Übersicht – Inhalt folgt.</p>
-            </div>
-        </div>
-    </div>
 
 </div>
 @endif

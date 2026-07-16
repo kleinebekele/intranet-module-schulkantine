@@ -1177,10 +1177,16 @@ class ServingController
             ->map(fn ($c) => ['uid' => $c->uid, 'name' => $c->user->name])
             ->sortBy('name')->values();
 
+        // Gibt/gab es in dieser Saison überhaupt OGS? (Abo oder OGS-Order). Nur dann
+        // ist der OGS-Umschalter sinnvoll – Schulen ohne OGS bekommen ihn nicht.
+        $hasOgs = Subscription::where('season_id', $season->id)->exists()
+            || Order::where('season_id', $season->id)->whereNull('category_id')->exists();
+
         return view('schulkantine::servings.terminal', [
             'season' => $season,
             'date' => $date,
             'open' => $open,
+            'hasOgs' => $hasOgs,
             'closedReason' => $open ? null : $this->closedReason($season, $date),
             'planGroups' => $open ? $this->terminalPlanDishes($season, $date) : collect(),
             'walkinGroups' => $open ? $this->terminalWalkinGroups($season, $date) : collect(),
@@ -1576,6 +1582,95 @@ class ServingController
             'allergens' => $eater->kantineAllergens->pluck('name')->all(),
             'diets' => $eater->kantineDiets->pluck('name')->all(),
         ];
+    }
+
+    /**
+     * Übersicht-Ansicht des Terminals: Wochen-Matrix aller Esser für die KW des
+     * gewählten Tages. Je Person und Öffnungstag: Vorbesteller → die vorbestellten
+     * Gerichte, OGS → ob teilgenommen wird (ja/nein). Antwort als JSON (on demand
+     * geladen, wenn die Übersicht geöffnet wird).
+     */
+    public function terminalOverview(Request $request)
+    {
+        abort_unless(Access::canServe($request->user()), 403, 'Kein Zugriff auf das Ausgabe-Terminal.');
+
+        $season = Season::where('is_active', true)->first();
+        if (! $season) {
+            return response()->json(['days' => [], 'people' => []]);
+        }
+        try {
+            $date = Carbon::parse((string) $request->input('date'))->startOfDay();
+        } catch (\Exception $e) {
+            $date = Carbon::today();
+        }
+
+        // Öffnungstage der ISO-Woche des gewählten Tages.
+        $monday = $date->copy()->startOfWeek(Carbon::MONDAY);
+        $days = [];
+        for ($i = 0; $i < 7; $i++) {
+            $d = $monday->copy()->addDays($i);
+            if ($season->isOpenOn($d)) {
+                $days[] = ['date' => $d->toDateString(), 'weekday' => ucfirst($d->isoFormat('dd')), 'dayLabel' => $d->format('d.m.')];
+            }
+        }
+        $dayStrs = array_column($days, 'date');
+        if (empty($dayStrs)) {
+            return response()->json(['days' => [], 'people' => []]);
+        }
+        $weekStart = $monday->toDateString();
+        $weekEnd = $monday->copy()->addDays(6)->toDateString();
+
+        // Menü-Bestellungen der Woche je Nutzer (Kategorie ≠ OGS, aktiv).
+        $ordersByUser = Order::where('season_id', $season->id)
+            ->whereBetween('date', [$weekStart, $weekEnd])
+            ->whereNotNull('category_id')->where('status', Order::STATUS_ORDERED)
+            ->with('dish')->get()->groupBy('user_id');
+
+        // OGS-Teilnahme je Öffnungstag (Set der user_ids).
+        $attendingByDay = [];
+        foreach ($days as $d) {
+            $attendingByDay[$d['date']] = $this->attendingOgsIds($season, Carbon::parse($d['date']))->flip();
+        }
+
+        // Wer wird gelistet: alle OGS-/Schüler-Kinder (nach Rolle) PLUS alle, die in der
+        // Woche etwas bestellt haben oder als OGS teilnehmen (deckt „Sonstige" ab, die
+        // bestellen). So bleibt die Liste bei den echten Essern, nicht der ganzen DB.
+        $childRoleIds = ['kantine_ogs', 'kantine_student'];
+        $eaterIds = User::whereHas('roles', fn ($q) => $q->whereIn('roles.role_id', $childRoleIds))->pluck('id')
+            ->merge($ordersByUser->keys())
+            ->merge(collect($attendingByDay)->flatMap(fn ($set) => $set->keys()))
+            ->unique();
+
+        $groups = CustomerGroup::all()->keyBy('role_id');
+        $eaters = User::whereIn('id', $eaterIds)->with('roles')->orderBy('name')->get();
+
+        $people = $eaters->map(function (User $u) use ($groups, $dayStrs, $ordersByUser, $attendingByDay) {
+            $group = CustomerGroup::forUser($u, $groups);
+            $isOgs = $group?->ordering_mode === CustomerGroup::MODE_JA_NEIN;
+            $userOrders = $ordersByUser->get($u->id, collect());
+
+            $daysData = [];
+            foreach ($dayStrs as $ds) {
+                if ($isOgs) {
+                    $daysData[$ds] = ['ogs' => $attendingByDay[$ds]->has($u->id)];
+                } else {
+                    $daysData[$ds] = ['dishes' => $userOrders
+                        ->filter(fn (Order $o) => $o->date->toDateString() === $ds)
+                        ->map(fn (Order $o) => $o->dish?->name)->filter()->values()->all()];
+                }
+            }
+
+            return [
+                'user_id' => $u->id,
+                'name' => $u->name,
+                'first' => \Illuminate\Support\Str::of($u->name)->trim()->explode(' ')->first(),
+                'mode' => $isOgs ? 'ogs' : 'menue',
+                'group' => $group?->name,
+                'days' => $daysData,
+            ];
+        })->values();
+
+        return response()->json(['days' => $days, 'people' => $people]);
     }
 
     /**
