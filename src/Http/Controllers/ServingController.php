@@ -1176,9 +1176,33 @@ class ServingController
             'walkinGroups' => $open ? $this->terminalWalkinGroups($season, $date) : collect(),
             'week' => $this->terminalWeek($season, $date),
             'simChips' => $simChips,
-            'prevDate' => (new DeadlineService)->previousOpenDay($season, $date)?->toDateString(),
-            'nextDate' => $this->nextOpenDay($season, $date),
+            'openDates' => $this->seasonOpenDates($season),
+            'today' => Carbon::today()->toDateString(),
         ]);
+    }
+
+    /**
+     * Alle Öffnungstage der Saison als [YYYY-MM-DD]-Liste – für den Touch-Kalender.
+     * Bewusst in EINEM Rutsch (Schließtage einmal laden, dann PHP-Schleife), statt
+     * Season::isOpenOn() je Tag aufzurufen (das würde je Tag die DB abfragen).
+     *
+     * @return array<int, string>
+     */
+    private function seasonOpenDates(Season $season): array
+    {
+        $weekdays = $season->opening_weekdays ?: [1, 2, 3, 4, 5];
+        $closed = $season->closedDays()->pluck('date')
+            ->map(fn ($d) => $d instanceof Carbon ? $d->toDateString() : Carbon::parse($d)->toDateString())
+            ->flip();
+
+        $dates = [];
+        for ($d = $season->start_date->copy(); $d->lte($season->end_date); $d->addDay()) {
+            if (in_array($d->dayOfWeekIso, $weekdays, true) && ! $closed->has($d->toDateString())) {
+                $dates[] = $d->toDateString();
+            }
+        }
+
+        return $dates;
     }
 
     /**
@@ -1494,16 +1518,5 @@ class ServingController
         }
 
         return ['kw' => $date->isoWeek(), 'days' => $days];
-    }
-
-    /** Nächster Öffnungstag ab (exklusive) date – oder null. */
-    private function nextOpenDay(Season $season, Carbon $date): ?string
-    {
-        $next = $date->copy()->addDay();
-        while ($next->lte($season->end_date) && ! $season->isOpenOn($next)) {
-            $next->addDay();
-        }
-
-        return ($next->lte($season->end_date) && $season->isOpenOn($next)) ? $next->toDateString() : null;
     }
 }

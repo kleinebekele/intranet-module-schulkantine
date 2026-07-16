@@ -42,6 +42,8 @@
             planGroups: @js($planGroups),
             walkinGroups: @js($walkinGroups),
             simChips: @js($simChips),
+            openDates: @js($openDates),   // alle Öffnungstage der Saison (Touch-Kalender)
+            today: @js($today),
             ogsPrice: @js((float) ($season->ogs_price ?? 0)),
 
             // --- Zustand ---
@@ -61,6 +63,9 @@
             overviewOpen: false,   // „Übersicht"-Ansicht (Männchen-Button, Inhalt folgt)
             modalOpen: false,      // Gericht-Detail-Modal
             modalDish: null,
+            dateModalOpen: false,  // Touch-Kalender
+            calYear: 0,
+            calMonth: 0,
             searchOpen: false,
             searchQuery: '',
             searchResults: [],
@@ -372,6 +377,35 @@
             },
 
             gotoDate(d) { if (d) window.location = this.urls.base + '?date=' + d; },
+
+            // ---- Touch-Kalender ----
+            get openSet() { return new Set(this.openDates); },
+            get calLabel() {
+                const m = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+                return m[this.calMonth] + ' ' + this.calYear;
+            },
+            get calCells() {
+                const first = new Date(this.calYear, this.calMonth, 1);
+                const startWeekday = (first.getDay() + 6) % 7; // Mo=0
+                const daysInMonth = new Date(this.calYear, this.calMonth + 1, 0).getDate();
+                const set = this.openSet;
+                const cells = [];
+                for (let i = 0; i < startWeekday; i++) cells.push(null);
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const ds = this.calYear + '-' + String(this.calMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+                    cells.push({ day: d, date: ds, open: set.has(ds), current: ds === this.date, today: ds === this.today });
+                }
+                return cells;
+            },
+            openDateModal() {
+                const [y, m] = this.date.split('-').map(Number);
+                this.calYear = y; this.calMonth = m - 1;
+                this.dateModalOpen = true;
+            },
+            calPrev() { if (this.calMonth === 0) { this.calMonth = 11; this.calYear--; } else this.calMonth--; },
+            calNext() { if (this.calMonth === 11) { this.calMonth = 0; this.calYear++; } else this.calMonth++; },
+            jumpToday() { const [y, m] = this.today.split('-').map(Number); this.calYear = y; this.calMonth = m - 1; },
+            pickDate(ds) { this.gotoDate(ds); },
         }));
     });
 </script>
@@ -394,13 +428,13 @@
     <header class="flex h-[10%] min-h-[72px] w-full items-stretch border-b border-gray-300 bg-white">
 
         {{-- Links: KW (+ Datum), anklickbar zum Wechseln --}}
-        <div class="flex w-[12%] min-w-[120px] flex-col items-center justify-center border-r border-gray-200 bg-gray-50 px-2">
-            <label class="cursor-pointer text-center leading-tight">
-                <div class="text-2xl font-bold text-indigo-700">KW {{ $week['kw'] }}</div>
-                <input type="date" value="{{ $date->toDateString() }}" @change="gotoDate($event.target.value)"
-                       class="mt-1 w-full cursor-pointer rounded border-gray-300 text-[11px]">
-            </label>
-        </div>
+        {{-- Ganzer Kasten = großer Touch-Button, öffnet den Kalender. --}}
+        <button type="button" @click="openDateModal()"
+                class="flex w-[12%] min-w-[120px] flex-col items-center justify-center gap-0.5 border-r border-gray-200 bg-gray-50 px-2 leading-tight hover:bg-gray-100">
+            <div class="text-2xl font-bold text-indigo-700">KW {{ $week['kw'] }}</div>
+            <div class="text-sm font-semibold text-gray-700">{{ $date->isoFormat('dd, D.M.') }}</div>
+            <div class="text-[10px] font-medium text-gray-400">📅 Tag wählen</div>
+        </button>
 
         {{-- Rechts: Wochenüberblick ODER Person --}}
         <div class="relative flex-1 overflow-hidden">
@@ -838,6 +872,41 @@
                 <button @click="closeDishModal()" class="mt-5 w-full rounded-xl bg-gray-800 py-3 text-base font-semibold text-white hover:bg-gray-700">Schließen</button>
             </div>
         </template>
+    </div>
+
+    {{-- Touch-Kalender: großer Monatsraster, nur Öffnungstage wählbar. --}}
+    <div x-show="dateModalOpen" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
+         @click.self="dateModalOpen = false" @keydown.escape.window="dateModalOpen = false">
+        <div class="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+            <div class="mb-3 flex items-center justify-between gap-2">
+                <button type="button" @click="calPrev()" class="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-3xl font-bold text-gray-600 hover:bg-gray-200">‹</button>
+                <div class="text-lg font-bold text-gray-800" x-text="calLabel"></div>
+                <button type="button" @click="calNext()" class="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-3xl font-bold text-gray-600 hover:bg-gray-200">›</button>
+            </div>
+            <div class="grid grid-cols-7 gap-1 text-center text-xs font-semibold uppercase text-gray-400">
+                <div>Mo</div><div>Di</div><div>Mi</div><div>Do</div><div>Fr</div><div>Sa</div><div>So</div>
+            </div>
+            <div class="mt-1 grid grid-cols-7 gap-1">
+                <template x-for="(c, i) in calCells" :key="i">
+                    <div>
+                        <template x-if="c">
+                            <button type="button" @click="c.open && pickDate(c.date)" :disabled="!c.open"
+                                    class="flex h-12 w-full items-center justify-center rounded-lg text-lg font-bold transition"
+                                    :class="c.current ? 'bg-indigo-600 text-white'
+                                            : (c.open ? (c.today ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-400' : 'bg-gray-100 text-gray-800 hover:bg-indigo-100')
+                                                      : 'cursor-default text-gray-300')"
+                                    x-text="c.day"></button>
+                        </template>
+                        <template x-if="!c"><div class="h-12"></div></template>
+                    </div>
+                </template>
+            </div>
+            <div class="mt-4 flex gap-2">
+                <button type="button" @click="jumpToday()" class="h-12 flex-1 rounded-xl bg-gray-100 text-base font-semibold text-gray-700 hover:bg-gray-200">Heute</button>
+                <button type="button" @click="dateModalOpen = false" class="h-12 flex-1 rounded-xl border border-gray-300 bg-white text-base font-semibold text-gray-600 hover:bg-gray-50">Schließen</button>
+            </div>
+        </div>
     </div>
 
     {{-- „Übersicht"-Ansicht (Vollbild). Inhalt folgt – vorerst Platzhalter. --}}
