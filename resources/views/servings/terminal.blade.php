@@ -394,24 +394,30 @@
                     </div>
                 </div>
 
-                {{-- Oben: Walk-in-Artikel --}}
+                {{-- Oben: Walk-in-Artikel – untereinander, gleiche Aufteilung wie der Nachschlag:
+                     [− Preis +] in der Mitte, rechts die Summe (Anzahl × Preis) je Artikel. --}}
                 <div class="min-h-0 flex-1 overflow-y-auto p-3">
                     <div class="mb-1 text-xs font-bold uppercase tracking-wide text-gray-400">Spontan mitnehmen</div>
                     <template x-for="group in walkinGroups" :key="group.category">
                         <div class="mb-3">
                             <div class="mb-1 text-xs font-semibold text-gray-500" x-text="group.category"></div>
-                            <div class="grid grid-cols-2 gap-2 xl:grid-cols-3">
+                            <div class="space-y-2">
                                 <template x-for="dish in group.dishes" :key="dish.id">
-                                    <div class="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-2">
+                                    <div class="flex items-center gap-3 rounded-xl border bg-white p-2"
+                                         :class="walkinQty[dish.id] ? 'border-indigo-300 ring-1 ring-indigo-200' : 'border-gray-200'">
                                         <div class="min-w-0 flex-1">
-                                            <div class="truncate text-base font-semibold text-gray-800" x-text="dish.name"></div>
-                                            <div class="text-sm text-gray-500" x-text="euro(dish.price)"></div>
+                                            <div class="truncate text-lg font-semibold text-gray-800" x-text="dish.name"></div>
                                         </div>
                                         <button type="button" @click="walkinMinus(dish.id)" :disabled="!walkinQty[dish.id]"
-                                                class="step-btn flex h-12 w-12 items-center justify-center rounded-lg bg-gray-200 text-2xl font-bold text-gray-700 disabled:opacity-30">−</button>
-                                        <span class="w-8 text-center text-xl font-bold" x-text="walkinQty[dish.id] || 0"></span>
+                                                class="step-btn flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-3xl font-bold text-gray-700 disabled:opacity-30">−</button>
+                                        <span class="w-20 shrink-0 text-center text-lg font-bold text-gray-700" x-text="euro(dish.price)"></span>
                                         <button type="button" @click="walkinPlus(dish.id)"
-                                                class="step-btn flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-600 text-2xl font-bold text-white">+</button>
+                                                class="step-btn flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-3xl font-bold text-white">+</button>
+                                        <div class="w-24 shrink-0 text-right">
+                                            <div class="text-xs text-gray-400"><span x-text="walkinQty[dish.id] || 0"></span> ×</div>
+                                            <div class="text-xl font-extrabold" :class="walkinQty[dish.id] ? 'text-gray-900' : 'text-gray-300'"
+                                                 x-text="euro((walkinQty[dish.id] || 0) * dish.price)"></div>
+                                        </div>
                                     </div>
                                 </template>
                             </div>
@@ -420,22 +426,30 @@
                     <div x-show="!walkinGroups.length" class="text-sm text-gray-400">Heute keine Artikel zur spontanen Mitnahme.</div>
                 </div>
 
-                {{-- Unten: Nachschlag (Münzen) --}}
+                {{-- Unten: Nachschlag – untereinander. Je Zeile: Münze · [− Betrag +] · rechts Summe. --}}
                 <div class="border-t border-gray-200 bg-white p-3">
                     <div class="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">Nachschlag</div>
-                    <div class="grid grid-cols-3 gap-3">
+                    <div class="space-y-2">
                         <template x-for="amt in coins" :key="amt">
-                            <div class="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2">
-                                {{-- „Münze" --}}
-                                <div class="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full border-2 border-amber-400 bg-amber-100 leading-none">
-                                    <span class="text-base font-extrabold text-amber-800" x-text="amt < 1 ? (amt*100)+'' : amt+''"></span>
-                                    <span class="text-[9px] font-bold text-amber-700" x-text="amt < 1 ? 'Cent' : 'Euro'"></span>
+                            <div class="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-2"
+                                 :class="coinQty[String(amt)] ? 'ring-1 ring-amber-300' : ''">
+                                {{-- Echte Euro-Münze (SVG, je nach Betrag) --}}
+                                <div class="h-14 w-14 shrink-0">
+                                    <template x-if="amt === 0.5"><x-schulkantine::coin value="50c" /></template>
+                                    <template x-if="amt === 1"><x-schulkantine::coin value="1e" /></template>
+                                    <template x-if="amt === 2"><x-schulkantine::coin value="2e" /></template>
                                 </div>
+                                <div class="min-w-0 flex-1 text-lg font-semibold text-amber-900" x-text="amt < 1 ? (amt*100)+' Cent' : amt+' Euro'"></div>
                                 <button type="button" @click="coinMinus(amt)" :disabled="!coinQty[String(amt)]"
-                                        class="step-btn flex h-14 w-14 items-center justify-center rounded-lg bg-gray-200 text-3xl font-bold text-gray-700 disabled:opacity-30">−</button>
-                                <span class="w-8 text-center text-2xl font-bold" x-text="coinQty[String(amt)] || 0"></span>
+                                        class="step-btn flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-3xl font-bold text-gray-700 disabled:opacity-30">−</button>
+                                <span class="w-20 shrink-0 text-center text-lg font-bold text-amber-800" x-text="euro(amt)"></span>
                                 <button type="button" @click="coinPlus(amt)"
-                                        class="step-btn flex h-14 w-14 items-center justify-center rounded-lg bg-amber-500 text-3xl font-bold text-white">+</button>
+                                        class="step-btn flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-3xl font-bold text-white">+</button>
+                                <div class="w-24 shrink-0 text-right">
+                                    <div class="text-xs text-gray-400"><span x-text="coinQty[String(amt)] || 0"></span> ×</div>
+                                    <div class="text-xl font-extrabold" :class="coinQty[String(amt)] ? 'text-amber-900' : 'text-gray-300'"
+                                         x-text="euro((coinQty[String(amt)] || 0) * amt)"></div>
+                                </div>
                             </div>
                         </template>
                     </div>
@@ -460,31 +474,32 @@
         @endif
     </main>
 
-    {{-- Chip-Simulation (nur wenn kein NFC / zum Testen) --}}
-    <div class="fixed bottom-3 left-3 z-30" x-data="{ openSim: false }">
-        <button @click="openSim = !openSim" class="rounded-full bg-gray-800/80 px-4 py-2 text-sm font-medium text-white shadow-lg">
-            <span x-show="!scanning">🔌 Chip</span>
-            <span x-show="scanning" x-cloak>📡 Scan aktiv</span>
-        </button>
-        <div x-show="openSim" x-cloak @click.outside="openSim=false"
-             class="absolute bottom-12 left-0 max-h-[60vh] w-72 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 shadow-2xl">
-            <div class="mb-2 flex items-center gap-2">
-                <button x-show="!scanning" @click="startScan()" class="flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white">NFC-Scan starten</button>
-                <button x-show="scanning" x-cloak @click="stopScan()" class="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white">Scan stoppen</button>
-            </div>
-            <div class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Chip simulieren</div>
-            <div class="space-y-1">
-                <template x-for="c in simChips" :key="c.uid">
-                    <button @click="openFor(c.uid); openSim=false" class="block w-full truncate rounded-lg px-2 py-1.5 text-left text-sm text-gray-700 hover:bg-indigo-50" x-text="c.name"></button>
-                </template>
-                <div x-show="!simChips.length" class="px-2 py-1 text-xs text-gray-400">Keine aktiven Chips.</div>
+    {{-- Steuerleiste unten links: Chip(-Simulation) + Terminal verlassen nebeneinander --}}
+    <div class="fixed bottom-3 left-3 z-30 flex items-center gap-2">
+        <div class="relative" x-data="{ openSim: false }">
+            <button @click="openSim = !openSim" class="rounded-full bg-gray-800/80 px-4 py-2 text-sm font-medium text-white shadow-lg">
+                <span x-show="!scanning">🔌 Chip</span>
+                <span x-show="scanning" x-cloak>📡 Scan aktiv</span>
+            </button>
+            <div x-show="openSim" x-cloak @click.outside="openSim=false"
+                 class="absolute bottom-12 left-0 max-h-[60vh] w-72 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 shadow-2xl">
+                <div class="mb-2 flex items-center gap-2">
+                    <button x-show="!scanning" @click="startScan()" class="flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white">NFC-Scan starten</button>
+                    <button x-show="scanning" x-cloak @click="stopScan()" class="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white">Scan stoppen</button>
+                </div>
+                <div class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Chip simulieren</div>
+                <div class="space-y-1">
+                    <template x-for="c in simChips" :key="c.uid">
+                        <button @click="openFor(c.uid); openSim=false" class="block w-full truncate rounded-lg px-2 py-1.5 text-left text-sm text-gray-700 hover:bg-indigo-50" x-text="c.name"></button>
+                    </template>
+                    <div x-show="!simChips.length" class="px-2 py-1 text-xs text-gray-400">Keine aktiven Chips.</div>
+                </div>
             </div>
         </div>
-    </div>
 
-    {{-- Ausgang zurück zur normalen Ansicht --}}
-    <a href="{{ route('module.schulkantine.servings.index') }}"
-       class="fixed bottom-3 right-3 z-30 rounded-full bg-gray-800/70 px-4 py-2 text-sm font-medium text-white shadow-lg hover:bg-gray-800">✕ Terminal verlassen</a>
+        <a href="{{ route('module.schulkantine.servings.index') }}"
+           class="rounded-full bg-gray-800/70 px-4 py-2 text-sm font-medium text-white shadow-lg hover:bg-gray-800">✕ Terminal verlassen</a>
+    </div>
 
 </div>
 @endif
