@@ -5,30 +5,57 @@
                 <x-module-icon name="users" class="text-2xl text-indigo-600" />
                 <h1 class="text-xl font-semibold text-gray-800">Teilnehmer</h1>
             </div>
-            @if (Route::has('module.userimport.index'))
-                <a href="{{ route('module.userimport.index') }}"
-                   class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                    <x-module-icon name="download" class="text-base" />
-                    Benutzer importieren
-                </a>
-            @endif
+            <div class="flex items-center gap-2">
+                {{-- Infos werden zusätzlich stündlich automatisch eingelesen; der Button ist für „jetzt sofort". --}}
+                <form method="POST" action="{{ route('module.schulkantine.eaters.info-import') }}">
+                    @csrf
+                    <button type="submit"
+                            title="Liest die CSV-Dateien aus storage/app/kantinen-import ein (läuft sonst stündlich automatisch)."
+                            class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium
+                                   {{ $wartendeImporte > 0
+                                        ? 'border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50' }}">
+                        <x-module-icon name="download" class="text-base" />
+                        Infos importieren
+                        @if ($wartendeImporte > 0)
+                            <span class="rounded-full bg-indigo-600 px-1.5 text-xs font-semibold text-white">{{ $wartendeImporte }}</span>
+                        @endif
+                    </button>
+                </form>
+
+                @if (Route::has('module.userimport.index'))
+                    <a href="{{ route('module.userimport.index') }}"
+                       class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        <x-module-icon name="download" class="text-base" />
+                        Benutzer importieren
+                    </a>
+                @endif
+            </div>
         </div>
     </x-slot>
 
     <div class="max-w-5xl">
+        @if (session('error'))
+            <div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                {{ session('error') }}
+            </div>
+        @endif
+
         <div class="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
             Teilnehmer sind Benutzer des Intranets. Die <strong>Gruppe ergibt sich aus der Rolle</strong>
             (Priorität OGS → Schüler → Sonstige) – sie wird über den Benutzer/Import gesteuert, nicht hier.
-            Hier pflegst du nur die <strong>Verträglichkeiten</strong>.
+            Hier pflegst du nur die <strong>Verträglichkeiten</strong>. Die <strong>Info</strong> (z. B. „Klasse 5")
+            kommt aus der CSV im Ordner <code class="rounded bg-gray-100 px-1">storage/app/kantinen-import</code>
+            und ist hier reine Anzeige.
         </div>
 
         {{-- Filterleiste --}}
         <form method="GET" action="{{ route('module.schulkantine.eaters.index') }}"
               class="mb-4 flex flex-wrap items-end gap-3">
             <div class="min-w-[12rem] flex-1">
-                <label for="search" class="block text-xs font-medium text-gray-500">Suche (Name oder E-Mail)</label>
+                <label for="search" class="block text-xs font-medium text-gray-500">Suche (Name, E-Mail oder Info)</label>
                 <input id="search" name="search" type="text" value="{{ $search }}"
-                       placeholder="z. B. Müller"
+                       placeholder="z. B. Müller oder Klasse 5"
                        class="mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
             </div>
             <button type="submit"
@@ -64,6 +91,7 @@
                                 <th class="px-3 py-2">Name</th>
                                 <th class="px-3 py-2">E-Mail</th>
                                 <th class="px-3 py-2">Gruppe (aus Rolle)</th>
+                                <th class="px-3 py-2">Info</th>
                                 <th class="px-3 py-2">Verträglichkeiten</th>
                                 <th class="px-3 py-2 text-center">Chip</th>
                                 <th class="px-3 py-2 text-right">Aktion</th>
@@ -78,6 +106,13 @@
                                     <td class="px-3 py-2">
                                         @if ($group)
                                             <span class="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{{ $group->name }}</span>
+                                        @else
+                                            <span class="text-gray-300">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        @if ($user->kantineInfo)
+                                            <span class="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">{{ $user->kantineInfo->info }}</span>
                                         @else
                                             <span class="text-gray-300">—</span>
                                         @endif

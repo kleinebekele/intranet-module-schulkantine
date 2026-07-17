@@ -140,6 +140,10 @@ Route::middleware(['web', 'auth'])
         Route::get('teilnehmer/{user}/bearbeiten', [EaterController::class, 'edit'])->name('eaters.edit');
         Route::put('teilnehmer/{user}', [EaterController::class, 'update'])->name('eaters.update');
 
+        // Teilnehmer-Infos (z. B. „Klasse 5") aus storage/app/kantinen-import einlesen.
+        // Läuft auch stündlich per Scheduler – der Button ist für „jetzt sofort".
+        Route::post('teilnehmer/info-import', [EaterController::class, 'importInfos'])->name('eaters.info-import');
+
         // Schul-Chips (nur Verwaltung): ausgeben (mit Pfand), zurücknehmen, entfernen.
         Route::post('teilnehmer/{user}/chip', [EaterController::class, 'issueChip'])->name('eaters.chip.issue');
         Route::post('teilnehmer/chip/{chip}/zurueck', [EaterController::class, 'returnChip'])->name('eaters.chip.return');

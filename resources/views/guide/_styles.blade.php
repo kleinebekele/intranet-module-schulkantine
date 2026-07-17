@@ -21,6 +21,12 @@
     .kantine-doc code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 3px;
         padding: 1px 5px; font-size: 12px; color: #0f172a; }
 
+    /* Datei-/Format-Beispiel (kein Konsolen-Befehl – das ist .cmd).
+       Bewusst mit eigener Klasse, damit die Regel nicht in die .cmd-Kästen durchschlägt. */
+    .kantine-doc pre.beispiel { margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 6px;
+        background: #f8fafc; padding: 8px 11px; font-size: 12px; color: #0f172a;
+        white-space: pre-wrap; page-break-inside: avoid; }
+
     /* Konsolen-Befehl – deutlich als Admin-/Server-Aktion markiert. */
     .kantine-doc .cmd { margin: 12px 0; border: 1px solid #fdba74; border-left: 5px solid #ea580c;
         border-radius: 6px; background: #fff7ed; padding: 9px 11px; page-break-inside: avoid; }

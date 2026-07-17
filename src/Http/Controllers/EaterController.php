@@ -9,6 +9,7 @@ use Intranet\Modules\Schulkantine\Models\Allergen;
 use Intranet\Modules\Schulkantine\Models\CustomerGroup;
 use Intranet\Modules\Schulkantine\Models\Diet;
 use Intranet\Modules\Schulkantine\Models\NfcChip;
+use Intranet\Modules\Schulkantine\Support\InfoImporter;
 
 /**
  * Teilnehmer-Verwaltung. Jeder Teilnehmer IST ein Benutzer (angelegt über den
@@ -24,10 +25,11 @@ class EaterController
 
         $search = trim((string) $request->query('search', ''));
 
-        $users = User::with(['roles', 'kantineAllergens', 'kantineDiets'])
+        $users = User::with(['roles', 'kantineAllergens', 'kantineDiets', 'kantineInfo'])
             ->when($search !== '', fn ($q) => $q->where(function ($sub) use ($search) {
                 $sub->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhereHas('kantineInfo', fn ($i) => $i->where('info', 'like', "%{$search}%"));
             }))
             ->orderBy('name')
             ->get();
@@ -37,7 +39,39 @@ class EaterController
             'groups' => CustomerGroup::all()->keyBy('role_id'), // einmal laden → kein N+1
             'chips' => NfcChip::active()->whereIn('user_id', $users->pluck('id'))->get()->groupBy('user_id'),
             'search' => $search,
+            // Liegt gerade eine CSV bereit? Dann den Import-Button hervorheben.
+            'wartendeImporte' => count(app(InfoImporter::class)->wartendeDateien()),
         ]);
+    }
+
+    /**
+     * Teilnehmer-Infos aus den CSV-Dateien in storage/app/kantinen-import einlesen.
+     * Derselbe Weg wie der stündliche Scheduler – nur eben auf Knopfdruck.
+     */
+    public function importInfos(Request $request, InfoImporter $importer)
+    {
+        $this->authorizeAdmin($request);
+
+        $ergebnis = $importer->run();
+
+        if ($ergebnis['dateien'] === 0 && $ergebnis['fehler'] === []) {
+            return back()->with('status', 'Keine CSV-Datei im Ordner kantinen-import gefunden – nichts zu importieren.');
+        }
+
+        $meldung = sprintf(
+            '%d Datei(en) eingelesen: %d Info(s) gesetzt, %d geleert.',
+            $ergebnis['dateien'],
+            $ergebnis['gesetzt'],
+            $ergebnis['geleert'],
+        );
+
+        if ($ergebnis['fehler'] !== []) {
+            return back()
+                ->with('status', $meldung)
+                ->with('error', implode(' · ', $ergebnis['fehler']));
+        }
+
+        return back()->with('status', $meldung);
     }
 
     public function edit(Request $request, User $user)

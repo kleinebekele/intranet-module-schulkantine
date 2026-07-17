@@ -5,8 +5,10 @@ namespace Intranet\Modules\Schulkantine;
 use App\Models\User;
 use App\Modules\Support\ModuleManifest;
 use App\Modules\Support\ModuleServiceProvider;
+use Illuminate\Console\Scheduling\Schedule;
 use Intranet\Modules\Schulkantine\Models\Allergen;
 use Intranet\Modules\Schulkantine\Models\Diet;
+use Intranet\Modules\Schulkantine\Models\UserInfo;
 
 /**
  * Anmelde-Klasse des Schulkantine-Moduls.
@@ -33,12 +35,30 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
         User::resolveRelationUsing('kantineDiets', fn (User $user) => $user
             ->belongsToMany(Diet::class, 'kantine_user_diet', 'user_id', 'diet_id'));
 
+        // Freie Zusatz-Info (z. B. „Klasse 5") – kommt ausschließlich aus dem
+        // CSV-Import und hängt an der Kantine, nicht am Core-Benutzer.
+        User::resolveRelationUsing('kantineInfo', fn (User $user) => $user
+            ->hasOne(UserInfo::class, 'user_id'));
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 \Intranet\Modules\Schulkantine\Console\Commands\SeedTestUsers::class,
                 \Intranet\Modules\Schulkantine\Console\Commands\SeedOgsTestkinder::class,
                 \Intranet\Modules\Schulkantine\Console\Commands\SeedDishes::class,
+                \Intranet\Modules\Schulkantine\Console\Commands\ImportInfos::class,
             ]);
+
+            // Stündlich nach neuen Teilnehmer-Info-CSVs schauen. Modul-lokal
+            // angemeldet (Insel-Prinzip, kein Eingriff in den Core-Scheduler).
+            // Voraussetzung am Server: ein Cron, der minütlich `artisan schedule:run`
+            // ruft – bis dahin greift der Button „Jetzt importieren" in der
+            // Teilnehmerliste.
+            $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+                $schedule->command('kantine:import-infos')
+                    ->hourly()
+                    ->timezone('Europe/Berlin')
+                    ->withoutOverlapping();
+            });
         }
     }
 

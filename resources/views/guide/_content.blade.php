@@ -118,6 +118,31 @@ php artisan kantine:seed-dishes</pre>
         verwalten. OGS-Kinder bekommen keinen Chip.</li>
 </ol>
 
+<h3>4.1.1 Teilnehmer-Infos importieren (z. B. Klasse)</h3>
+<p>
+    Die Spalte <strong>Info</strong> in der Teilnehmerliste (z. B. „Klasse 5") wird nicht im Intranet
+    gepflegt, sondern aus einer CSV eingelesen. Dazu die Datei im Ordner
+    <code>storage/app/kantinen-import</code> ablegen – die Kantine liest sie <strong>stündlich
+    automatisch</strong> ein und löscht sie danach. Wer nicht warten will, klickt in der Teilnehmerliste
+    auf „<strong>Infos importieren</strong>"; wartet eine Datei, zeigt der Button eine Zahl.
+</p>
+<p>Die CSV hat zwei Spalten – eine Kopfzeile darf sein, muss aber nicht:</p>
+<pre class="beispiel">user_id;Info
+2001;Klasse 5
+2002;Klasse 6</pre>
+<ul>
+    <li><strong>user_id</strong> ist die <em>externe ID</em> aus dem Quellsystem – dieselbe, mit der der
+        Benutzer importiert wurde (nicht die interne Intranet-Nummer).</li>
+    <li>Semikolon, Komma und Tabulator werden als Trennzeichen erkannt, Excel-Umlaute ebenso – ein
+        normaler Excel-Export läuft ohne Nacharbeit durch.</li>
+    <li>Eine vorhandene Info wird <strong>überschrieben</strong>. Wer in der Datei <strong>fehlt</strong>,
+        behält seine bisherige Info – eine unvollständige Datei kann also nichts kaputt machen. Zum
+        <strong>Entfernen</strong> einer Info die Zeile mit leerer zweiter Spalte schicken:
+        <code>2001;</code></li>
+    <li><strong>Unbekannte user_id</strong> werden übersprungen und nach dem Import gemeldet. Eine Datei,
+        die sich gar nicht lesen lässt, bleibt liegen und wird gemeldet – sie soll auffallen.</li>
+</ul>
+
 <h3>4.2 Speiseplan &amp; Wochenfreigabe (Admin)</h3>
 <ol>
     <li>Menü „<strong>Speiseplan</strong>": im Wochenraster je Öffnungstag über „Gericht hinzufügen"
