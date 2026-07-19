@@ -14,18 +14,37 @@
     </x-slot>
 
     <div class="w-full">
-        {{-- Filterleiste (GET, damit der Filter in der URL steht) --}}
+        {{-- Filterleiste (GET, damit der Filter in der URL steht und teilbar/lesezeichenfähig
+             bleibt). Gefiltert wird ohne Knopf: Die Auswahlfelder schicken sofort ab, die
+             Suche nach kurzer Tipppause. Da dabei die Seite neu lädt, holt sich das Suchfeld
+             den Fokus zurück – sonst müsste man nach jedem Treffer neu hineinklicken. --}}
         <form method="GET" action="{{ route('module.schulkantine.dishes.index') }}"
-              class="mb-4 flex flex-wrap items-end gap-3">
+              class="mb-4 flex flex-wrap items-end gap-3"
+              x-data="{
+                  timer: null,
+                  /**
+                   * Unter 3 Zeichen wird nicht gesucht: Ein einzelner Buchstabe trifft fast
+                   * jedes Gericht, das Filtern wäre nur Flackern. Ein geleertes Feld schickt
+                   * dagegen sofort ab – das ist das Zurücksetzen.
+                   */
+                  search(form, value) {
+                      clearTimeout(this.timer);
+                      if (value.length > 0 && value.length < 3) return;
+                      this.timer = setTimeout(() => form.requestSubmit(), 400);
+                  },
+              }">
             <div class="min-w-[12rem] flex-1">
                 <label for="search" class="block text-xs font-medium text-gray-500">Suche (Name)</label>
                 <input id="search" name="search" type="text" value="{{ $search }}"
                        placeholder="z. B. Spaghetti"
+                       @input="search($el.form, $el.value)"
+                       x-init="if ($el.value) { $el.focus(); $el.setSelectionRange($el.value.length, $el.value.length); }"
                        class="mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                <p class="mt-1 text-xs text-gray-400">Sucht ab 3 Zeichen von selbst.</p>
             </div>
             <div>
                 <label for="category" class="block text-xs font-medium text-gray-500">Kategorie</label>
-                <select id="category" name="category"
+                <select id="category" name="category" @change="$el.form.requestSubmit()"
                         class="mt-1 block rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                     <option value="">Alle Kategorien</option>
                     @foreach ($categories as $category)
@@ -36,19 +55,18 @@
             </div>
             <div>
                 <label for="status" class="block text-xs font-medium text-gray-500">Status</label>
-                <select id="status" name="status"
+                <select id="status" name="status" @change="$el.form.requestSubmit()"
                         class="mt-1 block rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                     <option value="">Alle</option>
                     <option value="active" @selected($statusFilter === 'active')>Aktiv</option>
                     <option value="inactive" @selected($statusFilter === 'inactive')>Inaktiv</option>
                 </select>
             </div>
-            <button type="submit"
-                    class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                <x-module-icon name="search" class="text-base" /> Filtern
-            </button>
             @if ($search !== '' || $categoryFilter !== '' || $statusFilter !== '')
-                <a href="{{ route('module.schulkantine.dishes.index') }}" class="px-2 py-2 text-sm text-gray-500 hover:text-gray-700">Zurücksetzen</a>
+                <a href="{{ route('module.schulkantine.dishes.index') }}"
+                   class="inline-flex items-center gap-1.5 px-2 py-2 text-sm text-gray-500 hover:text-gray-700">
+                    <x-module-icon name="x" class="text-base" /> Zurücksetzen
+                </a>
             @endif
         </form>
 
