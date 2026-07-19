@@ -34,13 +34,12 @@
                   },
               }">
             <div class="min-w-[12rem] flex-1">
-                <label for="search" class="block text-xs font-medium text-gray-500">Suche (Name)</label>
+                <label for="search" class="block text-xs font-medium text-gray-500">Suche (Name – sucht ab 3 Zeichen von selbst)</label>
                 <input id="search" name="search" type="text" value="{{ $search }}"
                        placeholder="z. B. Spaghetti"
                        @input="search($el.form, $el.value)"
                        x-init="if ($el.value) { $el.focus(); $el.setSelectionRange($el.value.length, $el.value.length); }"
                        class="mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                <p class="mt-1 text-xs text-gray-400">Sucht ab 3 Zeichen von selbst.</p>
             </div>
             <div>
                 <label for="category" class="block text-xs font-medium text-gray-500">Kategorie</label>
