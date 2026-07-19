@@ -61,6 +61,7 @@ Route::middleware(['web', 'auth'])
         Route::get('kategorien', [CategoryController::class, 'index'])->name('categories.index');
         Route::get('kategorien/neu', [CategoryController::class, 'create'])->name('categories.create');
         Route::post('kategorien', [CategoryController::class, 'store'])->name('categories.store');
+        Route::post('kategorien/reihenfolge', [CategoryController::class, 'reorder'])->name('categories.reorder');
         Route::get('kategorien/{category}/bearbeiten', [CategoryController::class, 'edit'])->name('categories.edit');
         Route::put('kategorien/{category}', [CategoryController::class, 'update'])->name('categories.update');
         Route::delete('kategorien/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');

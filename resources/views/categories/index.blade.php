@@ -18,21 +18,38 @@
             @if ($categories->isEmpty())
                 <p class="text-sm text-gray-500">Noch keine Kategorien. Lege die erste an! (z. B. Hauptmenü, Nachtisch, Getränk, Eis)</p>
             @else
+                <p class="mb-3 text-xs text-gray-400">
+                    Die Reihenfolge bestimmt, in welcher Folge die Kategorien im Speiseplan und
+                    beim Bestellen erscheinen – am Griff ziehen zum Sortieren, gespeichert wird sofort.
+                </p>
+
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
                         <thead>
                             <tr class="border-b border-gray-200 text-left text-xs font-medium uppercase tracking-wide text-gray-400">
-                                <th class="px-3 py-2">Reihenfolge</th>
+                                <th class="w-8 px-3 py-2"><span class="sr-only">Reihenfolge</span></th>
                                 <th class="px-3 py-2">Name</th>
                                 <th class="px-3 py-2">Erhältlich über</th>
                                 <th class="px-3 py-2">Status</th>
                                 <th class="px-3 py-2 text-right">Aktion</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100">
+                        {{-- Ziehen erledigt der Core (resources/js/app.js): `data-sortable`
+                             POSTet die ids der direkten Kinder in neuer Reihenfolge. --}}
+                        <tbody class="divide-y divide-gray-100"
+                               data-sortable="{{ route('module.schulkantine.categories.reorder') }}"
+                               data-handle="[data-drag-handle=category]">
                             @foreach ($categories as $category)
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-3 py-2 text-gray-400">{{ $category->sort_order }}</td>
+                                <tr class="hover:bg-gray-50" data-id="{{ $category->id }}">
+                                    <td class="px-3 py-2">
+                                        <button type="button" data-drag-handle="category"
+                                                class="cursor-grab text-gray-300 hover:text-gray-500 active:cursor-grabbing"
+                                                title="Ziehen zum Sortieren">
+                                            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z" />
+                                            </svg>
+                                        </button>
+                                    </td>
                                     <td class="px-3 py-2 font-medium text-gray-800">
                                         <span class="inline-flex items-center gap-2">
                                             <span class="inline-block h-3 w-3 rounded-full border border-black/10" style="background-color: {{ $category->color ?? '#9ca3af' }};"></span>

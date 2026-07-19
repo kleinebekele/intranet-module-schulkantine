@@ -20,14 +20,6 @@
             </div>
 
             <div>
-                <x-input-label for="sort_order" value="Reihenfolge" />
-                <x-text-input id="sort_order" name="sort_order" type="number" min="0" class="mt-1 block w-32"
-                              :value="old('sort_order', $category->sort_order ?? 0)" />
-                <p class="mt-1 text-xs text-gray-400">Kleinere Zahl = weiter oben im Speiseplan (z. B. Hauptmenü 0, Nachtisch 10).</p>
-                <x-input-error :messages="$errors->get('sort_order')" class="mt-2" />
-            </div>
-
-            <div>
                 <x-input-label for="color" value="Farbe" />
                 <div class="mt-1 flex items-center gap-3">
                     <input id="color" name="color" type="color" value="{{ old('color', $category->color ?? '#9ca3af') }}"
@@ -92,6 +84,9 @@
                     <x-module-icon name="{{ $category->exists ? 'save' : 'plus' }}" class="text-base" />
                     {{ $category->exists ? 'Speichern' : 'Kategorie anlegen' }}
                 </button>
+                @unless ($category->exists)
+                    <span class="text-xs text-gray-400">Neue Kategorien landen unten in der Liste – dort per Ziehen einsortieren.</span>
+                @endunless
                 <a href="{{ route('module.schulkantine.categories.index') }}"
                    class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
                     <x-module-icon name="x" class="text-base" />

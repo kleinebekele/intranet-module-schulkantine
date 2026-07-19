@@ -35,7 +35,10 @@ class CategoryController
     {
         $this->authorizeAdmin($request);
 
-        $category = Category::create($this->validated($request));
+        // Neue Kategorien hinten anhängen; sortiert wird danach per Drag & Drop.
+        $category = Category::create($this->validated($request) + [
+            'sort_order' => (int) Category::max('sort_order') + 1,
+        ]);
 
         return redirect()
             ->route('module.schulkantine.categories.index')
@@ -60,6 +63,30 @@ class CategoryController
             ->with('status', 'Kategorie wurde gespeichert.');
     }
 
+    /**
+     * Neue Reihenfolge aus dem Drag & Drop der Liste (Array von ids in der
+     * gewünschten Reihenfolge). Der Core liefert das Ziehen selbst mit: Ein
+     * `data-sortable="<url>"` genügt, SortableJS POSTet dann `{ ids: [...] }`.
+     *
+     * Die Position ist der Listenindex – die alten, frei vergebenen Zahlen
+     * (0, 10, 20 …) werden dabei zu einer lückenlosen Folge normalisiert.
+     */
+    public function reorder(Request $request)
+    {
+        $this->authorizeAdmin($request);
+
+        $ids = $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['integer', 'exists:kantine_categories,id'],
+        ])['ids'];
+
+        foreach ($ids as $position => $id) {
+            Category::where('id', $id)->update(['sort_order' => $position]);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
     public function destroy(Request $request, Category $category)
     {
         $this->authorizeAdmin($request);
@@ -78,7 +105,6 @@ class CategoryController
     {
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'sort_order' => ['nullable', 'integer', 'min:0'],
             'color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
         ]);
 
@@ -99,7 +125,6 @@ class CategoryController
             'name' => $request->string('name')->toString(),
             'allows_walkin' => $walkin,
             'allows_preorder' => $preorder,
-            'sort_order' => (int) $request->input('sort_order', 0),
             'color' => $request->input('color') ?: null,
             'is_active' => $request->boolean('is_active'),
         ];
