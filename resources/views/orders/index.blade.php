@@ -243,6 +243,17 @@
                                                                         // gewählte Karte darf man bis zur Abbestell-Frist wieder lösen.
                                                                         $clickable = $day['canOrder'] || ($isSel && $day['canCancel']);
                                                                         $postDish = $isSel ? '' : $m->dish_id; // Klick auf Gewähltes = abwählen
+
+                                                                        // Eine gewählte Kachel wird in ihrer KATEGORIEFARBE umrandet, nicht
+                                                                        // grün: Wo nur eine Kategorie bestellbar ist (Waldorfschule = nur
+                                                                        // Sparmenü), wäre sonst nach dem Bestellen alles grün und man
+                                                                        // unterschiede nichts mehr. Dass etwas bestellt ist, sagen weiterhin
+                                                                        // der grüne Haken, der grüne Preis und der Streifen an der linken
+                                                                        // Kante (unten) – das Signal geht also nicht verloren.
+                                                                        // Ohne Kategoriefarbe bleibt es beim bisherigen Grün.
+                                                                        $selStyle = $isSel && $catColor
+                                                                            ? 'border-color: '.$catColor.'; box-shadow: 0 0 0 2px '.$catColor.'59;'
+                                                                            : '';
                                                                     @endphp
                                                                     <form method="POST" action="{{ route('module.schulkantine.orders.store') }}">
                                                                         @csrf
@@ -250,10 +261,15 @@
                                                                         <input type="hidden" name="date" value="{{ $dateStr }}">
                                                                         <input type="hidden" name="category_id" value="{{ $catId }}">
                                                                         <input type="hidden" name="dish_id" value="{{ $postDish }}">
-                                                                        <button type="submit" @disabled(! $clickable)
+                                                                        <button type="submit" @disabled(! $clickable) style="{{ $selStyle }}"
                                                                                 class="group relative w-full overflow-hidden rounded-lg border text-left transition
-                                                                                       {{ $isSel ? 'border-green-500 ring-2 ring-green-300' : ($warn ? 'border-red-300' : 'border-gray-200') }}
+                                                                                       {{ $isSel ? ($catColor ? '' : 'border-green-500 ring-2 ring-green-300') : ($warn ? 'border-red-300' : 'border-gray-200') }}
                                                                                        {{ $clickable ? 'hover:border-indigo-400 cursor-pointer' : 'opacity-60 cursor-not-allowed' }}">
+                                                                            @if ($isSel)
+                                                                                {{-- „bestellt" an der linken Kante – bleibt sichtbar, auch wenn
+                                                                                     der Rahmen jetzt die Kategoriefarbe trägt. --}}
+                                                                                <span class="absolute inset-y-0 left-0 z-10 w-1 bg-green-500" aria-hidden="true"></span>
+                                                                            @endif
                                                                             <div class="flex flex-col lg:flex-row lg:items-stretch">
                                                                                 @if ($m->dish->photoUrl())
                                                                                     <img src="{{ $m->dish->photoUrl() }}" alt="" class="h-20 w-full flex-none object-cover lg:h-14 lg:w-14">
