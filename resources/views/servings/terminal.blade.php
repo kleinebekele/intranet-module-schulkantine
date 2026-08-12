@@ -206,7 +206,6 @@
                 if (e.key === 'Enter' || e.key === 'Tab') {
                     const uid = this.wedgeBuf;
                     this.wedgeBuf = '';
-                    console.log('[Chip-Scanner] Abschluss – Puffer:', JSON.stringify(uid)); // TEMP-Diagnose
                     if (uid.length >= 4) {
                         e.preventDefault();
                         if (this.searchOpen) this.closeSearch();
