@@ -68,6 +68,12 @@
             banner: null,          // { ok, text }
             scanning: false,
             ctrl: null,
+            // USB-Hardware-Scanner (PC/SC im Tastatur-Emulations-Modus, z. B. ACR1552):
+            // „tippt" die Chip-UID als sehr schnelle Zeichenfolge und schließt mit Enter
+            // ab. Wir puffern nur solche Bursts (kurze Zeichenabstände) und geben die
+            // Kennung an denselben Ablauf wie Web-NFC. UID wird serverseitig normalisiert.
+            wedgeBuf: '',
+            wedgeAt: 0,
             servedOnLoad: false,   // war beim Stempeln schon etwas gebucht?
             mode: 'vorbesteller',  // 'vorbesteller' | 'ogs' | 'overview'
             hasOgs: @js($hasOgs ?? false),   // gibt/gab es OGS in der Saison? (steuert den Umschalter)
@@ -112,6 +118,10 @@
                 const h = (location.hash || '').replace('#', '');
                 if (h === 'ogs' && this.hasOgs) this.mode = 'ogs';
                 else if (h === 'uebersicht' || h === 'overview') { this.mode = 'overview'; this.loadOverview(); }
+
+                // USB-Hardware-Scanner (Tastatur-Emulation) immer global mithören –
+                // kein „Scan starten" nötig, der Reader ist auf OS-Ebene dauerhaft aktiv.
+                window.addEventListener('keydown', (e) => this.onWedgeKey(e));
             },
             hashForMode(m) { return ({ vorbesteller: 'vorbesteller', ogs: 'ogs', overview: 'uebersicht' })[m] || 'vorbesteller'; },
             // Breite der vertikalen Scrollleiste – damit die Übersicht-Matrix (scrollt)
@@ -179,6 +189,38 @@
                 }
             },
             stopScan() { if (this.ctrl) this.ctrl.abort(); this.scanning = false; },
+
+            // USB-Kartenleser im Tastatur-Emulations-Modus „tippt" die Chip-UID sehr
+            // schnell und schließt mit Enter (oder Tab) ab. Wir sammeln nur solche
+            // Bursts und übergeben die Kennung an denselben Ablauf wie Web-NFC.
+            onWedgeKey(e) {
+                // Nicht stören, während in ein ECHTES (beschreibbares) Feld getippt wird.
+                // Die Bildschirm-Tastaturen sind Buttons; das Such-Feld ist readonly –
+                // dort darf ein aufgelegter Chip weiterhin durchgreifen.
+                const t = e.target;
+                if (t && (t.isContentEditable || ((t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') && !t.readOnly))) return;
+                if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+                const now = Date.now();
+                // Abschluss: eine ausreichend lange Kennung buchen, sonst nur verwerfen.
+                if (e.key === 'Enter' || e.key === 'Tab') {
+                    const uid = this.wedgeBuf;
+                    this.wedgeBuf = '';
+                    console.log('[Chip-Scanner] Abschluss – Puffer:', JSON.stringify(uid)); // TEMP-Diagnose
+                    if (uid.length >= 4) {
+                        e.preventDefault();
+                        if (this.searchOpen) this.closeSearch();
+                        this.openFor(uid);
+                    }
+                    return;
+                }
+                // Nur einzelne Zeichen puffern; Steuertasten (Shift, Pfeile …) ignorieren.
+                if (e.key.length !== 1) return;
+                // Zu große Pause = kein Scanner-Burst → Puffer frisch beginnen.
+                if (now - this.wedgeAt > 300) this.wedgeBuf = '';
+                this.wedgeAt = now;
+                this.wedgeBuf += e.key;
+            },
 
             // Offene Transaktion? Je nach Einstellung automatisch buchen oder nur warnen.
             // Gibt true zurück, wenn die nächste Person geladen werden darf.
@@ -1075,8 +1117,11 @@
             </button>
             <div x-show="openSim" x-cloak @click.outside="openSim=false"
                  class="absolute bottom-12 left-0 max-h-[60vh] w-72 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 shadow-2xl">
+                <div class="mb-2 rounded-lg bg-green-50 px-2 py-1.5 text-xs leading-tight text-green-700">
+                    🔌 <strong>USB-Scanner</strong> (Tastatur-Modus): einfach Chip auflegen – läuft automatisch, ohne „Scan starten".
+                </div>
                 <div class="mb-2 flex items-center gap-2">
-                    <button x-show="!scanning" @click="startScan()" class="flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white">NFC-Scan starten</button>
+                    <button x-show="!scanning" @click="startScan()" class="flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white">NFC-Scan starten (Android)</button>
                     <button x-show="scanning" x-cloak @click="stopScan()" class="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white">Scan stoppen</button>
                 </div>
                 <div class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Chip simulieren</div>
