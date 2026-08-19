@@ -8,8 +8,8 @@ use Illuminate\Database\Migrations\Migration;
  *
  * Auf den Bestellseiten steht Grün bereits für „bestellt". Sparmenü (Teal) und
  * Snack (Limette) lagen genau daneben – ein grünes Gericht in einer grünen
- * Kachel liest sich wie ein Status, nicht wie eine Kategorie. Und: Betriebe wie
- * die Waldorfschule arbeiten NUR mit Sparmenüs, alle anderen Kategorien sind
+ * Kachel liest sich wie ein Status, nicht wie eine Kategorie. Und: manche
+ * Betriebe arbeiten NUR mit Sparmenüs, alle anderen Kategorien sind
  * dort nicht vorbestellbar. Das Sparmenü ist damit die Kategorie, die man
  * ständig sieht – sie gehört nach vorn und bekommt die kräftige Farbe.
  *

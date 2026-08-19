@@ -245,7 +245,7 @@
                                                                         $postDish = $isSel ? '' : $m->dish_id; // Klick auf Gewähltes = abwählen
 
                                                                         // Eine gewählte Kachel wird in ihrer KATEGORIEFARBE umrandet, nicht
-                                                                        // grün: Wo nur eine Kategorie bestellbar ist (Waldorfschule = nur
+                                                                        // grün: Wo nur eine Kategorie bestellbar ist (z. B. nur
                                                                         // Sparmenü), wäre sonst nach dem Bestellen alles grün und man
                                                                         // unterschiede nichts mehr. Dass etwas bestellt ist, sagen weiterhin
                                                                         // der grüne Haken, der grüne Preis und der Streifen an der linken
