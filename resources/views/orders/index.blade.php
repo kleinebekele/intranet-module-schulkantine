@@ -12,7 +12,7 @@
             @if ($season)
                 <div class="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-1.5 text-right">
                     <div class="text-[11px] uppercase tracking-wide text-indigo-400">Kosten im {{ $monthStart->isoFormat('MMMM YYYY') }}</div>
-                    <div class="text-lg font-bold text-indigo-700">{{ $money($monthTotal) }}</div>
+                    <div class="text-lg font-bold text-indigo-700" id="month-total">{{ $money($monthTotal) }}</div>
                 </div>
             @endif
         </div>
@@ -289,7 +289,24 @@
                                                                             'price' => $money($m->dish->price),
                                                                             'description' => $m->dish->description,
                                                                             'photo' => $m->dish->photoUrl(),
-                                                                            'components' => $m->dish->components->map(fn ($c) => ['name' => $c->name, 'price' => $money($c->price)])->values(),
+                                                                            'components' => $m->dish->components->map(fn ($c) => [
+                                                                                'name' => $c->name,
+                                                                                'price' => $money($c->price),
+                                                                                // Voll-Detail des Bestandteils fürs Drill-in-Modal.
+                                                                                'detail' => [
+                                                                                    'name' => $c->name,
+                                                                                    'category' => $c->category?->name,
+                                                                                    'categoryColor' => $c->category?->color,
+                                                                                    'price' => $money($c->price),
+                                                                                    'description' => $c->description,
+                                                                                    'photo' => $c->photoUrl(),
+                                                                                    'components' => [],
+                                                                                    'allergens' => ($season->show_allergens ?? true) ? $c->allergens->map(fn ($a) => trim($a->code.' '.$a->name))->values() : [],
+                                                                                    'additives' => ($season->show_additives ?? true) ? $c->additives->map(fn ($a) => trim($a->code.' '.$a->name))->values() : [],
+                                                                                    'diets' => ($season->show_diets ?? true) ? $c->unsuitableDiets->map(fn ($d) => $d->name)->values() : [],
+                                                                                    'orderable' => false,
+                                                                                ],
+                                                                            ])->values(),
                                                                             'componentsPrice' => $money($m->dish->componentsPrice()),
                                                                             'savings' => (float) $m->dish->savings(),
                                                                             'savingsMoney' => $money($m->dish->savings()),
@@ -303,6 +320,7 @@
                                                                             'isSel' => $isSel,
                                                                             'clickable' => $clickable,
                                                                             'postDish' => (string) $postDish,
+                                                                            'orderable' => true,
                                                                         ];
 
                                                                         // Eine gewählte Kachel wird in ihrer KATEGORIEFARBE umrandet, nicht
@@ -417,8 +435,8 @@
 
     {{-- Detail-Modal für die Info-Icons der Gerichte (ein Modal für die ganze Seite;
          die Info-Buttons schicken ihre Gericht-Daten per Alpine-Event hierher). --}}
-    <div x-data="{ open: false, dish: {} }"
-         x-on:open-dish.window="dish = $event.detail; open = true"
+    <div x-data="{ open: false, dish: {}, stack: [] }"
+         x-on:open-dish.window="dish = $event.detail; stack = []; open = true"
          @keydown.escape.window="open = false"
          x-show="open" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -450,8 +468,12 @@
                         <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Besteht aus</div>
                         <ul class="mt-1 divide-y divide-gray-100 rounded-lg border border-gray-100">
                             <template x-for="c in dish.components" :key="c.name">
-                                <li class="flex items-center justify-between px-3 py-1.5 text-sm">
-                                    <span class="text-gray-700" x-text="c.name"></span>
+                                <li @click="if (c.detail) { stack.push(dish); dish = c.detail; }"
+                                    class="flex cursor-pointer items-center justify-between gap-2 px-3 py-1.5 text-sm hover:bg-gray-50">
+                                    <span class="flex items-center gap-1 text-gray-700">
+                                        <span x-text="c.name"></span>
+                                        <svg class="h-3.5 w-3.5 flex-none text-indigo-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                                    </span>
                                     <span class="text-gray-500" x-text="c.price"></span>
                                 </li>
                             </template>
@@ -496,25 +518,34 @@
                     </div>
                 </template>
 
-                {{-- Aktionen: Bestellen/Abbestellen (schließt danach) + Schließen --}}
-                <div class="mt-5 flex items-center justify-end gap-2 border-t border-gray-100 pt-4">
-                    <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">Schließen</button>
-                    <form method="POST" action="{{ route('module.schulkantine.orders.store') }}" @submit="open = false">
-                        @csrf
-                        <input type="hidden" name="eater_id" :value="dish.eaterId">
-                        <input type="hidden" name="date" :value="dish.date">
-                        <input type="hidden" name="category_id" :value="dish.categoryId">
-                        <input type="hidden" name="dish_id" :value="dish.postDish">
-                        <template x-if="dish.clickable">
-                            <button type="submit"
-                                    class="rounded-lg px-4 py-1.5 text-sm font-medium text-white"
-                                    :class="dish.isSel ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'"
-                                    x-text="dish.isSel ? 'Abbestellen' : 'Bestellen'"></button>
+                {{-- Aktionen: Zurück (im Detail eines Bestandteils), Bestellen/Abbestellen, Schließen --}}
+                <div class="mt-5 flex items-center justify-between gap-2 border-t border-gray-100 pt-4">
+                    <div>
+                        <template x-if="stack.length">
+                            <button type="button" @click="dish = stack.pop()" class="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">‹ Zurück</button>
                         </template>
-                        <template x-if="! dish.clickable">
-                            <span class="self-center text-xs text-amber-600">Bestellfrist abgelaufen</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">Schließen</button>
+                        <template x-if="dish.orderable">
+                            <form method="POST" action="{{ route('module.schulkantine.orders.store') }}" @submit="open = false">
+                                @csrf
+                                <input type="hidden" name="eater_id" :value="dish.eaterId">
+                                <input type="hidden" name="date" :value="dish.date">
+                                <input type="hidden" name="category_id" :value="dish.categoryId">
+                                <input type="hidden" name="dish_id" :value="dish.postDish">
+                                <template x-if="dish.clickable">
+                                    <button type="submit"
+                                            class="rounded-lg px-4 py-1.5 text-sm font-medium text-white"
+                                            :class="dish.isSel ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'"
+                                            x-text="dish.isSel ? 'Abbestellen' : 'Bestellen'"></button>
+                                </template>
+                                <template x-if="! dish.clickable">
+                                    <span class="self-center text-xs text-amber-600">Bestellfrist abgelaufen</span>
+                                </template>
+                            </form>
                         </template>
-                    </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -547,6 +578,12 @@
                     const fresh = doc.getElementById('orders-content');
                     if (fresh) {
                         live.innerHTML = fresh.innerHTML;
+                        // Monats-Summe oben (außerhalb #orders-content) mitziehen.
+                        const freshTotal = doc.getElementById('month-total');
+                        const liveTotal = document.getElementById('month-total');
+                        if (freshTotal && liveTotal) {
+                            liveTotal.textContent = freshTotal.textContent;
+                        }
                     } else {
                         window.location.reload();
                     }
