@@ -95,18 +95,50 @@
                                         <span class="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600" title="Es sind Verträglichkeiten hinterlegt">⚠️ Verträglichkeiten</span>
                                     @endif
                                     @if ($isOgs)
-                                        <form method="POST" action="{{ route('module.schulkantine.orders.subscription') }}" class="inline-flex items-center gap-2">
-                                            @csrf
-                                            <input type="hidden" name="eater_id" value="{{ $eater->id }}">
-                                            <input type="hidden" name="active" value="{{ $isSubscribed ? '0' : '1' }}">
+                                        @php $wdKurz = [1 => 'Mo', 2 => 'Di', 3 => 'Mi', 4 => 'Do', 5 => 'Fr', 6 => 'Sa', 7 => 'So']; @endphp
+                                        <div x-data="{ open: false }" class="inline-flex items-center gap-2">
                                             @if ($isSubscribed)
-                                                <span class="text-xs text-gray-500">🔁 Abo aktiv – isst automatisch mit</span>
-                                                <button type="submit" class="rounded-md border border-red-200 bg-white px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50">Abo abbestellen</button>
+                                                @php $aboTage = collect($openingWeekdays)->sort()->filter(fn ($d) => in_array($d, $e['aboWeekdays']))->map(fn ($d) => $wdKurz[$d])->join(', '); @endphp
+                                                <span class="text-xs text-gray-500">🔁 Abo aktiv – isst {{ $aboTage ?: 'nichts' }}</span>
+                                                <button type="button" @click="open = true" class="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Tage ändern</button>
+                                                <form method="POST" action="{{ route('module.schulkantine.orders.subscription') }}" class="inline">
+                                                    @csrf
+                                                    <input type="hidden" name="eater_id" value="{{ $eater->id }}">
+                                                    <input type="hidden" name="active" value="0">
+                                                    <button type="submit" class="rounded-md border border-red-200 bg-white px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50">Abo abbestellen</button>
+                                                </form>
                                             @else
                                                 <span class="text-xs text-amber-600">Abo aus – nur angehakte Tage</span>
-                                                <button type="submit" class="rounded-md border border-green-200 bg-white px-2 py-0.5 text-xs font-medium text-green-700 hover:bg-green-50">Abo aktivieren</button>
+                                                <button type="button" @click="open = true" class="rounded-md border border-green-200 bg-white px-2 py-0.5 text-xs font-medium text-green-700 hover:bg-green-50">Abo aktivieren</button>
                                             @endif
-                                        </form>
+
+                                            {{-- Modal: Standardtage des Kindes wählen (Abo aktivieren/anpassen) --}}
+                                            <div x-show="open" x-cloak @keydown.escape.window="open = false"
+                                                 class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display:none;">
+                                                <div class="absolute inset-0 bg-black/40" @click="open = false"></div>
+                                                <form method="POST" action="{{ route('module.schulkantine.orders.subscription') }}"
+                                                      class="relative z-10 w-full max-w-sm rounded-2xl bg-white p-5 text-left shadow-xl">
+                                                    @csrf
+                                                    <input type="hidden" name="eater_id" value="{{ $eater->id }}">
+                                                    <input type="hidden" name="active" value="1">
+                                                    <h3 class="text-base font-semibold text-gray-800">Standardtage – {{ $eater->name }}</h3>
+                                                    <p class="mt-1 text-xs text-gray-500">An welchen Wochentagen isst {{ $eater->name }} standardmäßig? Einzelne Tage lassen sich weiter an- und abhaken; an Schließtagen wird ohnehin nichts bestellt.</p>
+                                                    <div class="mt-3 flex flex-wrap gap-2">
+                                                        @foreach (collect($openingWeekdays)->sort() as $wd)
+                                                            <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                                                                <input type="checkbox" name="weekdays[]" value="{{ $wd }}" @checked(in_array($wd, $e['aboWeekdays'])) class="rounded border-gray-300 text-green-600 focus:ring-green-500">
+                                                                {{ $wdKurz[$wd] }}
+                                                            </label>
+                                                        @endforeach
+                                                    </div>
+                                                    <p class="mt-2 text-[11px] text-gray-400">Nichts angehakt = isst an allen Öffnungstagen.</p>
+                                                    <div class="mt-4 flex justify-end gap-2">
+                                                        <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">Abbrechen</button>
+                                                        <button type="submit" class="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700">Speichern</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
                                     @endif
                                 </div>
                                 {{-- Offener Betrag DIESER Person im angezeigten Monat --}}
@@ -131,9 +163,11 @@
                                             $items = collect($plan[$dateStr] ?? []);
                                             $eaterTotal = $dayTotals[$eater->id][$dateStr] ?? 0;
                                             if ($isOgs) {
-                                                $attends = $isSubscribed
-                                                    ? ! isset($ogsCancelled[$eater->id][$dateStr])
-                                                    : isset($ogsOrdered[$eater->id][$dateStr]);
+                                                // Standardtag aus dem Abo-Muster; einzelne An-/Abmeldung schlägt es.
+                                                $default = $isSubscribed && in_array($day['date']->dayOfWeekIso, $e['aboWeekdays']);
+                                                $attends = isset($ogsOrdered[$eater->id][$dateStr])
+                                                    ? true
+                                                    : (isset($ogsCancelled[$eater->id][$dateStr]) ? false : $default);
                                                 $hasOrder = $day['open'] && $attends;
                                             } else {
                                                 $attends = false;

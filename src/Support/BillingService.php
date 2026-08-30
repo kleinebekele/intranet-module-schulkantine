@@ -9,6 +9,7 @@ use Intranet\Modules\Schulkantine\Models\Order;
 use Intranet\Modules\Schulkantine\Models\Season;
 use Intranet\Modules\Schulkantine\Models\Serving;
 use Intranet\Modules\Schulkantine\Models\Subscription;
+use Intranet\Modules\Schulkantine\Support\OgsAttendance;
 
 /**
  * Berechnet die Monatsabrechnung je Person (Phase 5).
@@ -86,13 +87,11 @@ class BillingService
             $lines[$row->user_id] = $l;
         }
 
-        // 3) OGS-Kosten (abgeleitet). Identische Regel wie im OrderController:
-        //    mit Abo  → Öffnungstage minus Abbestellungen; ohne Abo → bestellte Tage.
+        // 3) OGS-Kosten (abgeleitet) – dieselbe Wahrheit wie überall (OgsAttendance):
+        //    Standardtage aus dem Abo-Muster, einzelne An-/Abmeldungen schlagen es.
         $ogsPrice = (float) ($season->ogs_price ?? 0);
         if ($ogsPrice > 0 && $openCount > 0) {
-            $subscribed = Subscription::where('season_id', $season->id)
-                ->where('active', true)
-                ->pluck('user_id')->flip();
+            $subs = Subscription::where('season_id', $season->id)->get()->keyBy('user_id');
 
             // OGS-Bestellzeilen des Monats (Tagesmenü hat category_id, OGS nicht).
             $ogsOrders = Order::where('season_id', $season->id)
@@ -100,23 +99,14 @@ class BillingService
                 ->whereBetween('date', [$from, $to])
                 ->get(['user_id', 'date', 'status']);
 
-            // Alle OGS-Esser: mit Abo ODER mit eigener OGS-Bestellzeile.
-            $ogsUserIds = $subscribed->keys()
+            // Alle OGS-Esser: mit aktivem Abo ODER mit eigener OGS-Bestellzeile.
+            $ogsUserIds = $subs->filter(fn ($s) => $s->active)->keys()
                 ->merge($ogsOrders->pluck('user_id'))
                 ->unique();
 
             foreach ($ogsUserIds as $uid) {
                 $rows = $ogsOrders->where('user_id', $uid);
-                if ($subscribed->has($uid)) {
-                    $storno = $rows->where('status', Order::STATUS_CANCELLED)
-                        ->map(fn ($r) => $r->date->toDateString())
-                        ->filter(fn ($ds) => isset($openDays[$ds]))->unique()->count();
-                    $days = max(0, $openCount - $storno);
-                } else {
-                    $days = $rows->where('status', Order::STATUS_ORDERED)
-                        ->map(fn ($r) => $r->date->toDateString())
-                        ->filter(fn ($ds) => isset($openDays[$ds]))->unique()->count();
-                }
+                $days = count(OgsAttendance::attendedDates($subs->get($uid), $openDays, $rows));
                 if ($days > 0) {
                     $l = $line($uid);
                     $l['ogs_days'] = $days;
@@ -232,12 +222,12 @@ class BillingService
         $ogs = ['days' => 0, 'price' => $ogsPrice, 'total' => 0.0, 'dates' => [], 'cancelled' => [],
             'subscribed' => false, 'picked' => 0, 'declined' => 0, 'noshow' => 0];
         if ($ogsPrice > 0 && ! empty($openDays)) {
-            $subscribed = Subscription::where('season_id', $season->id)
-                ->where('user_id', $userId)->where('active', true)->exists();
+            $sub = Subscription::where('season_id', $season->id)
+                ->where('user_id', $userId)->first();
             $ogsRows = Order::where('season_id', $season->id)
                 ->where('user_id', $userId)->whereNull('category_id')
                 ->whereBetween('date', [$from, $to])->get(['date', 'status']);
-            $ogs['subscribed'] = $subscribed;
+            $ogs['subscribed'] = (bool) ($sub && $sub->active);
 
             // Ausgabe-Stand je OGS-Tag: nicht-spontane Zeile ohne Gericht = OGS-Essen.
             // vorhanden + declined = abgelehnt · vorhanden = abgeholt · fehlt = nicht abgeholt.
@@ -251,23 +241,18 @@ class BillingService
                 return $sv === null ? 'none' : ($sv->declined ? 'declined' : 'taken');
             };
 
-            if ($subscribed) {
-                $cancelled = $ogsRows->where('status', Order::STATUS_CANCELLED)
-                    ->map(fn ($r) => $r->date->toDateString())
-                    ->filter(fn ($ds) => isset($openDays[$ds]))->unique()->flip();
-                foreach (array_keys($openDays) as $ds) {
-                    if ($cancelled->has($ds)) {
-                        $ogs['cancelled'][] = Carbon::parse($ds);
-                    } else {
-                        $ogs['dates'][] = ['date' => Carbon::parse($ds), 'status' => $statusFor($ds)];
-                    }
-                }
-            } elseif ($ogsRows->isNotEmpty()) {
-                $ordered = $ogsRows->where('status', Order::STATUS_ORDERED)
-                    ->map(fn ($r) => $r->date->toDateString())
-                    ->filter(fn ($ds) => isset($openDays[$ds]))->unique()->sort();
-                foreach ($ordered as $ds) {
+            $orderedSet = $ogsRows->where('status', Order::STATUS_ORDERED)
+                ->map(fn ($r) => $r->date->toDateString())->flip();
+            $cancelledSet = $ogsRows->where('status', Order::STATUS_CANCELLED)
+                ->map(fn ($r) => $r->date->toDateString())->flip();
+            foreach (array_keys($openDays) as $ds) {
+                $default = $sub && $sub->active && $sub->eatsWeekday(Carbon::parse($ds)->dayOfWeekIso);
+                $hasOrdered = $orderedSet->has($ds);
+                $hasCancelled = $cancelledSet->has($ds);
+                if ($hasOrdered || (! $hasCancelled && $default)) {
                     $ogs['dates'][] = ['date' => Carbon::parse($ds), 'status' => $statusFor($ds)];
+                } elseif ($default && $hasCancelled) {
+                    $ogs['cancelled'][] = Carbon::parse($ds);
                 }
             }
             $ogs['days'] = count($ogs['dates']);

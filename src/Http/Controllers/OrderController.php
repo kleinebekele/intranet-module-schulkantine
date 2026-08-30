@@ -14,6 +14,7 @@ use Intranet\Modules\Schulkantine\Models\Order;
 use Intranet\Modules\Schulkantine\Models\Season;
 use Intranet\Modules\Schulkantine\Models\Subscription;
 use Intranet\Modules\Schulkantine\Support\DeadlineService;
+use Intranet\Modules\Schulkantine\Support\OgsAttendance;
 use Intranet\Modules\Schulkantine\Support\ReleaseService;
 
 /**
@@ -28,6 +29,9 @@ use Intranet\Modules\Schulkantine\Support\ReleaseService;
  */
 class OrderController
 {
+    /** Kurzlabels der ISO-Wochentage für Statusmeldungen. */
+    private const WEEKDAY_KURZ = [1 => 'Mo', 2 => 'Di', 3 => 'Mi', 4 => 'Do', 5 => 'Fr', 6 => 'Sa', 7 => 'So'];
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -165,14 +169,14 @@ class OrderController
             ->map(fn ($v) => (float) $v)
             ->all();
 
-        // Aktive Abos je Esser (für die OGS-Standard-Teilnahme).
-        $subscribed = Subscription::whereIn('user_id', $eaterIds)
+        // Abos je Esser (inkl. Standardtage-Muster) für die OGS-Teilnahme.
+        $subs = Subscription::whereIn('user_id', $eaterIds)
             ->where('season_id', $season->id)
-            ->where('active', true)
-            ->pluck('user_id')->flip();
+            ->get()->keyBy('user_id');
+        $subscribed = $subs->filter(fn ($s) => $s->active)->keys()->flip();
 
         // Esser aufbereiten (Gruppe, Modus, Sonderkost-IDs).
-        $eaterData = $eaters->map(function (User $eater) use ($groups) {
+        $eaterData = $eaters->map(function (User $eater) use ($groups, $subs, $openingWeekdays) {
             $group = CustomerGroup::forUser($eater, $groups);
 
             return [
@@ -184,6 +188,9 @@ class OrderController
                 // Kategorien, die dieser Esser NICHT vorbestellen darf (Eltern-Freigabe).
                 'blockedCats' => ChildCategoryPermission::where('user_id', $eater->id)
                     ->where('may_preorder', false)->pluck('category_id')->all(),
+                // OGS-Abo: aktiv? und an welchen Wochentagen (leer/kein Muster = alle Öffnungstage).
+                'aboActive' => (bool) ($subs[$eater->id]->active ?? false),
+                'aboWeekdays' => ($subs[$eater->id]->weekdays ?? null) ?: $openingWeekdays,
             ];
         });
 
@@ -203,8 +210,6 @@ class OrderController
                         $openMonthDays[$d->toDateString()] = true;
                     }
                 }
-                $openMonthCount = count($openMonthDays);
-
                 $ogsMonth = Order::whereIn('user_id', $ogsEaterIds)
                     ->where('season_id', $season->id)
                     ->whereNull('category_id')
@@ -213,16 +218,7 @@ class OrderController
 
                 foreach ($ogsEaterIds as $uid) {
                     $rows = $ogsMonth->where('user_id', $uid);
-                    if ($subscribed->has($uid)) {
-                        $storno = $rows->where('status', Order::STATUS_CANCELLED)
-                            ->map(fn ($r) => $r->date->toDateString())
-                            ->filter(fn ($ds) => isset($openMonthDays[$ds]))->unique()->count();
-                        $attended = max(0, $openMonthCount - $storno);
-                    } else {
-                        $attended = $rows->where('status', Order::STATUS_ORDERED)
-                            ->map(fn ($r) => $r->date->toDateString())
-                            ->filter(fn ($ds) => isset($openMonthDays[$ds]))->unique()->count();
-                    }
+                    $attended = count(OgsAttendance::attendedDates($subs->get($uid), $openMonthDays, $rows));
                     $monthByUser[$uid] = ($monthByUser[$uid] ?? 0) + $attended * $ogsPrice;
                 }
             }
@@ -247,6 +243,7 @@ class OrderController
             'monthTotal' => $monthTotal,
             'monthByUser' => $monthByUser,
             'ogsPrice' => $ogsPrice,
+            'openingWeekdays' => $openingWeekdays,
             'monthStart' => $monthStart,
             'prevWeek' => $weekStart->copy()->subWeek()->toDateString(),
             'nextWeek' => $weekStart->copy()->addWeek()->toDateString(),
@@ -307,6 +304,8 @@ class OrderController
         $data = $request->validate([
             'eater_id' => ['required', 'integer'],
             'active' => ['required', 'in:0,1'],
+            'weekdays' => ['nullable', 'array'],
+            'weekdays.*' => ['integer', 'between:1,7'],
         ]);
 
         $season = Season::where('is_active', true)->firstOrFail();
@@ -318,14 +317,24 @@ class OrderController
         abort_unless($group && $group->ordering_mode === CustomerGroup::MODE_JA_NEIN, 422, 'Nur OGS-Esser haben ein Abo.');
 
         $active = $data['active'] === '1';
+        // Leere Auswahl = keine Einschränkung (isst an allen Öffnungstagen).
+        $weekdays = collect($data['weekdays'] ?? [])
+            ->map(fn ($d) => (int) $d)->unique()->sort()->values()->all();
+
         Subscription::updateOrCreate(
             ['season_id' => $season->id, 'user_id' => $eater->id],
-            ['active' => $active],
+            ['active' => $active, 'weekdays' => $weekdays ?: null],
         );
 
-        return back()->with('status', $active
-            ? $eater->name.': Abo aktiviert – isst wieder an allen Öffnungstagen (außer abbestellten).'
-            : $eater->name.': Abo abbestellt – isst nur noch an einzeln angehakten Tagen.');
+        if (! $active) {
+            return back()->with('status', $eater->name.': Abo abbestellt – isst nur noch an einzeln angehakten Tagen.');
+        }
+
+        $tage = $weekdays === []
+            ? 'an allen Öffnungstagen'
+            : 'nur '.collect($weekdays)->map(fn ($d) => self::WEEKDAY_KURZ[$d] ?? $d)->join(', ');
+
+        return back()->with('status', $eater->name.': Abo aktiviert – isst '.$tage.' (außer abbestellten Tagen).');
     }
 
     // ------------------------------------------------------------- Menü-Modus
@@ -471,7 +480,9 @@ class OrderController
 
     private function handleOgs(Request $request, Season $season, User $eater, Carbon $date, DeadlineService $deadline, string $attend)
     {
-        $subscribed = Subscription::where('season_id', $season->id)->where('user_id', $eater->id)->exists();
+        $sub = Subscription::where('season_id', $season->id)->where('user_id', $eater->id)->first();
+        // Standardteilnahme aus dem Abo-Muster (Wochentag); einzelne Tage schlagen sie.
+        $default = $sub && $sub->active && $sub->eatsWeekday($date->dayOfWeekIso);
 
         $cancelOrder = Order::where('user_id', $eater->id)
             ->where('season_id', $season->id)
@@ -494,8 +505,8 @@ class OrderController
             }
             // Etwaige Abbestellung aufheben.
             $cancelOrder?->delete();
-            // Ohne Abo braucht es eine explizite Bestell-Zeile.
-            if (! $subscribed && ! $orderRow) {
+            // Nicht-Standardtag (oder kein Abo) braucht eine explizite Bestell-Zeile.
+            if (! $default && ! $orderRow) {
                 Order::create([
                     'season_id' => $season->id,
                     'user_id' => $eater->id,
@@ -513,8 +524,8 @@ class OrderController
         }
         // Eine evtl. Einzelbestellung entfernen.
         $orderRow?->delete();
-        // Bei Abo: Abbestellung als storniert-Zeile festhalten.
-        if ($subscribed && ! $cancelOrder) {
+        // Standardtag: Abbestellung als storniert-Zeile festhalten.
+        if ($default && ! $cancelOrder) {
             Order::create([
                 'season_id' => $season->id,
                 'user_id' => $eater->id,

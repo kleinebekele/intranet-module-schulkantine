@@ -18,11 +18,23 @@ class Subscription extends Model
         'season_id',
         'user_id',
         'active',
+        'weekdays',
     ];
 
     protected function casts(): array
     {
-        return ['active' => 'boolean'];
+        return ['active' => 'boolean', 'weekdays' => 'array'];
+    }
+
+    /**
+     * Isst das Kind an diesem ISO-Wochentag (1 = Mo … 7 = So) standardmäßig?
+     * Leeres/kein Muster = alle Öffnungstage (bisheriges Verhalten).
+     */
+    public function eatsWeekday(int $iso): bool
+    {
+        $wd = $this->weekdays;
+
+        return empty($wd) || in_array($iso, $wd, true);
     }
 
     public function season(): BelongsTo

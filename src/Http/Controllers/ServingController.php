@@ -19,6 +19,7 @@ use Intranet\Modules\Schulkantine\Models\Serving;
 use Intranet\Modules\Schulkantine\Models\Subscription;
 use Intranet\Modules\Schulkantine\Support\Access;
 use Intranet\Modules\Schulkantine\Support\DeadlineService;
+use Intranet\Modules\Schulkantine\Support\OgsAttendance;
 
 /**
  * Ausgabe & Betrieb (Phase 4). Das Küchen-/Ausgabepersonal arbeitet hier mit der
@@ -483,15 +484,15 @@ class ServingController
             ->exists();
     }
 
-    /** Nimmt dieser OGS-Esser an dem Tag teil (Abo minus Abbestellung oder Einzelbestellung)? */
+    /** Nimmt dieser OGS-Esser an dem Tag teil? Standardtage (Abo-Muster) plus
+     *  einzelne An-/Abmeldungen – zentral über OgsAttendance. */
     private function isOgsAttending(Season $season, User $eater, Carbon $date): bool
     {
         $dateStr = $date->toDateString();
 
-        $subscribed = Subscription::where('season_id', $season->id)
+        $sub = Subscription::where('season_id', $season->id)
             ->where('user_id', $eater->id)
-            ->where('active', true)
-            ->exists();
+            ->first();
 
         $cancelled = Order::where('season_id', $season->id)
             ->where('user_id', $eater->id)
@@ -507,7 +508,7 @@ class ServingController
             ->where('status', Order::STATUS_ORDERED)
             ->exists();
 
-        return ($subscribed && ! $cancelled) || $ordered;
+        return OgsAttendance::attends($sub, $date, $ordered, $cancelled);
     }
 
     /**
