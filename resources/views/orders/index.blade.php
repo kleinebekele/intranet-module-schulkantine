@@ -244,6 +244,23 @@
                                                                         $clickable = $day['canOrder'] || ($isSel && $day['canCancel']);
                                                                         $postDish = $isSel ? '' : $m->dish_id; // Klick auf Gewähltes = abwählen
 
+                                                                        // Alle Details fürs Info-Modal (Alpine liest dieses Objekt beim Klick).
+                                                                        $dishData = [
+                                                                            'name' => $m->dish->name,
+                                                                            'category' => $m->dish->category?->name,
+                                                                            'categoryColor' => $m->dish->category?->color,
+                                                                            'price' => $money($m->dish->price),
+                                                                            'description' => $m->dish->description,
+                                                                            'photo' => $m->dish->photoUrl(),
+                                                                            'components' => $m->dish->components->map(fn ($c) => ['name' => $c->name, 'price' => $money($c->price)])->values(),
+                                                                            'componentsPrice' => $money($m->dish->componentsPrice()),
+                                                                            'savings' => (float) $m->dish->savings(),
+                                                                            'savingsMoney' => $money($m->dish->savings()),
+                                                                            'allergens' => $m->dish->effectiveAllergens()->map(fn ($a) => trim($a->code.' '.$a->name))->values(),
+                                                                            'additives' => $m->dish->effectiveAdditives()->map(fn ($a) => trim($a->code.' '.$a->name))->values(),
+                                                                            'diets' => $m->dish->effectiveUnsuitableDiets()->map(fn ($d) => $d->name)->values(),
+                                                                        ];
+
                                                                         // Eine gewählte Kachel wird in ihrer KATEGORIEFARBE umrandet, nicht
                                                                         // grün: Wo nur eine Kategorie bestellbar ist (z. B. nur
                                                                         // Sparmenü), wäre sonst nach dem Bestellen alles grün und man
@@ -255,12 +272,16 @@
                                                                             ? 'border-color: '.$catColor.'; box-shadow: 0 0 0 2px '.$catColor.'59;'
                                                                             : '';
                                                                     @endphp
-                                                                    <form method="POST" action="{{ route('module.schulkantine.orders.store') }}">
+                                                                    <form method="POST" action="{{ route('module.schulkantine.orders.store') }}" class="relative">
                                                                         @csrf
                                                                         <input type="hidden" name="eater_id" value="{{ $eater->id }}">
                                                                         <input type="hidden" name="date" value="{{ $dateStr }}">
                                                                         <input type="hidden" name="category_id" value="{{ $catId }}">
                                                                         <input type="hidden" name="dish_id" value="{{ $postDish }}">
+                                                                        <button type="button" x-data @click.stop="$dispatch('open-dish', @js($dishData))" title="Details anzeigen" aria-label="Details anzeigen"
+                                                                                class="absolute left-1 top-1 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-indigo-600 shadow ring-1 ring-black/5 hover:bg-white">
+                                                                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                                                                        </button>
                                                                         <button type="submit" @disabled(! $clickable) style="{{ $selStyle }}"
                                                                                 class="group relative w-full overflow-hidden rounded-lg border text-left transition
                                                                                        {{ $isSel ? ($catColor ? '' : 'border-green-500 ring-2 ring-green-300') : ($warn ? 'border-red-300' : 'border-gray-200') }}
@@ -352,5 +373,90 @@
                 </p>
             @endif
         @endif
+    </div>
+
+    {{-- Detail-Modal für die Info-Icons der Gerichte (ein Modal für die ganze Seite;
+         die Info-Buttons schicken ihre Gericht-Daten per Alpine-Event hierher). --}}
+    <div x-data="{ open: false, dish: {} }"
+         x-on:open-dish.window="dish = $event.detail; open = true"
+         @keydown.escape.window="open = false"
+         x-show="open" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         style="display:none;">
+        <div class="absolute inset-0 bg-black/40" @click="open = false"></div>
+        <div class="relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl">
+            <template x-if="dish.photo">
+                <img :src="dish.photo" alt="" class="h-44 w-full rounded-t-2xl object-cover">
+            </template>
+            <div class="p-5">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-800" x-text="dish.name"></h2>
+                        <span x-show="dish.category" class="mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium"
+                              :style="dish.categoryColor ? ('background-color:'+dish.categoryColor+'22; color:'+dish.categoryColor) : 'background-color:#eef2ff; color:#4f46e5'"
+                              x-text="dish.category"></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="whitespace-nowrap text-lg font-bold text-indigo-700" x-text="dish.price"></span>
+                        <button type="button" @click="open = false" class="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600" aria-label="Schließen">
+                            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <p x-show="dish.description" class="mt-3 whitespace-pre-line text-sm text-gray-600" x-text="dish.description"></p>
+
+                <template x-if="dish.components && dish.components.length">
+                    <div class="mt-4">
+                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Besteht aus</div>
+                        <ul class="mt-1 divide-y divide-gray-100 rounded-lg border border-gray-100">
+                            <template x-for="c in dish.components" :key="c.name">
+                                <li class="flex items-center justify-between px-3 py-1.5 text-sm">
+                                    <span class="text-gray-700" x-text="c.name"></span>
+                                    <span class="text-gray-500" x-text="c.price"></span>
+                                </li>
+                            </template>
+                        </ul>
+                        <div class="mt-1 text-xs text-gray-400">
+                            einzeln <span x-text="dish.componentsPrice"></span>
+                            <template x-if="dish.savings > 0"><span> · <span class="font-medium text-green-600"><span x-text="dish.savingsMoney"></span> gespart</span></span></template>
+                        </div>
+                    </div>
+                </template>
+
+                <template x-if="dish.allergens && dish.allergens.length">
+                    <div class="mt-4">
+                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Allergene</div>
+                        <div class="mt-1 flex flex-wrap gap-1">
+                            <template x-for="a in dish.allergens" :key="a">
+                                <span class="rounded bg-red-50 px-1.5 py-0.5 text-[11px] text-red-700" x-text="a"></span>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
+                <template x-if="dish.additives && dish.additives.length">
+                    <div class="mt-4">
+                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Zusatzstoffe</div>
+                        <div class="mt-1 flex flex-wrap gap-1">
+                            <template x-for="a in dish.additives" :key="a">
+                                <span class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600" x-text="a"></span>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
+                <template x-if="dish.diets && dish.diets.length">
+                    <div class="mt-4">
+                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Nicht geeignet bei</div>
+                        <div class="mt-1 flex flex-wrap gap-1">
+                            <template x-for="d in dish.diets" :key="d">
+                                <span class="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700" x-text="d"></span>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
     </div>
 </x-app-layout>
