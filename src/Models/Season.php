@@ -21,6 +21,9 @@ class Season extends Model
         'ogs_price',
         'opening_weekdays',
         'is_active',
+        'show_additives',
+        'show_allergens',
+        'show_diets',
     ];
 
     protected function casts(): array
@@ -31,6 +34,9 @@ class Season extends Model
             'ogs_price' => 'decimal:2',
             'opening_weekdays' => 'array',
             'is_active' => 'boolean',
+            'show_additives' => 'boolean',
+            'show_allergens' => 'boolean',
+            'show_diets' => 'boolean',
         ];
     }
 

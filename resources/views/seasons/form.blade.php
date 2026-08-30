@@ -82,6 +82,32 @@
                 Diese Saison ist aktiv (es kann nur eine aktiv sein)
             </label>
 
+            <div class="border-t border-gray-100 pt-5">
+                <h2 class="text-sm font-semibold text-gray-700">Anzeige beim Essen-Bestellen</h2>
+                <p class="mt-0.5 text-xs text-gray-400">
+                    Steuert, was Eltern und Kinder auf der Bestellseite und im Gericht-Detail sehen.
+                    Warnungen („nicht geeignet") erscheinen nur für das, was hier eingeblendet ist.
+                    Die Ausgabe/Küche sieht die Angaben unabhängig davon weiterhin vollständig.
+                </p>
+                <div class="mt-3 space-y-2">
+                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                        <input type="checkbox" name="show_additives" value="1" @checked(old('show_additives', $season->show_additives ?? true))
+                               class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        Zusatzstoffe / Inhaltsstoffe anzeigen
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                        <input type="checkbox" name="show_allergens" value="1" @checked(old('show_allergens', $season->show_allergens ?? true))
+                               class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        Allergene anzeigen (samt Allergen-Warnungen)
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                        <input type="checkbox" name="show_diets" value="1" @checked(old('show_diets', $season->show_diets ?? true))
+                               class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        Diät-Eignung anzeigen (samt Diät-Warnungen)
+                    </label>
+                </div>
+            </div>
+
             @if ($season->exists && isset($settings))
                 {{-- Globale Bestell-Einstellungen. Gelten übergreifend (nicht je Saison),
                      werden aber hier gepflegt, damit es kein eigenes Einstellungen-Menü braucht. --}}

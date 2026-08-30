@@ -207,6 +207,9 @@ class SeasonController
             'ogs_price' => $request->filled('ogs_price') ? (float) $request->input('ogs_price') : null,
             'opening_weekdays' => array_map('intval', $request->input('opening_weekdays', [])),
             'is_active' => $request->boolean('is_active'),
+            'show_additives' => $request->boolean('show_additives'),
+            'show_allergens' => $request->boolean('show_allergens'),
+            'show_diets' => $request->boolean('show_diets'),
         ];
     }
 

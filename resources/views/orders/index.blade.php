@@ -65,9 +65,12 @@
                     //          geforderte Diät markiert.
                     // Bewusst über effective*: Bei einem Sparmenü stecken Allergene
                     // und Diät-Verstöße in den Bestandteilen, nicht am Bündel selbst.
-                    $dishWarn = function ($dish, array $allergenIds, array $dietIds) {
-                        $hasAllergen = $dish->effectiveAllergens()->pluck('id')->intersect($allergenIds)->isNotEmpty();
-                        $conflictsDiet = $dish->effectiveUnsuitableDiets()->pluck('id')->intersect($dietIds)->isNotEmpty();
+                    $dishWarn = function ($dish, array $allergenIds, array $dietIds) use ($season) {
+                        // Warnung nur für das, was diese Saison überhaupt einblendet.
+                        $hasAllergen = ($season->show_allergens ?? true)
+                            && $dish->effectiveAllergens()->pluck('id')->intersect($allergenIds)->isNotEmpty();
+                        $conflictsDiet = ($season->show_diets ?? true)
+                            && $dish->effectiveUnsuitableDiets()->pluck('id')->intersect($dietIds)->isNotEmpty();
                         return $hasAllergen || $conflictsDiet;
                     };
                 @endphp
@@ -290,9 +293,16 @@
                                                                             'componentsPrice' => $money($m->dish->componentsPrice()),
                                                                             'savings' => (float) $m->dish->savings(),
                                                                             'savingsMoney' => $money($m->dish->savings()),
-                                                                            'allergens' => $m->dish->effectiveAllergens()->map(fn ($a) => trim($a->code.' '.$a->name))->values(),
-                                                                            'additives' => $m->dish->effectiveAdditives()->map(fn ($a) => trim($a->code.' '.$a->name))->values(),
-                                                                            'diets' => $m->dish->effectiveUnsuitableDiets()->map(fn ($d) => $d->name)->values(),
+                                                                            'allergens' => ($season->show_allergens ?? true) ? $m->dish->effectiveAllergens()->map(fn ($a) => trim($a->code.' '.$a->name))->values() : [],
+                                                                            'additives' => ($season->show_additives ?? true) ? $m->dish->effectiveAdditives()->map(fn ($a) => trim($a->code.' '.$a->name))->values() : [],
+                                                                            'diets' => ($season->show_diets ?? true) ? $m->dish->effectiveUnsuitableDiets()->map(fn ($d) => $d->name)->values() : [],
+                                                                            // Bestell-Kontext, damit man auch aus dem Modal bestellen/abbestellen kann.
+                                                                            'eaterId' => $eater->id,
+                                                                            'date' => $dateStr,
+                                                                            'categoryId' => $catId,
+                                                                            'isSel' => $isSel,
+                                                                            'clickable' => $clickable,
+                                                                            'postDish' => (string) $postDish,
                                                                         ];
 
                                                                         // Eine gewählte Kachel wird in ihrer KATEGORIEFARBE umrandet, nicht
@@ -312,10 +322,6 @@
                                                                         <input type="hidden" name="date" value="{{ $dateStr }}">
                                                                         <input type="hidden" name="category_id" value="{{ $catId }}">
                                                                         <input type="hidden" name="dish_id" value="{{ $postDish }}">
-                                                                        <button type="button" x-data @click.stop="$dispatch('open-dish', @js($dishData))" title="Details anzeigen" aria-label="Details anzeigen"
-                                                                                class="absolute left-1 top-1 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-indigo-600 shadow ring-1 ring-black/5 hover:bg-white">
-                                                                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
-                                                                        </button>
                                                                         <button type="submit" @disabled(! $clickable) style="{{ $selStyle }}"
                                                                                 class="group relative w-full overflow-hidden rounded-lg border text-left transition
                                                                                        {{ $isSel ? ($catColor ? '' : 'border-green-500 ring-2 ring-green-300') : ($warn ? 'border-red-300' : 'border-gray-200') }}
@@ -333,7 +339,7 @@
                                                                                 @endif
                                                                                 <div class="min-w-0 flex-1 p-1.5 lg:py-1 lg:pl-2 lg:pr-1">
                                                                                     <div class="flex items-start justify-between gap-1">
-                                                                                        <span class="text-xs font-semibold text-gray-800">{{ $m->dish->name }}</span>
+                                                                                        <span class="text-xs font-semibold text-gray-800">{{ $m->dish->name }}<span x-data @click.stop.prevent="$dispatch('open-dish', @js($dishData))" role="button" tabindex="0" title="Details anzeigen" aria-label="Details anzeigen" class="ml-1 inline-flex translate-y-px cursor-pointer align-middle text-indigo-500 hover:text-indigo-700"><svg class="inline h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg></span></span>
                                                                                         @php $comp = $m->dish->components; @endphp
                                                                                         <span class="flex flex-none items-center gap-1 text-xs font-bold {{ $isSel ? 'text-green-700' : 'text-gray-700' }}">
                                                                                             @if ($isSel)
@@ -362,13 +368,13 @@
                                                                                         $effAllergens = $m->dish->effectiveAllergens();
                                                                                         $effAdditives = $m->dish->effectiveAdditives();
                                                                                     @endphp
-                                                                                    @if ($effAllergens->isNotEmpty())
+                                                                                    @if (($season->show_allergens ?? true) && $effAllergens->isNotEmpty())
                                                                                         <div class="mt-0.5 truncate text-[10px] {{ $warn ? 'text-red-500 font-medium' : 'text-gray-400' }}"
                                                                                              title="Allergene: {{ $effAllergens->map(fn ($a) => $a->code.' '.$a->name)->join(', ') }}">
                                                                                             Allergene: {{ $effAllergens->pluck('code')->join(', ') }}
                                                                                         </div>
                                                                                     @endif
-                                                                                    @if ($effAdditives->isNotEmpty())
+                                                                                    @if (($season->show_additives ?? true) && $effAdditives->isNotEmpty())
                                                                                         <div class="truncate text-[10px] text-gray-400"
                                                                                              title="Zusatzstoffe: {{ $effAdditives->map(fn ($a) => $a->code.' '.$a->name)->join(', ') }}">
                                                                                             Zusatzstoffe: {{ $effAdditives->pluck('code')->join(', ') }}
@@ -391,7 +397,7 @@
                                     @endforeach
                                 </div>
 
-                                @if ($hasSonderkost)
+                                @if ($hasSonderkost && (($season->show_allergens ?? true) || ($season->show_diets ?? true)))
                                     <div class="border-t border-gray-100 px-4 py-2 text-[11px] text-gray-500">
                                         <span class="font-medium text-red-600">⚠️ Nicht geeignet</span> = enthält ein gemiedenes Allergen oder erfüllt eine geforderte Diät nicht ({{ $eater->name }}). Bestellen bleibt trotzdem möglich.
                                     </div>
@@ -419,6 +425,10 @@
          style="display:none;">
         <div class="absolute inset-0 bg-black/40" @click="open = false"></div>
         <div class="relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl">
+            <button type="button" @click="open = false" aria-label="Schließen"
+                    class="absolute right-3 top-3 z-20 rounded-full bg-white/90 p-1.5 text-gray-500 shadow ring-1 ring-black/5 hover:bg-white hover:text-gray-700">
+                <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            </button>
             <template x-if="dish.photo">
                 <img :src="dish.photo" alt="" class="h-44 w-full rounded-t-2xl object-cover">
             </template>
@@ -430,12 +440,7 @@
                               :style="dish.categoryColor ? ('background-color:'+dish.categoryColor+'22; color:'+dish.categoryColor) : 'background-color:#eef2ff; color:#4f46e5'"
                               x-text="dish.category"></span>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <span class="whitespace-nowrap text-lg font-bold text-indigo-700" x-text="dish.price"></span>
-                        <button type="button" @click="open = false" class="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600" aria-label="Schließen">
-                            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
-                        </button>
-                    </div>
+                    <span class="mr-8 whitespace-nowrap text-lg font-bold text-indigo-700" x-text="dish.price"></span>
                 </div>
 
                 <p x-show="dish.description" class="mt-3 whitespace-pre-line text-sm text-gray-600" x-text="dish.description"></p>
@@ -490,6 +495,27 @@
                         </div>
                     </div>
                 </template>
+
+                {{-- Aktionen: Bestellen/Abbestellen (schließt danach) + Schließen --}}
+                <div class="mt-5 flex items-center justify-end gap-2 border-t border-gray-100 pt-4">
+                    <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">Schließen</button>
+                    <form method="POST" action="{{ route('module.schulkantine.orders.store') }}" @submit="open = false">
+                        @csrf
+                        <input type="hidden" name="eater_id" :value="dish.eaterId">
+                        <input type="hidden" name="date" :value="dish.date">
+                        <input type="hidden" name="category_id" :value="dish.categoryId">
+                        <input type="hidden" name="dish_id" :value="dish.postDish">
+                        <template x-if="dish.clickable">
+                            <button type="submit"
+                                    class="rounded-lg px-4 py-1.5 text-sm font-medium text-white"
+                                    :class="dish.isSel ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'"
+                                    x-text="dish.isSel ? 'Abbestellen' : 'Bestellen'"></button>
+                        </template>
+                        <template x-if="! dish.clickable">
+                            <span class="self-center text-xs text-amber-600">Bestellfrist abgelaufen</span>
+                        </template>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
