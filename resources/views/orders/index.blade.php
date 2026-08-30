@@ -530,7 +530,7 @@
                 const form = e.target;
                 if (!(form instanceof HTMLFormElement)) return;
                 const action = form.action || '';
-                if (action.indexOf('/schulkantine/orders') === -1) return;
+                if (action.indexOf('/schulkantine/bestellen') === -1) return;
 
                 e.preventDefault();
                 const live = document.getElementById('orders-content');
