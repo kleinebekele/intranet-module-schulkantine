@@ -18,7 +18,7 @@
         </div>
     </x-slot>
 
-    <div class="max-w-full">
+    <div class="max-w-full" id="orders-content">
         {{-- Erfolgsmeldungen zeigt das App-Layout bereits global; hier nur Fehler. --}}
         @if ($errors->any())
             <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ $errors->first() }}</div>
@@ -228,7 +228,7 @@
                                                         <input type="hidden" name="attend" value="{{ $attends ? '1' : '0' }}">
                                                         <label class="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm {{ $attends ? 'border-green-300 bg-green-50 text-green-800' : 'border-gray-200 text-gray-700' }} {{ $editable ? 'cursor-pointer' : 'opacity-60' }}">
                                                             <input type="checkbox" @checked($attends) @disabled(! $editable)
-                                                                   onchange="this.form.attend.value = this.checked ? '1' : '0'; this.form.submit();"
+                                                                   onchange="this.form.attend.value = this.checked ? '1' : '0'; this.form.requestSubmit();"
                                                                    class="rounded border-gray-300 text-green-600 focus:ring-green-500">
                                                             <span class="font-medium">isst an diesem Tag</span>
                                                         </label>
@@ -519,4 +519,42 @@
             </div>
         </div>
     </div>
+
+    {{-- Bestellungen ohne Seiten-Sprung: Formulare per fetch senden und nur den
+         Bestell-Bereich austauschen. Die Scrollposition bleibt so erhalten.
+         Fällt JS aus, senden die Formulare ganz normal (Server-Redirect). --}}
+    @once
+        <script>
+        (function () {
+            document.addEventListener('submit', async function (e) {
+                const form = e.target;
+                if (!(form instanceof HTMLFormElement)) return;
+                const action = form.action || '';
+                if (action.indexOf('/schulkantine/orders') === -1) return;
+
+                e.preventDefault();
+                const live = document.getElementById('orders-content');
+                if (!live) { form.submit(); return; }
+
+                try {
+                    const res = await fetch(action, {
+                        method: 'POST',
+                        body: new FormData(form),
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
+                        credentials: 'same-origin',
+                    });
+                    const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+                    const fresh = doc.getElementById('orders-content');
+                    if (fresh) {
+                        live.innerHTML = fresh.innerHTML;
+                    } else {
+                        window.location.reload();
+                    }
+                } catch (err) {
+                    window.location.reload();
+                }
+            });
+        })();
+        </script>
+    @endonce
 </x-app-layout>
