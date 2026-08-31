@@ -435,8 +435,8 @@
 
     {{-- Detail-Modal für die Info-Icons der Gerichte (ein Modal für die ganze Seite;
          die Info-Buttons schicken ihre Gericht-Daten per Alpine-Event hierher). --}}
-    <div x-data="{ open: false, dish: {}, stack: [] }"
-         x-on:open-dish.window="dish = $event.detail; stack = []; open = true"
+    <div x-data="{ open: false, dish: {} }"
+         x-on:open-dish.window="dish = $event.detail; open = true"
          @keydown.escape.window="open = false"
          x-show="open" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -463,89 +463,109 @@
 
                 <p x-show="dish.description" class="mt-3 whitespace-pre-line text-sm text-gray-600" x-text="dish.description"></p>
 
+                {{-- Sparmenü: die Bestandteile direkt ausgeklappt, jeweils mit ihren Details. --}}
                 <template x-if="dish.components && dish.components.length">
                     <div class="mt-4">
                         <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Besteht aus</div>
-                        <ul class="mt-1 divide-y divide-gray-100 rounded-lg border border-gray-100">
+                        <div class="mt-2 space-y-3">
                             <template x-for="c in dish.components" :key="c.name">
-                                <li @click="if (c.detail) { stack.push(dish); dish = c.detail; }"
-                                    class="flex cursor-pointer items-center justify-between gap-2 px-3 py-1.5 text-sm hover:bg-gray-50">
-                                    <span class="flex items-center gap-1 text-gray-700">
-                                        <span x-text="c.name"></span>
-                                        <svg class="h-3.5 w-3.5 flex-none text-indigo-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
-                                    </span>
-                                    <span class="text-gray-500" x-text="c.price"></span>
-                                </li>
+                                <div class="rounded-lg border border-gray-100 p-3">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-sm font-medium text-gray-800" x-text="c.name"></span>
+                                        <span class="whitespace-nowrap text-sm text-gray-500" x-text="c.price"></span>
+                                    </div>
+                                    <p x-show="c.detail && c.detail.description" class="mt-1 whitespace-pre-line text-xs text-gray-500" x-text="c.detail ? c.detail.description : ''"></p>
+                                    <template x-if="c.detail && c.detail.allergens && c.detail.allergens.length">
+                                        <div class="mt-2">
+                                            <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Allergene</div>
+                                            <div class="mt-0.5 flex flex-wrap gap-1">
+                                                <template x-for="a in c.detail.allergens" :key="a"><span class="rounded bg-red-50 px-1.5 py-0.5 text-[11px] text-red-700" x-text="a"></span></template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <template x-if="c.detail && c.detail.additives && c.detail.additives.length">
+                                        <div class="mt-1.5">
+                                            <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Zusatzstoffe</div>
+                                            <div class="mt-0.5 flex flex-wrap gap-1">
+                                                <template x-for="a in c.detail.additives" :key="a"><span class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600" x-text="a"></span></template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <template x-if="c.detail && c.detail.diets && c.detail.diets.length">
+                                        <div class="mt-1.5">
+                                            <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Nicht geeignet bei</div>
+                                            <div class="mt-0.5 flex flex-wrap gap-1">
+                                                <template x-for="d in c.detail.diets" :key="d"><span class="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700" x-text="d"></span></template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
                             </template>
-                        </ul>
-                        <div class="mt-1 text-xs text-gray-400">
+                        </div>
+                        <div class="mt-2 text-xs text-gray-400">
                             einzeln <span x-text="dish.componentsPrice"></span>
                             <template x-if="dish.savings > 0"><span> · <span class="font-medium text-green-600"><span x-text="dish.savingsMoney"></span> gespart</span></span></template>
                         </div>
                     </div>
                 </template>
 
-                <template x-if="dish.allergens && dish.allergens.length">
-                    <div class="mt-4">
-                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Allergene</div>
-                        <div class="mt-1 flex flex-wrap gap-1">
-                            <template x-for="a in dish.allergens" :key="a">
-                                <span class="rounded bg-red-50 px-1.5 py-0.5 text-[11px] text-red-700" x-text="a"></span>
-                            </template>
-                        </div>
-                    </div>
-                </template>
-
-                <template x-if="dish.additives && dish.additives.length">
-                    <div class="mt-4">
-                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Zusatzstoffe</div>
-                        <div class="mt-1 flex flex-wrap gap-1">
-                            <template x-for="a in dish.additives" :key="a">
-                                <span class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600" x-text="a"></span>
-                            </template>
-                        </div>
-                    </div>
-                </template>
-
-                <template x-if="dish.diets && dish.diets.length">
-                    <div class="mt-4">
-                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Nicht geeignet bei</div>
-                        <div class="mt-1 flex flex-wrap gap-1">
-                            <template x-for="d in dish.diets" :key="d">
-                                <span class="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700" x-text="d"></span>
-                            </template>
-                        </div>
-                    </div>
-                </template>
-
-                {{-- Aktionen: Zurück (im Detail eines Bestandteils), Bestellen/Abbestellen, Schließen --}}
-                <div class="mt-5 flex items-center justify-between gap-2 border-t border-gray-100 pt-4">
+                {{-- Einzelgericht (kein Sparmenü): eigene Allergene/Zusatzstoffe/Diäten. --}}
+                <template x-if="! (dish.components && dish.components.length)">
                     <div>
-                        <template x-if="stack.length">
-                            <button type="button" @click="dish = stack.pop()" class="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">‹ Zurück</button>
+                        <template x-if="dish.allergens && dish.allergens.length">
+                            <div class="mt-4">
+                                <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Allergene</div>
+                                <div class="mt-1 flex flex-wrap gap-1">
+                                    <template x-for="a in dish.allergens" :key="a">
+                                        <span class="rounded bg-red-50 px-1.5 py-0.5 text-[11px] text-red-700" x-text="a"></span>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <template x-if="dish.additives && dish.additives.length">
+                            <div class="mt-4">
+                                <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Zusatzstoffe</div>
+                                <div class="mt-1 flex flex-wrap gap-1">
+                                    <template x-for="a in dish.additives" :key="a">
+                                        <span class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600" x-text="a"></span>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <template x-if="dish.diets && dish.diets.length">
+                            <div class="mt-4">
+                                <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Nicht geeignet bei</div>
+                                <div class="mt-1 flex flex-wrap gap-1">
+                                    <template x-for="d in dish.diets" :key="d">
+                                        <span class="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700" x-text="d"></span>
+                                    </template>
+                                </div>
+                            </div>
                         </template>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">Schließen</button>
-                        <template x-if="dish.orderable">
-                            <form method="POST" action="{{ route('module.schulkantine.orders.store') }}" @submit="open = false">
-                                @csrf
-                                <input type="hidden" name="eater_id" :value="dish.eaterId">
-                                <input type="hidden" name="date" :value="dish.date">
-                                <input type="hidden" name="category_id" :value="dish.categoryId">
-                                <input type="hidden" name="dish_id" :value="dish.postDish">
-                                <template x-if="dish.clickable">
-                                    <button type="submit"
-                                            class="rounded-lg px-4 py-1.5 text-sm font-medium text-white"
-                                            :class="dish.isSel ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'"
-                                            x-text="dish.isSel ? 'Abbestellen' : 'Bestellen'"></button>
-                                </template>
-                                <template x-if="! dish.clickable">
-                                    <span class="self-center text-xs text-amber-600">Bestellfrist abgelaufen</span>
-                                </template>
-                            </form>
+                </template>
+
+                {{-- Aktionen: Bestellen/Abbestellen (schließt danach) + Schließen --}}
+                <div class="mt-5 flex items-center justify-end gap-2 border-t border-gray-100 pt-4">
+                    <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">Schließen</button>
+                    <form method="POST" action="{{ route('module.schulkantine.orders.store') }}" @submit="open = false">
+                        @csrf
+                        <input type="hidden" name="eater_id" :value="dish.eaterId">
+                        <input type="hidden" name="date" :value="dish.date">
+                        <input type="hidden" name="category_id" :value="dish.categoryId">
+                        <input type="hidden" name="dish_id" :value="dish.postDish">
+                        <template x-if="dish.clickable">
+                            <button type="submit"
+                                    class="rounded-lg px-4 py-1.5 text-sm font-medium text-white"
+                                    :class="dish.isSel ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'"
+                                    x-text="dish.isSel ? 'Abbestellen' : 'Bestellen'"></button>
                         </template>
-                    </div>
+                        <template x-if="! dish.clickable">
+                            <span class="self-center text-xs text-amber-600">Bestellfrist abgelaufen</span>
+                        </template>
+                    </form>
                 </div>
             </div>
         </div>
