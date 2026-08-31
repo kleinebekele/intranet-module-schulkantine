@@ -469,36 +469,46 @@
                         <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Besteht aus</div>
                         <div class="mt-2 space-y-3">
                             <template x-for="c in dish.components" :key="c.name">
-                                <div class="rounded-lg border border-gray-100 p-3">
-                                    <div class="flex items-center justify-between gap-2">
-                                        <span class="text-sm font-medium text-gray-800" x-text="c.name"></span>
-                                        <span class="whitespace-nowrap text-sm text-gray-500" x-text="c.price"></span>
+                                <div class="overflow-hidden rounded-xl border border-gray-100">
+                                    <template x-if="c.detail && c.detail.photo">
+                                        <img :src="c.detail.photo" alt="" class="h-28 w-full object-cover">
+                                    </template>
+                                    <div class="p-3">
+                                        <div class="flex items-start justify-between gap-2">
+                                            <div>
+                                                <div class="text-sm font-semibold text-gray-800" x-text="c.name"></div>
+                                                <span x-show="c.detail && c.detail.category" class="mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium"
+                                                      :style="(c.detail && c.detail.categoryColor) ? ('background-color:'+c.detail.categoryColor+'22; color:'+c.detail.categoryColor) : 'background-color:#eef2ff; color:#4f46e5'"
+                                                      x-text="c.detail ? c.detail.category : ''"></span>
+                                            </div>
+                                            <span class="whitespace-nowrap text-sm font-bold text-indigo-700" x-text="c.price"></span>
+                                        </div>
+                                        <p x-show="c.detail && c.detail.description" class="mt-2 whitespace-pre-line text-xs text-gray-600" x-text="c.detail ? c.detail.description : ''"></p>
+                                        <template x-if="c.detail && c.detail.allergens && c.detail.allergens.length">
+                                            <div class="mt-2">
+                                                <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Allergene</div>
+                                                <div class="mt-0.5 flex flex-wrap gap-1">
+                                                    <template x-for="a in c.detail.allergens" :key="a"><span class="rounded bg-red-50 px-1.5 py-0.5 text-[11px] text-red-700" x-text="a"></span></template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template x-if="c.detail && c.detail.additives && c.detail.additives.length">
+                                            <div class="mt-1.5">
+                                                <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Zusatzstoffe</div>
+                                                <div class="mt-0.5 flex flex-wrap gap-1">
+                                                    <template x-for="a in c.detail.additives" :key="a"><span class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600" x-text="a"></span></template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template x-if="c.detail && c.detail.diets && c.detail.diets.length">
+                                            <div class="mt-1.5">
+                                                <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Nicht geeignet bei</div>
+                                                <div class="mt-0.5 flex flex-wrap gap-1">
+                                                    <template x-for="d in c.detail.diets" :key="d"><span class="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700" x-text="d"></span></template>
+                                                </div>
+                                            </div>
+                                        </template>
                                     </div>
-                                    <p x-show="c.detail && c.detail.description" class="mt-1 whitespace-pre-line text-xs text-gray-500" x-text="c.detail ? c.detail.description : ''"></p>
-                                    <template x-if="c.detail && c.detail.allergens && c.detail.allergens.length">
-                                        <div class="mt-2">
-                                            <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Allergene</div>
-                                            <div class="mt-0.5 flex flex-wrap gap-1">
-                                                <template x-for="a in c.detail.allergens" :key="a"><span class="rounded bg-red-50 px-1.5 py-0.5 text-[11px] text-red-700" x-text="a"></span></template>
-                                            </div>
-                                        </div>
-                                    </template>
-                                    <template x-if="c.detail && c.detail.additives && c.detail.additives.length">
-                                        <div class="mt-1.5">
-                                            <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Zusatzstoffe</div>
-                                            <div class="mt-0.5 flex flex-wrap gap-1">
-                                                <template x-for="a in c.detail.additives" :key="a"><span class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600" x-text="a"></span></template>
-                                            </div>
-                                        </div>
-                                    </template>
-                                    <template x-if="c.detail && c.detail.diets && c.detail.diets.length">
-                                        <div class="mt-1.5">
-                                            <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Nicht geeignet bei</div>
-                                            <div class="mt-0.5 flex flex-wrap gap-1">
-                                                <template x-for="d in c.detail.diets" :key="d"><span class="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700" x-text="d"></span></template>
-                                            </div>
-                                        </div>
-                                    </template>
                                 </div>
                             </template>
                         </div>
