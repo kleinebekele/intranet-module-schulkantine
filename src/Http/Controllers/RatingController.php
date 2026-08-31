@@ -149,13 +149,16 @@ class RatingController
     {
         abort_unless(Access::canViewServings($request->user()), 403, 'Kein Zugriff auf die Bewertungen.');
 
-        // Monatsfilter (optional). Default: gesamter Zeitraum.
+        // Monatsfilter (optional). Default: gesamter Zeitraum. Die Monate werden
+        // PHP-seitig gebildet (das date-Feld ist als Carbon gecastet) – kein
+        // datenbankspezifisches strftime/DATE_FORMAT, damit es auf SQLite wie
+        // MySQL läuft.
         $months = MealRating::query()
-            ->selectRaw("strftime('%Y-%m', date) as ym")
-            ->distinct()
-            ->orderByDesc('ym')
-            ->pluck('ym')
+            ->orderByDesc('date')
+            ->pluck('date')
+            ->map(fn ($d) => $d?->format('Y-m'))
             ->filter()
+            ->unique()
             ->values();
 
         $monthValue = $request->query('monat');

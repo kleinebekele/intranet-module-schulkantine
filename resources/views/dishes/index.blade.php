@@ -104,6 +104,7 @@
                                 <th class="px-3 py-2 xl:hidden">Verträglichkeiten</th>
                                 <th class="px-3 py-2">Bewertung</th>
                                 <th class="hidden px-3 py-2 sm:table-cell">Status</th>
+                                <th class="hidden px-3 py-2 lg:table-cell">Erstellt</th>
                                 <th class="px-3 py-2 text-right">Aktion</th>
                             </tr>
                         </thead>
@@ -111,16 +112,19 @@
                             @foreach ($dishes as $dish)
                                 <tr class="hover:bg-gray-50">
                                     <td class="w-24 px-3 py-2">
-                                        @if ($dish->photoUrl())
-                                            <img src="{{ $dish->photoUrl() }}" alt="" class="h-20 w-20 max-w-none shrink-0 rounded-lg border border-gray-200 object-cover">
-                                        @else
-                                            <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-300">
-                                                <x-module-icon name="restaurant" class="text-3xl" />
-                                            </div>
-                                        @endif
+                                        <a href="{{ route('module.schulkantine.dishes.edit', $dish) }}" title="Bearbeiten" class="block">
+                                            @if ($dish->photoUrl())
+                                                <img src="{{ $dish->photoUrl() }}" alt="" class="h-20 w-20 max-w-none shrink-0 rounded-lg border border-gray-200 object-cover">
+                                            @else
+                                                <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-300 hover:text-gray-400">
+                                                    <x-module-icon name="restaurant" class="text-3xl" />
+                                                </div>
+                                            @endif
+                                        </a>
                                     </td>
                                     <td class="px-3 py-2 font-medium text-gray-800">
-                                        {{ $dish->name }}
+                                        <a href="{{ route('module.schulkantine.dishes.edit', $dish) }}"
+                                           class="text-gray-800 hover:text-indigo-700 hover:underline">{{ $dish->name }}</a>
                                         @unless ($dish->is_active)
                                             {{-- Inaktiv-Hinweis, solange die Status-Spalte ausgeblendet ist --}}
                                             <span class="ml-1 text-xs font-medium text-gray-400 sm:hidden">(inaktiv)</span>
@@ -227,6 +231,9 @@
                                         @else
                                             <span class="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">inaktiv</span>
                                         @endif
+                                    </td>
+                                    <td class="hidden whitespace-nowrap px-3 py-2 text-gray-500 lg:table-cell">
+                                        {{ optional($dish->created_at)->format('d.m.Y') ?? '—' }}
                                     </td>
                                     <td class="px-3 py-2 text-right">
                                         <a href="{{ route('module.schulkantine.dishes.edit', $dish) }}" title="Bearbeiten"
