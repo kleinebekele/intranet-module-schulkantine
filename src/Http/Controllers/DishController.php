@@ -26,6 +26,20 @@ class DishController
         $categoryFilter = (string) $request->query('category', '');
         $statusFilter = (string) $request->query('status', '');
 
+        // Sortierung (Dropdown über der Tabelle). Whitelist → Spalte + Richtung.
+        $sort = (string) $request->query('sort', 'name');
+        $sortMap = [
+            'name' => ['name', 'asc'],
+            'created_desc' => ['created_at', 'desc'],
+            'created_asc' => ['created_at', 'asc'],
+            'price_asc' => ['price', 'asc'],
+            'price_desc' => ['price', 'desc'],
+        ];
+        if (! isset($sortMap[$sort])) {
+            $sort = 'name';
+        }
+        [$sortColumn, $sortDirection] = $sortMap[$sort];
+
         // components.* wird für isBundle() und die effective*-Sets gebraucht (sonst N+1).
         $dishes = Dish::with([
             'category', 'allergens', 'additives', 'unsuitableDiets',
@@ -37,7 +51,9 @@ class DishController
                 : $q->where('category_id', $categoryFilter))
             ->when($statusFilter === 'active', fn ($q) => $q->where('is_active', true))
             ->when($statusFilter === 'inactive', fn ($q) => $q->where('is_active', false))
-            ->orderBy('name')
+            ->orderBy($sortColumn, $sortDirection)
+            // Zweitschlüssel Name, damit gleiche Preise/Daten stabil sortiert bleiben.
+            ->when($sortColumn !== 'name', fn ($q) => $q->orderBy('name'))
             ->get();
 
         $categories = Category::orderBy('sort_order')->orderBy('name')->get();
@@ -52,7 +68,7 @@ class DishController
                 'down' => $group->where('rating', MealRating::DOWN)->count(),
             ]);
 
-        return view('schulkantine::dishes.index', compact('dishes', 'categories', 'search', 'categoryFilter', 'statusFilter', 'ratings'));
+        return view('schulkantine::dishes.index', compact('dishes', 'categories', 'search', 'categoryFilter', 'statusFilter', 'ratings', 'sort'));
     }
 
     public function create(Request $request)

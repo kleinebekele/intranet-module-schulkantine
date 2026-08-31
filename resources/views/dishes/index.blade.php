@@ -61,6 +61,17 @@
                     <option value="inactive" @selected($statusFilter === 'inactive')>Inaktiv</option>
                 </select>
             </div>
+            <div>
+                <label for="sort" class="block text-xs font-medium text-gray-500">Sortierung</label>
+                <select id="sort" name="sort" @change="$el.form.requestSubmit()"
+                        class="mt-1 block rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="name" @selected($sort === 'name')>Name (A–Z)</option>
+                    <option value="created_desc" @selected($sort === 'created_desc')>Erstellt (neueste zuerst)</option>
+                    <option value="created_asc" @selected($sort === 'created_asc')>Erstellt (älteste zuerst)</option>
+                    <option value="price_asc" @selected($sort === 'price_asc')>Preis (aufsteigend)</option>
+                    <option value="price_desc" @selected($sort === 'price_desc')>Preis (absteigend)</option>
+                </select>
+            </div>
             @if ($search !== '' || $categoryFilter !== '' || $statusFilter !== '')
                 <a href="{{ route('module.schulkantine.dishes.index') }}"
                    class="inline-flex items-center gap-1.5 px-2 py-2 text-sm text-gray-500 hover:text-gray-700">
