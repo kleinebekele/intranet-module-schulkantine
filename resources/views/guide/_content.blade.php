@@ -168,25 +168,33 @@ php artisan kantine:seed-dishes</pre>
         erscheint eine rote Warnung.</li>
 </ul>
 
-<h3>4.4 Essensausgabe (Kellner / Koch)</h3>
+<h3>4.4 Ausgabe-Übersicht (Kellner / Koch / OGS-Betreuer)</h3>
 <ul>
-    <li>Menü „<strong>Ausgabe</strong>": Liste der Esser mit ihren Bestellungen (Tabs Menü / OGS).</li>
-    <li><strong>Abhaken</strong> (nur Kellner/Admin): Häkchen „ausgegeben" setzen bzw. zurücknehmen.</li>
-    <li><strong>NFC-Chip:</strong> Chip scannen → der Esser wird erkannt, ein Fenster zeigt seine
-        Bestellungen samt Sonderkost-Warnungen; dort die Ausgabe bestätigen. Ergebnis je Position:
-        <em>genommen</em>, <em>Alternative</em> oder <em>abgelehnt</em> (mit Grund).</li>
-    <li><strong>Spontane Abholung:</strong> für Kategorien, die Walk-in erlauben (z. B. Getränke) – nicht
-        für OGS-Kinder.</li>
-    <li><strong>Mengenliste</strong> für die Küche (auch als PDF), <strong>No-Shows</strong> zeigt
-        bestellte, aber nicht abgeholte Essen.</li>
-    <li><strong>Koch</strong> sieht diese Listen nur, kann aber nicht abhaken.</li>
+    <li>Menü „<strong>Ausgabe</strong>": reine <strong>administrative Übersicht</strong> eines Tages
+        (nur lesen). Ausgeben/Abhaken läuft am <strong>Ausgabe-Terminal</strong>.</li>
+    <li>Tab „<strong>Ausgabe Übersicht</strong>": Mengen je Gericht (auch als <strong>Mengen-PDF</strong>),
+        <strong>No-Shows</strong> (bestellt, nicht abgeholt) und die OGS-Zahl des Tages.</li>
+    <li>Tab „<strong>Details</strong>": jeder Esser einzeln – <strong>Tagesmenü</strong> (was bestellt
+        wurde, mit Sonderkost-Warnung) und <strong>OGS</strong> getrennt.</li>
 </ul>
 
-<h3>4.5 OGS-Sammelliste (OGS-Betreuer)</h3>
-<p>Menü „<strong>OGS-Sammelliste</strong>": zeigt die heute teilnehmenden OGS-Kinder mit
-    Allergen-/Diät-Hinweisen und Ausgabestatus.</p>
+<h3>4.5 Ausgabe-Terminal (Kellner)</h3>
+<ul>
+    <li>Menü „<strong>Ausgabe Terminal</strong>": Vollbild-Ansicht für den Tresen (Touch).</li>
+    <li><strong>NFC-Chip</strong> auflegen (oder Esser über die Suche finden) → seine Bestellungen samt
+        Sonderkost-Warnungen erscheinen; dort die Ausgabe bestätigen. Ergebnis je Position:
+        <em>genommen</em>, <em>Alternative</em> oder <em>abgelehnt</em> (mit Grund).</li>
+    <li><strong>Spontane Abholung</strong> für Kategorien, die Walk-in erlauben (z. B. Getränke) – nicht
+        für OGS-Kinder.</li>
+    <li><strong>Koch</strong> sieht die Übersicht, gibt aber nicht aus (nur Kellner/Admin).</li>
+</ul>
 
-<h3>4.6 Essen bewerten (alle) &amp; Bewertungs-Report (Betrieb)</h3>
+<h3>4.6 OGS-Sammelliste (OGS-Betreuer)</h3>
+<p>Kein eigener Menüpunkt mehr: die Sammelliste steht in „<strong>Ausgabe</strong>" im Tab
+    „<strong>Details</strong>" (heute teilnehmende OGS-Kinder mit Allergen-/Diät-Hinweisen) und lässt
+    sich dort als <strong>OGS-Sammelliste-PDF</strong> drucken.</p>
+
+<h3>4.7 Essen bewerten (alle) &amp; Bewertungs-Report (Betrieb)</h3>
 <ul>
     <li>Menü „<strong>Essen bewerten</strong>": jedes Haushaltsmitglied bewertet die tatsächlich
         erhaltenen Essen per Daumen hoch/runter – jederzeit änderbar. Abgelehnte Essen/Alternativen sind
@@ -195,7 +203,7 @@ php artisan kantine:seed-dishes</pre>
         hoch/runter + Quote) ist für Koch/Kellner/Admin über die Gerichte-Liste erreichbar.</li>
 </ul>
 
-<h3>4.7 Auswertung / Abrechnung (Admin)</h3>
+<h3>4.8 Auswertung / Abrechnung (Admin)</h3>
 <ul>
     <li>Menü „<strong>Auswertung</strong>": monatliche Übersicht je Haushalt – Menü, OGS, Spontan, Pfand,
         Summe und Bezahlt-Status.</li>
@@ -245,35 +253,37 @@ php artisan kantine:seed-dishes</pre>
 </div>
 
 <div class="scenario">
-    <h4>Szenario 4 – Ausgabe abhaken</h4>
+    <h4>Szenario 4 – Ausgabe am Terminal</h4>
     <p><strong>Als:</strong> kellner@kantine.test</p>
     <ol>
-        <li>„Ausgabe" für den Bestelltag öffnen.</li>
-        <li>Beim Schüler-Kind „ausgegeben" abhaken, danach wieder zurücknehmen.</li>
+        <li>„Ausgabe Terminal" für den Bestelltag öffnen.</li>
+        <li>Beim Schüler-Kind einen Chip auflegen (oder per Suche öffnen) und die Ausgabe bestätigen.</li>
+        <li>In „Ausgabe" (Tab Übersicht) prüfen, dass die Mengenliste sich entsprechend verändert hat.</li>
     </ol>
-    <p class="exp"><strong>Erwartet:</strong> Häkchen lässt sich setzen und zurücknehmen; die Mengenliste
-        verändert sich entsprechend.</p>
+    <p class="exp"><strong>Erwartet:</strong> Die Ausgabe wird am Terminal gebucht; die Übersicht zeigt
+        die Position als „ausgegeben".</p>
 </div>
 
 <div class="scenario">
     <h4>Szenario 5 – Rollen-Rechte prüfen</h4>
     <p><strong>Als:</strong> koch@kantine.test</p>
     <ol>
-        <li>„Ausgabe" öffnen – die Liste ist sichtbar.</li>
-        <li>Versuchen abzuhaken.</li>
+        <li>„Ausgabe" öffnen – die Übersicht (Mengen, No-Shows, Details) ist sichtbar.</li>
+        <li>„Ausgabe Terminal" aufrufen.</li>
     </ol>
-    <p class="exp"><strong>Erwartet:</strong> Der Koch kann alles <em>sehen</em>, aber nicht abhaken
-        (nur Kellner/Admin dürfen das).</p>
+    <p class="exp"><strong>Erwartet:</strong> Der Koch kann die Übersicht <em>sehen</em>, hat aber keinen
+        Zugriff auf das Terminal (Ausgeben ist nur Kellner/Admin).</p>
 </div>
 
 <div class="scenario">
     <h4>Szenario 6 – OGS-Sammelliste</h4>
     <p><strong>Als:</strong> ogs-betreuer@kantine.test</p>
     <ol>
-        <li>„OGS-Sammelliste" öffnen.</li>
+        <li>„Ausgabe" öffnen, Tab „Details" wählen.</li>
+        <li>Abschnitt „OGS-Sammelliste" ansehen und das OGS-Sammelliste-PDF laden.</li>
     </ol>
     <p class="exp"><strong>Erwartet:</strong> Die heute teilnehmenden OGS-Kinder werden mit
-        Allergen-/Diät-Hinweisen angezeigt.</p>
+        Allergen-/Diät-Hinweisen angezeigt; das PDF enthält dieselbe Liste zum Abhaken.</p>
 </div>
 
 <div class="scenario">

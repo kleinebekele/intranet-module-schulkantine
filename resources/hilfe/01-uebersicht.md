@@ -51,9 +51,9 @@ hinaus gibt es drei Betriebs-Rollen:
 
 | Rolle | sieht / darf |
 |---|---|
-| Kantine: Koch | Ausgabelisten und Mengen ansehen |
-| Kantine: Ausgabe (Kellner) | zusätzlich abhaken und spontane Abholung erfassen |
-| Kantine: OGS-Betreuer | die OGS-Sammelliste des Tages |
+| Kantine: Koch | Ausgabe-Übersicht und Mengen ansehen |
+| Kantine: Ausgabe (Kellner) | zusätzlich am Ausgabe-Terminal abhaken und Spontankäufe erfassen |
+| Kantine: OGS-Betreuer | die OGS-Sammelliste des Tages (Ausgabe → Details, als PDF druckbar) |
 
 Alles Verwaltende – Saison, Speiseplan, Gerichte, Teilnehmer, Auswertung – hängt am
 Administrator-Kennzeichen des Intranets.

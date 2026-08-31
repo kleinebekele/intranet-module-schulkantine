@@ -1,66 +1,49 @@
 ---
-titel: Ausgabe und Mengenplanung
+titel: Ausgabe – Übersicht
 route: module.schulkantine.servings.index
 kategorie: Schulkantine – Betrieb
 position: 10
 ---
 
+rollen: kantine_koch, kantine_kellner, kantine_ogs_betreuer, admin
+
+Diese Seite ist die **administrative Übersicht** eines Tages – zum Ansehen, nicht zum
+Abhaken. Ausgegeben und gebucht wird am **Ausgabe-Terminal**; hier sehen Küche und
+Verwaltung, was an dem Tag läuft.
+
+Oben navigieren Sie tageweise. Zwei Tabs teilen die Ansicht: **Ausgabe Übersicht** und
+**Details**.
+
+## Ausgabe Übersicht
+
 rollen: kantine_koch, kantine_kellner, admin
 
-Die Ausgabeliste zeigt den Tag: wer hat bestellt, was steht ihm zu, und wer hat es bekommen.
-Sie arbeitet mit der **tatsächlichen Ausgabe**, nicht mit den Vorbestellungen – die sind nur
-die Vorbefüllung.
+Der erste Tab zeigt die Zahlen des Tages:
 
-## Zwei Listen an einem Tag
+- **Mengen je Gericht** – bestellt, ausgegeben, spontan und noch offen. Die reine
+  Kochmenge gibt es zusätzlich als **Mengen-PDF** für die Küche.
+- **Bestellt, aber nicht abgeholt** (No-Shows) – wo Essen übrig geblieben ist. Bezahlt
+  wird es trotzdem; die Liste ist Rückmeldung, kein Mahnwerkzeug.
+- **OGS-Essen** – wie viele OGS-Kinder heute essen und wie viele schon ausgegeben sind.
 
-rollen: kantine_koch, kantine_kellner, admin
+Der beste Zeitpunkt fürs Kochen ist nach Ablauf des Bestellschlusses – vorher kann sich
+die Zahl noch ändern.
 
-Oben schalten Sie zwischen **Tagesmenü** und **OGS** um. Beide Gruppen essen zu eigenen
-Zeiten, deshalb sind es getrennte Listen und nicht eine lange.
+## Details
 
-Der Umschalter erscheint nur, wenn es in dieser Saison überhaupt OGS gibt.
+rollen: kantine_koch, kantine_kellner, kantine_ogs_betreuer, admin
 
-## Abhaken
+Der zweite Tab listet **jeden Esser einzeln** – getrennt nach **Tagesmenü** und **OGS**:
+
+- Im Tagesmenü steht je Person, was sie bestellt hat, samt Kennzeichnung und einer Warnung,
+  wenn ein Gericht nicht zu ihren hinterlegten Verträglichkeiten passt.
+- Die **OGS-Sammelliste** zeigt, welche Kinder heute ein OGS-Essen bekommen. Zum Mitnehmen
+  und Abhaken auf Papier gibt es sie als **OGS-Sammelliste-PDF**.
+
+## Abhaken und Spontankäufe
 
 rollen: kantine_kellner, admin
 
-Ein Klick auf den Esser markiert das Essen als ausgegeben, ein zweiter nimmt es zurück. Wer
-nur die Rolle „Koch" hat, sieht die Liste, hakt aber nicht ab – das ist Absicht, damit sich
-Küche und Tresen nicht gegenseitig überschreiben.
-
-Wichtig fürs Verständnis: **Das Abhaken ändert nichts an der Abrechnung.** Wer bestellt hat,
-zahlt – ob abgehakt oder nicht. Der Haken dient dem Betrieb, nicht der Kasse.
-
-## Spontane Abholung
-
-rollen: kantine_kellner, admin
-
-Jemand nimmt etwas ohne Vorbestellung mit – vergessen, Frist verpasst, oder einfach ein
-Getränk dazu. Das erfassen Sie als spontane Abholung; es wird berechnet.
-
-Drei Dinge können das verhindern, und die Meldung sagt jeweils, welches:
-
-- Die **Kategorie** erlaubt keine spontane Abholung (ein Hauptgericht muss gekocht sein).
-- Die **Eltern** haben diese Kategorie für das Kind nicht freigegeben.
-- Das **Wochenbudget** des Kindes ist erschöpft.
-
-Ob genug da ist, weiß das System nicht – der Vorrat wird bewusst nicht im Intranet geführt.
-Das entscheiden Sie am Tresen.
-
-## Mengen
-
-rollen: kantine_koch, kantine_kellner, admin
-
-Unter **Mengen** steht, wie viele Portionen je Gericht zu kochen sind, gerechnet aus den
-Vorbestellungen. Die Liste gibt es auch als PDF für die Küche.
-
-Der beste Zeitpunkt ist nach Ablauf des Bestellschlusses – vorher kann sich die Zahl noch
-ändern.
-
-## No-Shows
-
-rollen: kantine_koch, kantine_kellner, admin
-
-„Bestellt, aber nicht abgeholt" zeigt, wo Essen übrig geblieben ist. Bezahlt wird es
-trotzdem; die Liste ist kein Mahnwerkzeug, sondern eine Rückmeldung darüber, wo regelmäßig
-zu viel gekocht wird.
+Beides passiert nicht mehr hier, sondern am **Ausgabe-Terminal**: Chip auflegen (oder Person
+suchen), Ausgabe bestätigen, bei Bedarf einen Spontankauf ergänzen. Diese Übersicht liest nur
+mit und ändert nichts an der Abrechnung – wer bestellt hat, zahlt, ob abgehakt oder nicht.

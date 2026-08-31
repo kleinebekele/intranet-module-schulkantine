@@ -25,13 +25,15 @@ use Intranet\Modules\Schulkantine\Support\OgsAttendance;
  * Ausgabe & Betrieb (Phase 4). Das Küchen-/Ausgabepersonal arbeitet hier mit der
  * TATSÄCHLICHEN Ausgabe (kantine_servings), nicht mit den Vorbestellungen:
  *
- *  - index()        Ausgabeliste eines Tages, umschaltbar Tagesmenü ⇄ OGS.
- *                   Abhaken je Esser + spontane Abholung erfassen.
+ *  - index()        Administrative Ausgabe-Übersicht eines Tages (nur lesen):
+ *                   Tab „Übersicht" (Mengen/No-Shows/OGS-Zahl) + Tab „Details"
+ *                   (jeder Esser einzeln, Tagesmenü und OGS getrennt). Das
+ *                   eigentliche Ausgeben/Abhaken läuft am Ausgabe-Terminal.
  *  - toggle()       Einen Esser als „ausgegeben" markieren / zurücknehmen.
  *  - spontaneous()  Spontane Abholung (ohne/nach Vorbestellung) erfassen.
  *  - destroy()      Eine Ausgabe-Zeile entfernen (v. a. spontane Abholung).
  *  - quantities()   Mengenplanung je Gericht + No-Shows („bestellt, nicht geholt").
- *  - ogsList()      OGS-Sammelliste: heute essende OGS-Kinder (für den Betreuer).
+ *  - ogsPdf()       OGS-Sammelliste als PDF (heute essende OGS-Kinder, zum Drucken).
  *
  * Zugriff über die Betriebs-Rollen (siehe Support\Access).
  */
@@ -42,7 +44,15 @@ class ServingController
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless(Access::canViewServings($user), 403, 'Kein Zugriff auf die Ausgabelisten.');
+        // Seit Einführung des Ausgabe-Terminals ist diese Seite eine reine
+        // administrative Übersicht (nur lesen). Ausgeben/Abhaken läuft am Terminal.
+        // Zugriff daher für Betriebs-Rollen UND OGS-Betreuer (deren Sammelliste
+        // im Details-Tab aufgegangen ist).
+        abort_unless(
+            Access::canViewServings($user) || Access::canViewOgsList($user),
+            403,
+            'Kein Zugriff auf die Ausgabelisten.'
+        );
 
         $season = Season::where('is_active', true)->first();
         if (! $season) {
@@ -50,106 +60,44 @@ class ServingController
         }
 
         $date = $this->resolveDate($request, $season);
-        $group = $request->query('group') === 'ogs' ? 'ogs' : 'menu';
         $open = $season->isOpenOn($date);
-        $canServe = Access::canServe($user);
 
-        $rows = [];
-        if ($open) {
-            $rows = $group === 'ogs'
-                ? $this->ogsRows($season, $date)
-                : $this->menuRows($season, $date);
-        }
-
-        // Spontane Abholungen des Tages (getrennt gelistet) + Auswahl fürs Erfassen.
-        $spontaneous = Serving::where('season_id', $season->id)
-            ->whereDate('date', $date->toDateString())
-            ->where('spontaneous', true)
-            ->with(['user', 'dish.category'])
-            ->orderBy('id')
-            ->get();
-
-        // Spontan wählbar sind nur die HEUTE geplanten Gerichte (Speiseplan des Tages)
-        // aus Walk-in-Kategorien – in Speiseplan-Reihenfolge (sort_order).
-        $walkinDishes = Menu::where('season_id', $season->id)
-            ->whereDate('date', $date->toDateString())
-            ->with(['dish.category'])
-            ->orderBy('sort_order')->orderBy('id')
-            ->get()
-            ->map(fn (Menu $m) => $m->dish)
-            ->filter(fn (?Dish $d) => $d && $d->category && $d->category->allows_walkin)
-            ->unique('id')
-            ->values();
-
-        // Gruppiert für das Chip-Modal (Kategorie-Reihenfolge = erstes Auftreten im Plan).
-        $walkinGroups = $walkinDishes
-            ->groupBy(fn (Dish $d) => $d->category?->name ?? 'Ohne Kategorie')
-            ->map(fn ($dishes, $cat) => [
-                'category' => $cat,
-                'dishes' => $dishes->map(fn (Dish $d) => [
-                    'id' => $d->id, 'name' => $d->name, 'price' => (float) $d->price,
-                ])->values(),
-            ])->values();
-
-        // Simulations-Chips: ALLE aktiven Chips (für die Chip-Simulation, wenn kein
-        // NFC-Gerät vorhanden ist). Aktiv = nicht zurückgegeben. Bewusst nicht nur die
-        // heute gelisteten Esser – jeder Chip-Träger kann seinen Chip vorhalten (auch
-        // ohne Bestellung, z. B. für eine spontane Abholung). OGS-Kinder haben keine.
-        $simChips = collect();
-        if ($group === 'menu') {
-            $rowUsers = collect($rows)->keyBy(fn ($r) => $r['user']->id);
-            $simChips = NfcChip::active()->with('user')->get()
-                ->filter(fn ($c) => $c->user !== null)
-                ->map(fn ($c) => [
-                    'uid' => $c->uid,
-                    'name' => $c->user->name,
-                    'served' => (bool) ($rowUsers[$c->user_id]['served'] ?? false),
-                ])
-                ->sortBy('name')
-                ->values();
-        }
-
-        // No-Shows (bestellt, nicht abgeholt) + Mengen je Gericht – im Tagesmenü-View
-        // direkt in die Ausgabe integriert (keine Extra-Seiten mehr nötig). No-Shows
-        // je Esser gruppiert (Name → Gerichte), damit die Namensliste kurz bleibt.
+        // Übersicht (Tab 1): Mengen je Gericht, No-Shows, OGS-Zahl.
+        // Details (Tab 2): jeder Esser einzeln – Tagesmenü und OGS getrennt.
         $noShowGroups = [];
         $menuByDish = [];
-        $ogsQuant = ['attending' => 0, 'served' => 0];
-        if ($open && $group === 'menu') {
+        $ogsQuant = $this->emptyOgs();
+        $menuRows = [];
+        $ogsRows = [];
+
+        if ($open) {
             $quant = $this->quantitiesData($season, $date);
             $menuByDish = $quant['menuByDish'];
             $ogsQuant = $quant['ogs'];
+
+            // No-Shows je Esser gruppiert (Name → Gerichte), damit die Liste kurz bleibt.
             foreach ($quant['noShows'] as $ns) {
                 $name = $ns['user']?->name ?? 'Unbekannt';
                 $noShowGroups[$name][] = $ns['dish'];
             }
             ksort($noShowGroups, SORT_NATURAL | SORT_FLAG_CASE);
+
+            $menuRows = $this->menuRows($season, $date);
+            $ogsRows = $this->ogsEatersDetailed($season, $date);
         }
 
-        // Suchliste zum Finden eines Essers (Name → Modal). Keine OGS-Kinder –
-        // die haben keine Chips und werden im Tagesmenü-View nicht ausgegeben.
-        $searchUsers = ($open && $group === 'menu' && $canServe)
-            ? User::whereDoesntHave('roles', fn ($q) => $q->whereIn('roles.role_id',
-                CustomerGroup::where('ordering_mode', CustomerGroup::MODE_JA_NEIN)->pluck('role_id')))
-                ->orderBy('name')->get(['id', 'name'])
-            : collect();
-
         return view('schulkantine::servings.index', [
-            'simChips' => $simChips,
             'season' => $season,
             'date' => $date,
             'open' => $open,
-            'group' => $group,
-            'rows' => $rows,
-            'canServe' => $canServe,
-            'walkinGroups' => $walkinGroups,
-            'searchUsers' => $searchUsers,
+            'menuByDish' => $menuByDish,
             'noShowGroups' => $noShowGroups,
             'noShowCount' => count($noShowGroups),
-            'menuByDish' => $menuByDish,
             'ogsQuant' => $ogsQuant,
+            'menuRows' => $menuRows,
+            'ogsRows' => $ogsRows,
             'closedReason' => $open ? null : $this->closedReason($season, $date),
-        ] + $this->dayNav($season, $date, ['group' => $group]));
+        ] + $this->dayNav($season, $date, []));
     }
 
     /**
@@ -875,44 +823,60 @@ class ServingController
 
     // -------------------------------------------------- OGS-Sammelliste (4d)
 
-    public function ogsList(Request $request)
+    /**
+     * OGS-Sammelliste als PDF (zum Drucken für den OGS-Betreuer). Die Bildschirm-
+     * ansicht ist in die Ausgabe-Übersicht (Details-Tab) gewandert; gedruckt wird
+     * hier.
+     */
+    public function ogsPdf(Request $request)
     {
         $user = $request->user();
-        abort_unless(Access::canViewOgsList($user), 403, 'Kein Zugriff auf die OGS-Sammelliste.');
+        abort_unless(
+            Access::canViewOgsList($user) || Access::canViewServings($user),
+            403,
+            'Kein Zugriff auf die OGS-Sammelliste.'
+        );
 
-        $season = Season::where('is_active', true)->first();
-        if (! $season) {
-            return view('schulkantine::servings.ogs', ['season' => null]);
-        }
-
+        $season = Season::where('is_active', true)->firstOrFail();
         $date = $this->resolveDate($request, $season);
-        $open = $season->isOpenOn($date);
+        abort_unless($season->isOpenOn($date), 422, 'An diesem Tag hat die Kantine nicht geöffnet.');
 
-        $eaters = collect();
-        if ($open) {
-            $attending = $this->attendingOgs($season, $date);
-            $servedIds = Serving::where('season_id', $season->id)
-                ->whereDate('date', $date->toDateString())
-                ->where('spontaneous', false)
-                ->whereIn('user_id', $attending->pluck('id'))
-                ->pluck('user_id')
-                ->flip();
-
-            $eaters = $attending->map(fn (User $u) => [
-                'user' => $u,
-                'served' => $servedIds->has($u->id),
-                'allergens' => $u->kantineAllergens->pluck('name')->all(),
-                'diets' => $u->kantineDiets->pluck('name')->all(),
-            ])->values();
-        }
-
-        return view('schulkantine::servings.ogs', [
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulkantine::servings.ogs_pdf', [
             'season' => $season,
             'date' => $date,
-            'open' => $open,
-            'eaters' => $eaters,
-            'closedReason' => $open ? null : $this->closedReason($season, $date),
-        ] + $this->dayNav($season, $date, []));
+            'eaters' => $this->ogsEatersDetailed($season, $date),
+            'generatedAt' => Carbon::now(),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download('ogs-sammelliste-'.$date->toDateString().'.pdf');
+    }
+
+    /**
+     * Die heute essenden OGS-Kinder mit Ausgabe-Status und Verträglichkeiten –
+     * für den Details-Tab der Ausgabe-Übersicht und die OGS-Sammelliste-PDF.
+     *
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function ogsEatersDetailed(Season $season, Carbon $date): Collection
+    {
+        $attending = $this->attendingOgs($season, $date);
+        if ($attending->isEmpty()) {
+            return collect();
+        }
+
+        $servedIds = Serving::where('season_id', $season->id)
+            ->whereDate('date', $date->toDateString())
+            ->where('spontaneous', false)
+            ->whereIn('user_id', $attending->pluck('id'))
+            ->pluck('user_id')
+            ->flip();
+
+        return $attending->map(fn (User $u) => [
+            'user' => $u,
+            'served' => $servedIds->has($u->id),
+            'allergens' => $u->kantineAllergens->pluck('name')->all(),
+            'diets' => $u->kantineDiets->pluck('name')->all(),
+        ])->values();
     }
 
     // ----------------------------------------------------------------- Helfer
@@ -1016,27 +980,6 @@ class ServingController
         }
 
         return count($priority);
-    }
-
-    /** Zeilen der OGS-Ausgabeliste (ja/nein) für einen Tag. */
-    private function ogsRows(Season $season, Carbon $date): array
-    {
-        $attending = $this->attendingOgs($season, $date);
-        if ($attending->isEmpty()) {
-            return [];
-        }
-
-        $servedUserIds = $this->servedUserIds($season, $date, $attending->pluck('id'));
-
-        return $attending->map(fn (User $u) => [
-            'user' => $u,
-            'group' => 'OGS',
-            'served' => $servedUserIds->has($u->id),
-            'dishes' => collect(), // OGS: kein Gericht (nur ja/nein)
-            'warn' => false,
-            'allergens' => $u->kantineAllergens->pluck('name')->all(),
-            'diets' => $u->kantineDiets->pluck('name')->all(),
-        ])->all();
     }
 
     /** IDs der Esser, die an dem Tag bereits (vorbestellt) ausgegeben wurden. */

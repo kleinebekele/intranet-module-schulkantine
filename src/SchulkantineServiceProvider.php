@@ -70,7 +70,6 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
             ->item('ratings', 'Essen bewerten', 'module.schulkantine.ratings.index', icon: 'like')
             ->item('servings', 'Ausgabe', 'module.schulkantine.servings.index', icon: 'serving')
             ->item('servings-terminal', 'Ausgabe Terminal', 'module.schulkantine.servings.terminal', icon: 'grid')
-            ->item('ogs-list', 'OGS-Sammelliste', 'module.schulkantine.servings.ogs', icon: 'list')
             ->item('reports', 'Auswertung', 'module.schulkantine.reports.index', icon: 'chart')
             ->item('seasons', 'Saisons & Kalender', 'module.schulkantine.seasons.index', icon: 'calendar')
             ->item('customer-groups', 'Kundengruppen', 'module.schulkantine.customer-groups.index', icon: 'users')

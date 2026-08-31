@@ -104,8 +104,9 @@ Route::middleware(['web', 'auth'])
         Route::post('ausgabe/spontan', [ServingController::class, 'spontaneous'])->name('servings.spontaneous');
         Route::delete('ausgabe/{serving}', [ServingController::class, 'destroy'])->name('servings.destroy');
 
-        // OGS-Sammelliste – OGS-Betreuer (Zugriff im Controller geprüft).
-        Route::get('ogs-sammelliste', [ServingController::class, 'ogsList'])->name('servings.ogs');
+        // OGS-Sammelliste als PDF – OGS-Betreuer/Betrieb (Zugriff im Controller geprüft).
+        // Die Bildschirm-Liste steckt im Details-Tab der Ausgabe-Übersicht.
+        Route::get('ogs-sammelliste/pdf', [ServingController::class, 'ogsPdf'])->name('servings.ogs.pdf');
 
         // Auswertung & Abrechnung (Phase 5) – nur Admin (im Controller geprüft).
         Route::get('auswertung', [ReportController::class, 'index'])->name('reports.index');
