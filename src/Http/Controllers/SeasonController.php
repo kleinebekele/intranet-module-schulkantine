@@ -210,6 +210,7 @@ class SeasonController
             'show_additives' => $request->boolean('show_additives'),
             'show_allergens' => $request->boolean('show_allergens'),
             'show_diets' => $request->boolean('show_diets'),
+            'ratings_enabled' => $request->boolean('ratings_enabled'),
         ];
     }
 

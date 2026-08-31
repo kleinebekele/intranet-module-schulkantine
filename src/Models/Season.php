@@ -24,6 +24,7 @@ class Season extends Model
         'show_additives',
         'show_allergens',
         'show_diets',
+        'ratings_enabled',
     ];
 
     protected function casts(): array
@@ -37,7 +38,26 @@ class Season extends Model
             'show_additives' => 'boolean',
             'show_allergens' => 'boolean',
             'show_diets' => 'boolean',
+            'ratings_enabled' => 'boolean',
         ];
+    }
+
+    /**
+     * Sind Bewertungen in der aktiven Saison erlaubt? Steuert Menüpunkt und
+     * Zugriff auf „Essen bewerten". Bewusst fehlertolerant (Default an), damit
+     * das Menü auch vor der Migration oder ohne aktive Saison rendert – der
+     * Menü-Filter im Core wertet das je Anfrage aus.
+     */
+    public static function ratingsEnabledForActive(): bool
+    {
+        try {
+            $value = static::where('is_active', true)->value('ratings_enabled');
+        } catch (\Throwable $e) {
+            return true;
+        }
+
+        // Keine aktive Saison ODER Spalte fehlt (null) → Standard: erlaubt.
+        return $value === null ? true : (bool) $value;
     }
 
     /** Alle Schließtage dieser Saison (Ferien, Feiertage, Sonderfälle). */

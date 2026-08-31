@@ -31,13 +31,16 @@
                     {{ $hh['user']->name }}
                 </div>
                 <ul class="divide-y divide-gray-50">
-                    @foreach ($hh['servings'] as $serving)
-                        @php $current = optional($serving->rating)->rating; @endphp
+                    @foreach ($hh['items'] as $item)
+                        @php $current = $item['current']; $serving = $item['serving']; @endphp
                         <li class="flex items-center justify-between gap-4 px-4 py-3">
                             <div class="min-w-0">
-                                <div class="truncate font-medium text-gray-800">{{ $serving->dish?->name ?? 'Essen' }}</div>
+                                @if ($item['bundle'])
+                                    <div class="text-xs font-medium uppercase tracking-wide text-indigo-500">{{ $item['bundle'] }}</div>
+                                @endif
+                                <div class="truncate font-medium text-gray-800">{{ $item['name'] }}</div>
                                 <div class="text-xs text-gray-400">
-                                    {{ $wochentage[$serving->date->dayOfWeek] }}, {{ $serving->date->format('d.m.Y') }}
+                                    {{ $wochentage[$item['date']->dayOfWeek] }}, {{ $item['date']->format('d.m.Y') }}
                                 </div>
                             </div>
 
@@ -47,6 +50,7 @@
                                     <form method="POST" action="{{ route('module.schulkantine.ratings.destroy', $serving) }}">
                                         @csrf
                                         @method('DELETE')
+                                        <input type="hidden" name="dish_id" value="{{ $item['dish_id'] }}">
                                         <button type="submit" title="Bewertung zurücknehmen"
                                                 class="flex h-10 w-10 items-center justify-center rounded-lg border border-green-500 bg-green-500 text-lg text-white shadow-sm hover:bg-green-600">
                                             👍
@@ -55,6 +59,7 @@
                                 @else
                                     <form method="POST" action="{{ route('module.schulkantine.ratings.rate', $serving) }}">
                                         @csrf
+                                        <input type="hidden" name="dish_id" value="{{ $item['dish_id'] }}">
                                         <input type="hidden" name="rating" value="{{ \Intranet\Modules\Schulkantine\Models\MealRating::UP }}">
                                         <button type="submit" title="Hat mir geschmeckt"
                                                 class="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-lg text-gray-500 hover:border-green-400 hover:bg-green-50">
@@ -68,6 +73,7 @@
                                     <form method="POST" action="{{ route('module.schulkantine.ratings.destroy', $serving) }}">
                                         @csrf
                                         @method('DELETE')
+                                        <input type="hidden" name="dish_id" value="{{ $item['dish_id'] }}">
                                         <button type="submit" title="Bewertung zurücknehmen"
                                                 class="flex h-10 w-10 items-center justify-center rounded-lg border border-rose-500 bg-rose-500 text-lg text-white shadow-sm hover:bg-rose-600">
                                             👎
@@ -76,6 +82,7 @@
                                 @else
                                     <form method="POST" action="{{ route('module.schulkantine.ratings.rate', $serving) }}">
                                         @csrf
+                                        <input type="hidden" name="dish_id" value="{{ $item['dish_id'] }}">
                                         <input type="hidden" name="rating" value="{{ \Intranet\Modules\Schulkantine\Models\MealRating::DOWN }}">
                                         <button type="submit" title="Hat mir nicht geschmeckt"
                                                 class="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-lg text-gray-500 hover:border-rose-400 hover:bg-rose-50">

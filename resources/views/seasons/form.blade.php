@@ -108,6 +108,19 @@
                 </div>
             </div>
 
+            <div class="border-t border-gray-100 pt-5">
+                <h2 class="text-sm font-semibold text-gray-700">Bewertungen</h2>
+                <p class="mt-0.5 text-xs text-gray-400">
+                    Steuert, ob Essen bewertet werden darf. Ist es aus, wird der Menüpunkt „Essen bewerten"
+                    ausgeblendet und die Bewertungs-Seiten sind gesperrt.
+                </p>
+                <label class="mt-3 flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" name="ratings_enabled" value="1" @checked(old('ratings_enabled', $season->ratings_enabled ?? true))
+                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    Essen bewerten erlauben
+                </label>
+            </div>
+
             @if ($season->exists && isset($settings))
                 {{-- Globale Bestell-Einstellungen. Gelten übergreifend (nicht je Saison),
                      werden aber hier gepflegt, damit es kein eigenes Einstellungen-Menü braucht. --}}

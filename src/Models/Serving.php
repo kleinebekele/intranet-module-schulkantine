@@ -5,6 +5,7 @@ namespace Intranet\Modules\Schulkantine\Models;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
@@ -74,9 +75,19 @@ class Serving extends Model
         return $this->belongsTo(User::class, 'served_by');
     }
 
-    /** Die Bewertung (Daumen) zu dieser Ausgabe – falls schon abgegeben. */
+    /**
+     * Die Bewertung (Daumen) zu dieser Ausgabe – falls schon abgegeben.
+     * Nur sinnvoll für Einzelgerichte; ein Sparmenü hat je Bestandteil eine
+     * eigene Bewertung (siehe ratings()).
+     */
     public function rating(): HasOne
     {
         return $this->hasOne(MealRating::class);
+    }
+
+    /** Alle Bewertungen zu dieser Ausgabe (je Bestandteil eines Sparmenüs eine). */
+    public function ratings(): HasMany
+    {
+        return $this->hasMany(MealRating::class);
     }
 }

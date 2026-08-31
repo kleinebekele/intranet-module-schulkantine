@@ -5,6 +5,7 @@ namespace Intranet\Modules\Schulkantine\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Intranet\Modules\Schulkantine\Models\MealRating;
+use Intranet\Modules\Schulkantine\Models\Season;
 use Intranet\Modules\Schulkantine\Models\Serving;
 use Intranet\Modules\Schulkantine\Support\Access;
 
@@ -36,6 +37,8 @@ class RatingController
     /** Bewertungsseite für den eigenen Haushalt (ich + meine Kinder). */
     public function index(Request $request)
     {
+        $this->ensureRatingsEnabled();
+
         $viewer = $request->user();
 
         // Kinder zuerst, der Nutzer selbst zuletzt (wie „Meine Daten").
@@ -44,38 +47,78 @@ class RatingController
 
         // Eine Ausgabe-Zeile existiert erst, wenn das Essen tatsächlich
         // ausgegeben wurde – das ist bereits das richtige Signal (kein
-        // zusätzlicher Datumsfilter nötig).
+        // zusätzlicher Datumsfilter nötig). Ein Sparmenü wird über seine
+        // Bestandteile bewertet (dish.components), darum diese mitladen.
         $servings = $this->ratableServings()
             ->whereIn('user_id', $members->pluck('id'))
-            ->with(['dish:id,name', 'rating:id,serving_id,rating'])
+            ->with(['dish.components:id,name', 'ratings:id,serving_id,dish_id,rating'])
             ->orderByDesc('date')
             ->get()
             ->groupBy('user_id');
 
         $households = $members->map(fn (User $m) => [
             'user' => $m,
-            'servings' => $servings->get($m->id, collect()),
-        ])->filter(fn ($row) => $row['servings']->isNotEmpty())->values();
+            'items' => $this->ratableItems($servings->get($m->id, collect())),
+        ])->filter(fn ($row) => $row['items']->isNotEmpty())->values();
 
         return view('schulkantine::ratings.index', [
             'households' => $households,
         ]);
     }
 
+    /**
+     * Zerlegt die Ausgaben einer Person in bewertbare Einzelposten: ein
+     * Sparmenü in seine Bestandteile, jedes andere Gericht in sich selbst.
+     * Je Posten die bereits abgegebene Bewertung (Serving + Gericht).
+     *
+     * @param  \Illuminate\Support\Collection<int, Serving>  $servings
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function ratableItems($servings): \Illuminate\Support\Collection
+    {
+        $items = collect();
+
+        foreach ($servings as $serving) {
+            $dish = $serving->dish;
+            if (! $dish) {
+                continue;
+            }
+
+            $isBundle = $dish->isBundle();
+            $parts = $isBundle ? $dish->components : collect([$dish]);
+            $ratingByDish = $serving->ratings->keyBy('dish_id');
+
+            foreach ($parts as $part) {
+                $items->push([
+                    'serving' => $serving,
+                    'dish_id' => $part->id,
+                    'name' => $part->name,
+                    'bundle' => $isBundle ? $dish->name : null,
+                    'date' => $serving->date,
+                    'current' => optional($ratingByDish->get($part->id))->rating,
+                ]);
+            }
+        }
+
+        return $items;
+    }
+
     /** Bewertung setzen/ändern (jederzeit änderbar). */
     public function rate(Request $request, Serving $serving)
     {
+        $this->ensureRatingsEnabled();
         $this->authorizeRating($request->user(), $serving);
 
         $validated = $request->validate([
             'rating' => 'required|integer|in:'.MealRating::DOWN.','.MealRating::UP,
+            'dish_id' => 'required|integer',
         ]);
+        $dishId = $this->resolveRatedDish($serving, (int) $validated['dish_id']);
 
         MealRating::updateOrCreate(
-            ['serving_id' => $serving->id],
+            ['serving_id' => $serving->id, 'dish_id' => $dishId],
             [
                 'user_id' => $serving->user_id,
-                'dish_id' => $serving->dish_id,
                 'date' => $serving->date,
                 'rating' => (int) $validated['rating'],
             ],
@@ -84,12 +127,16 @@ class RatingController
         return back()->with('status', 'Danke für deine Bewertung!');
     }
 
-    /** Bewertung zurücknehmen. */
+    /** Bewertung zurücknehmen (genau dieses Gericht dieser Ausgabe). */
     public function destroy(Request $request, Serving $serving)
     {
+        $this->ensureRatingsEnabled();
         $this->authorizeRating($request->user(), $serving);
 
-        MealRating::where('serving_id', $serving->id)->delete();
+        $validated = $request->validate(['dish_id' => 'required|integer']);
+        $dishId = $this->resolveRatedDish($serving, (int) $validated['dish_id']);
+
+        MealRating::where('serving_id', $serving->id)->where('dish_id', $dishId)->delete();
 
         return back()->with('status', 'Bewertung entfernt.');
     }
@@ -150,6 +197,36 @@ class RatingController
             'monthValue' => $monthValue,
             'totalVotes' => $ratings->count(),
         ]);
+    }
+
+    /**
+     * Prüft, dass das zu bewertende Gericht wirklich zu dieser Ausgabe gehört:
+     * bei einem Einzelgericht das Gericht selbst, bei einem Sparmenü einer seiner
+     * Bestandteile. Liefert die geprüfte dish_id zurück.
+     */
+    private function resolveRatedDish(Serving $serving, int $dishId): int
+    {
+        $serving->loadMissing('dish.components');
+        $dish = $serving->dish;
+
+        $valid = $dish && (
+            $dish->id === $dishId
+            || ($dish->isBundle() && $dish->components->contains('id', $dishId))
+        );
+
+        abort_unless($valid, 422, 'Dieses Gericht gehört nicht zu dieser Ausgabe.');
+
+        return $dishId;
+    }
+
+    /** Bewertungen müssen in der aktiven Saison erlaubt sein (Saison-Schalter). */
+    private function ensureRatingsEnabled(): void
+    {
+        abort_unless(
+            Season::ratingsEnabledForActive(),
+            403,
+            'Für die aktuelle Saison ist das Bewerten von Essen deaktiviert.',
+        );
     }
 
     /**
