@@ -66,6 +66,7 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
     {
         return ModuleManifest::make('schulkantine', 'Schulkantine', icon: 'restaurant')
             ->item('orders', 'Essen bestellen', 'module.schulkantine.orders.index', icon: 'cart')
+            ->item('abrechnung', 'Meine Abrechnung', 'module.schulkantine.abrechnung.index', icon: 'tag')
             ->item('sonderkost', 'Meine Daten', 'module.schulkantine.sonderkost.index', icon: 'diet')
             ->item('ratings', 'Essen bewerten', 'module.schulkantine.ratings.index', icon: 'like')
             ->item('servings', 'Ausgabe', 'module.schulkantine.servings.index', icon: 'serving')

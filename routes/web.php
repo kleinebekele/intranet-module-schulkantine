@@ -9,6 +9,7 @@ use Intranet\Modules\Schulkantine\Http\Controllers\DishController;
 use Intranet\Modules\Schulkantine\Http\Controllers\EaterController;
 use Intranet\Modules\Schulkantine\Http\Controllers\GuideController;
 use Intranet\Modules\Schulkantine\Http\Controllers\MenuController;
+use Intranet\Modules\Schulkantine\Http\Controllers\MyBillingController;
 use Intranet\Modules\Schulkantine\Http\Controllers\OrderController;
 use Intranet\Modules\Schulkantine\Http\Controllers\RatingController;
 use Intranet\Modules\Schulkantine\Http\Controllers\ReportController;
@@ -85,6 +86,12 @@ Route::middleware(['web', 'auth'])
         Route::get('bestellen', [OrderController::class, 'index'])->name('orders.index');
         Route::post('bestellen', [OrderController::class, 'store'])->name('orders.store');
         Route::post('bestellen/abo', [OrderController::class, 'subscription'])->name('orders.subscription');
+
+        // Meine Abrechnung (Selbstbedienung: ich + meine Kinder) – jeder Nutzer.
+        // Eigenes Präfix (abrechnung.*), damit die Sichtbarkeit unabhängig von der
+        // Admin-„Auswertung" (reports.*) ist.
+        Route::get('abrechnung', [MyBillingController::class, 'index'])->name('abrechnung.index');
+        Route::get('abrechnung/{user}', [MyBillingController::class, 'show'])->name('abrechnung.show');
 
         // Ausgabe & Betrieb (Phase 4) – Küchen-/Ausgabepersonal (Zugriff im Controller geprüft).
         Route::get('ausgabe', [ServingController::class, 'index'])->name('servings.index');
