@@ -19,6 +19,16 @@ Was Sie sehen, hängt an der Gruppe des jeweiligen Essers:
 
 Haben Sie mehrere Kinder in verschiedenen Gruppen, stehen beide Ansichten untereinander.
 
+## Menüs
+
+Neben den Einzelgerichten kann es je Tag **Menüs** geben – eine feste Zusammenstellung
+(z. B. Hauptgericht + Nachtisch) zu einem **Festpreis**. Ein Menü bestellen Sie als Ganzes:
+ein Klick auf die Menü-Karte bestellt oder bestellt wieder ab. Über das **ℹ️-Info-Symbol**
+sehen Sie, welche Gerichte enthalten sind, samt Foto, Preis und Verträglichkeiten.
+
+Ein Menü und einzelne Gerichte schließen sich am selben Tag aus: Bestellen Sie ein Menü,
+ersetzt es eine etwaige Einzelauswahl des Tages – und umgekehrt.
+
 ## OGS: angemeldet ist der Normalfall
 
 Für OGS-Kinder wird beim ersten Aufruf automatisch eine Dauerbestellung für die Saison

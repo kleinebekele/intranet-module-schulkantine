@@ -37,6 +37,12 @@ Zwei Häkchen beschreiben, auf welchen Wegen eine Kategorie erhältlich ist:
 Die letzte Zeile ist bewusst gesperrt: Eine Kategorie, die weder vorbestellbar noch spontan
 erhältlich ist, wäre nirgends zu bekommen.
 
+**Wichtig:** Nur **vorbestellbare** Kategorien erscheinen auf „Essen bestellen". Eine „nur
+spontan"-Kategorie steht zwar im Speiseplan (für die Ausgabe am Tresen), ihre Gerichte tauchen
+aber NICHT zum Vorbestellen auf. Wenn ein Gericht auf der Bestellseite fehlt, ist das die
+erste Stelle zum Nachsehen. (Innerhalb eines **Menüs** ist eine solche Kategorie trotzdem
+enthalten – das Menü wird als Ganzes vorbestellt.)
+
 ## Reihenfolge und Farbe
 
 rollen: admin

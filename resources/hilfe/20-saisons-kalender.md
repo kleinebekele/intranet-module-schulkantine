@@ -11,7 +11,11 @@ Die Saison ist der oberste Rahmen – in der Regel ein Schuljahr. An ihr hängen
 Speisepläne und alle Bestellungen. Es gibt immer genau **eine aktive** Saison; sie ist es, in
 der bestellt und ausgegeben wird.
 
-## Eine Saison anlegen
+Die Detailseite einer Saison ist in drei Tabs gegliedert: **Schließtage**, **Menüs** und
+**Einstellungen** (dort steht das Saison-Formular – einen eigenen Bearbeiten-Knopf gibt es
+nicht mehr).
+
+## Eine Saison anlegen (Tab „Einstellungen")
 
 rollen: admin
 
@@ -20,6 +24,21 @@ denen die Kantine grundsätzlich öffnet.
 
 Für OGS gehört hier auch der **Saison-Fixpreis** hin: OGS-Essen werden nicht je Gericht
 abgerechnet, sondern mit diesem Preis je Teilnahmetag.
+
+## Menüs (Tab „Menüs")
+
+rollen: admin
+
+Ein **Menü** ist eine feste Zusammenstellung zu einem Festpreis (z. B. Hauptgericht +
+Nachtisch). Hier legen Sie die **Vorlage** an: Name, Preis, an welchen Wochentagen es
+angeboten wird und **aus welcher Kategorie wie viele Gerichte** es enthält. Welche Gerichte
+konkret drinstecken, wählen Sie NICHT hier, sondern je Öffnungstag im **Speiseplan** – so
+müssen Sie nicht jede Kombination einzeln anlegen.
+
+Menüs erstellt man meist zu Saisonbeginn. Bearbeiten (Preis ändern, weiteres Menü) wirkt sich
+zunächst **nur auf die Vorlage** aus. Erst der Knopf **„Menüs ausrollen (Push)"** rollt die
+aktiven Menüs auf alle offenen (noch nicht freigegebenen) Wochen aus. Eine einzelne Woche
+lässt sich im Speiseplan gezielt neu pushen.
 
 ## Ferien und Feiertage holen
 

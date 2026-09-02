@@ -7,18 +7,42 @@ position: 24
 
 rollen: admin
 
-Der Speiseplan sagt, welches Gericht an welchem Tag für welche Gruppe angeboten wird. Erst
-was hier steht, ist bestellbar.
+Der Speiseplan legt je Öffnungstag das konkrete Angebot fest: die **Menüs** (aus den
+Vorlagen der Saison) und einzelne **Gerichte** je Kategorie. Ein Tagesangebot gilt für alle:
+Schüler und Sonstige wählen daraus, OGS isst nur ja/nein mit. Erst was hier steht, ist
+bestellbar.
 
-## Je Gruppe ein eigener Plan
+## Menüs füllen
 
 rollen: admin
 
-Dass ein Gericht nur für bestimmte Esser zu haben ist, regelt sich allein darüber, in wessen
-Plan es steht – es gibt keine zusätzliche Freigabe-Tabelle.
+Ganz oben stehen je Tag die **Menüs**, die für diesen Wochentag vorgesehen sind (per „Push"
+aus den Saison-Vorlagen ausgerollt). Jedes Menü hat je Kategorie-Slot ein **Suchfeld**: Tippen
+Sie z. B. „Kartoffel", bleiben nur passende Gerichte der Kategorie übrig; ein Klick wählt das
+Gericht. Mit **Menü speichern** wird die Auswahl übernommen. Ein Menü ist erst bestellbar,
+wenn alle Slots gefüllt sind.
 
-Die OGS-Gruppe bekommt je Öffnungstag **ein** Angebot. Was inhaltlich dahintersteckt,
-entscheidet die Küche; die Kinder wählen ohnehin nur ja oder nein.
+## Einzelgerichte je Kategorie
+
+rollen: admin
+
+Darunter steht je Kategorie (in der Kategorie-Reihenfolge) das à-la-carte-Angebot. Über
+**„+ hinzufügen"** wählen Sie – ebenfalls mit Suchfeld – ein Gericht **genau dieser Kategorie**
+aus; ein Klick setzt es auf den Plan. Innerhalb einer Kategorie sind die Gerichte nach Preis
+(höchster zuerst), dann alphabetisch sortiert.
+
+Steht bei einer Kategorie der Hinweis **„Nur für spontane Abholung eingestellt"**, erscheinen
+ihre Gerichte NICHT auf „Essen bestellen" (sie sind nur am Tresen zu haben). Ob eine Kategorie
+vorbestellbar ist, stellen Sie unter **Kategorien** ein.
+
+## Menüs dieser Woche pushen
+
+rollen: admin
+
+Der Knopf **„Menüs dieser Woche pushen"** rollt die aktiven Menü-Vorlagen nach aktuellem Stand
+**nur auf die angezeigte Woche** aus – auch wenn sie bereits freigegeben ist. Vorhandene Menüs
+werden aufgefrischt, fehlende angelegt; gelöscht wird nichts, und bereits gewählte Gerichte
+bleiben erhalten, wo Kategorie und Position passen.
 
 ## Wochenfreigabe
 
@@ -31,8 +55,11 @@ Freigegeben wird immer eine **ganze Woche**, nicht ein einzelner Tag. Zwei Wege 
 - **Von Hand**, wenn Sie eine Woche früher öffnen oder bewusst gesperrt halten wollen. Die
   Handeinstellung schlägt die Automatik – in beide Richtungen.
 
-Eine gesperrte Woche bleibt gesperrt, auch wenn der automatische Vorlauf sie längst erreicht
-hat. Wenn Eltern melden, sie könnten nicht bestellen, ist das die erste Stelle zum Nachsehen.
+Eine freigegebene Woche ist **festgeschrieben**: Alle Hinzufügen- und Ändern-Möglichkeiten
+verschwinden, der Plan ist nur noch lesbar – festgeschrieben ist festgeschrieben, auch wenn
+noch niemand bestellt hat. Zum Nachbessern schalten Sie die Woche mit **„Zur Bearbeitung
+freigeben"** wieder frei. Das geht nur, solange es noch **keine aktive Bestellung** gibt;
+liegt bereits eine vor, bleibt die Woche gesperrt (OGS-Ja/Nein zählt hier nicht mit).
 
 ## Freigabe und Frist sind zweierlei
 
@@ -42,10 +69,10 @@ Die Freigabe ist die grobe Schranke (darf diese Woche überhaupt bestellt werden
 die feine (ist es für diesen Tag noch rechtzeitig). Eine freigegebene Woche heißt also nicht,
 dass jeder Tag darin noch offen ist – der morgige Tag kann längst zu sein.
 
-## Einen Tag wieder herausnehmen
+## Bestellungen einsehen
 
 rollen: admin
 
-Ein Gericht vom Plan zu nehmen, für das schon bestellt wurde, lässt die Bestellungen ins
-Leere laufen. Prüfen Sie vorher die Mengen für den Tag; ist dort schon etwas eingetragen, ist
-ein Austausch am Ausgabetresen (Alternative) meist der ruhigere Weg.
+Je Tag lässt sich unten **„Bestellungen"** aufklappen: wer hat was bestellt. Einzelne
+Bestellungen können Sie hier auch entfernen (umgeht bewusst die Eltern-Fristen). OGS-Essen
+(ja/nein) taucht hier NICHT auf – das gehört nicht zum Speiseplan.
