@@ -66,6 +66,12 @@ class Season extends Model
         return $this->hasMany(ClosedDay::class, 'season_id');
     }
 
+    /** Menü-Vorlagen dieser Saison (Ersatz für Sparmenüs). */
+    public function menuTemplates(): HasMany
+    {
+        return $this->hasMany(MenuTemplate::class)->orderBy('sort_order')->orderBy('id');
+    }
+
     /**
      * Hat die Kantine an diesem Datum geöffnet?
      *

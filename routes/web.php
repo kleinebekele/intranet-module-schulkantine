@@ -9,6 +9,7 @@ use Intranet\Modules\Schulkantine\Http\Controllers\DishController;
 use Intranet\Modules\Schulkantine\Http\Controllers\EaterController;
 use Intranet\Modules\Schulkantine\Http\Controllers\GuideController;
 use Intranet\Modules\Schulkantine\Http\Controllers\MenuController;
+use Intranet\Modules\Schulkantine\Http\Controllers\MenuTemplateController;
 use Intranet\Modules\Schulkantine\Http\Controllers\MyBillingController;
 use Intranet\Modules\Schulkantine\Http\Controllers\OrderController;
 use Intranet\Modules\Schulkantine\Http\Controllers\RatingController;
@@ -52,6 +53,11 @@ Route::middleware(['web', 'auth'])
 
         // Ferien & Feiertage per API ziehen
         Route::post('saisons/{season}/ferien-import', [SeasonController::class, 'importHolidays'])->name('seasons.import');
+
+        // Menü-Vorlagen einer Saison (Ersatz für Sparmenüs) – Tab „Menüs".
+        Route::post('saisons/{season}/menues', [MenuTemplateController::class, 'store'])->name('menu-templates.store');
+        Route::put('menues/{menuTemplate}', [MenuTemplateController::class, 'update'])->name('menu-templates.update');
+        Route::delete('menues/{menuTemplate}', [MenuTemplateController::class, 'destroy'])->name('menu-templates.destroy');
 
         // Kundengruppen (3 feste Gruppen – nur Betriebsparameter editierbar)
         Route::get('kundengruppen', [CustomerGroupController::class, 'index'])->name('customer-groups.index');

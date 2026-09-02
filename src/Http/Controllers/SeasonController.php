@@ -54,11 +54,19 @@ class SeasonController
     {
         $this->authorizeAdmin($request);
 
-        $season->load(['closedDays' => fn ($q) => $q->orderBy('date')]);
+        $season->load([
+            'closedDays' => fn ($q) => $q->orderBy('date'),
+            'menuTemplates.slots.category',
+        ]);
 
         return view('schulkantine::seasons.show', [
             'season' => $season,
             'bundeslandName' => Bundeslaender::all()[$season->bundesland] ?? $season->bundesland,
+            // Für den Einstellungen-Tab (Formular) und den Menü-Tab (Kategorie-Slots).
+            'bundeslaender' => Bundeslaender::all(),
+            'settings' => Setting::current(),
+            'categories' => \Intranet\Modules\Schulkantine\Models\Category::where('is_active', true)
+                ->orderBy('sort_order')->orderBy('name')->get(),
         ]);
     }
 
