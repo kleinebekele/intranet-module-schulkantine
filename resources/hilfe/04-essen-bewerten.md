@@ -17,9 +17,6 @@ war. Nicht bewertbar sind deshalb:
 - Ausgaben, bei denen es eine Alternative gab – dann steht im Protokoll ein anderes Gericht
   als das, was auf dem Teller lag.
 
-Ein **Sparmenü** wird in seine Bestandteile zerlegt: Sie bewerten jedes enthaltene Gericht
-einzeln (z. B. Hauptgericht und Nachtisch getrennt), nicht „das Sparmenü" als Ganzes.
-
 Ob überhaupt bewertet werden darf, lässt sich **je Saison** abschalten (Saison bearbeiten →
 „Bewertungen"). Ist es aus, verschwindet der Menüpunkt „Essen bewerten".
 

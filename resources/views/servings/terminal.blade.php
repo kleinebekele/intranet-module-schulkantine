@@ -384,7 +384,6 @@
 
             // ---- Verträglichkeiten / Detail-Modal ----
             // Kollidiert das Gericht mit der Sonderkost der gestempelten Person?
-            // (Bei Sparmenüs sind die Allergene der Bestandteile bereits eingerechnet.)
             dishWarn(dish) {
                 if (!this.person || !dish) return false;
                 const pa = this.person.allergenIds || [];
@@ -976,7 +975,6 @@
                                                 <span x-text="dish.name"></span>
                                                 <span x-show="dishWarn(dish)" x-cloak class="shrink-0 rounded-md bg-yellow-100 px-1.5 text-sm font-bold text-yellow-800">⚠ nicht geeignet</span>
                                             </span>
-                                            <div x-show="dish.is_bundle" class="text-sm text-teal-700" x-text="dish.components.join(' + ')"></div>
                                         </div>
                                         {{-- Auswahl-Button (nur in einer bestellten Kategorie) --}}
                                         <button type="button" x-show="tileClickable(group.category_id)" x-cloak
@@ -1321,9 +1319,6 @@
                     </div>
                     <div class="min-w-0 flex-1">
                         <div class="text-xl font-bold text-gray-800" x-text="euro(modalDish.price)"></div>
-                        <div x-show="modalDish.is_bundle" x-cloak class="mt-1 text-sm font-medium text-teal-700">
-                            Sparmenü: <span x-text="modalDish.components.join(' + ')"></span>
-                        </div>
                     </div>
                 </div>
 

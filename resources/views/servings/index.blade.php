@@ -189,16 +189,6 @@
                                                                     <span class="text-xs font-medium">⚠️ {{ implode(', ', array_merge($d['allergenHits'], $d['dietHits'])) }}</span>
                                                                 @endif
                                                             </span>
-                                                            @if (! empty($d['components']))
-                                                                <span class="flex flex-wrap items-center gap-1 text-xs">
-                                                                    @foreach ($d['components'] as $c)
-                                                                        <span class="inline-flex items-center gap-0.5 rounded px-1 {{ $c['hits'] ? 'bg-red-600 font-semibold text-white' : 'bg-white/70 text-gray-500' }}">
-                                                                            {{ $c['name'] }}@if ($c['hits'])<span class="font-normal"> ⚠️ {{ implode(', ', $c['hits']) }}</span>@endif
-                                                                        </span>
-                                                                        @if (! $loop->last)<span class="text-gray-400">+</span>@endif
-                                                                    @endforeach
-                                                                </span>
-                                                            @endif
                                                         </span>
                                                     @endforeach
                                                 </div>

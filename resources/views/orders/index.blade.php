@@ -63,14 +63,12 @@
                     //  – Allergen: Gericht enthält ein gemiedenes Allergen.
                     //  – Diät: Gericht ist als „nicht geeignet" für eine vom Esser
                     //          geforderte Diät markiert.
-                    // Bewusst über effective*: Bei einem Sparmenü stecken Allergene
-                    // und Diät-Verstöße in den Bestandteilen, nicht am Bündel selbst.
                     $dishWarn = function ($dish, array $allergenIds, array $dietIds) use ($season) {
                         // Warnung nur für das, was diese Saison überhaupt einblendet.
                         $hasAllergen = ($season->show_allergens ?? true)
-                            && $dish->effectiveAllergens()->pluck('id')->intersect($allergenIds)->isNotEmpty();
+                            && $dish->allergens->pluck('id')->intersect($allergenIds)->isNotEmpty();
                         $conflictsDiet = ($season->show_diets ?? true)
-                            && $dish->effectiveUnsuitableDiets()->pluck('id')->intersect($dietIds)->isNotEmpty();
+                            && $dish->unsuitableDiets->pluck('id')->intersect($dietIds)->isNotEmpty();
                         return $hasAllergen || $conflictsDiet;
                     };
                 @endphp
@@ -264,13 +262,10 @@
                                                             <div class="grid grid-cols-2 gap-2 lg:grid-cols-1 lg:gap-1.5">
                                                                 @foreach ($catItems as $m)
                                                                     @php
-                                                                        // Sparmenü, dessen Bestandteil in einer für dieses Kind
-                                                                        // gesperrten Kategorie liegt, gar nicht erst anbieten –
-                                                                        // sonst käme der gesperrte Nachtisch durchs Hintertürchen.
-                                                                        // (Der Controller lehnt es zusätzlich serverseitig ab.)
-                                                                        // Ein „nur spontan"-Bestandteil blockiert das Sparmenü NICHT:
-                                                                        // vorbestellbar ist es über seine eigene Sparmenü-Kategorie.
-                                                                        $occupied = $m->dish->occupiedCategoryIds();
+                                                                        // Gericht, dessen Kategorie für dieses Kind gesperrt ist,
+                                                                        // gar nicht erst anbieten (der Controller lehnt es zusätzlich
+                                                                        // serverseitig ab).
+                                                                        $occupied = array_values(array_filter([$m->dish->category_id]));
                                                                     @endphp
                                                                     @continue(array_intersect($occupied, $e['blockedCats'] ?? []) !== [])
                                                                     @php
@@ -289,30 +284,9 @@
                                                                             'price' => $money($m->dish->price),
                                                                             'description' => $m->dish->description,
                                                                             'photo' => $m->dish->photoUrl(),
-                                                                            'components' => $m->dish->components->map(fn ($c) => [
-                                                                                'name' => $c->name,
-                                                                                'price' => $money($c->price),
-                                                                                // Voll-Detail des Bestandteils fürs Drill-in-Modal.
-                                                                                'detail' => [
-                                                                                    'name' => $c->name,
-                                                                                    'category' => $c->category?->name,
-                                                                                    'categoryColor' => $c->category?->color,
-                                                                                    'price' => $money($c->price),
-                                                                                    'description' => $c->description,
-                                                                                    'photo' => $c->photoUrl(),
-                                                                                    'components' => [],
-                                                                                    'allergens' => ($season->show_allergens ?? true) ? $c->allergens->map(fn ($a) => trim($a->code.' '.$a->name))->values() : [],
-                                                                                    'additives' => ($season->show_additives ?? true) ? $c->additives->map(fn ($a) => trim($a->code.' '.$a->name))->values() : [],
-                                                                                    'diets' => ($season->show_diets ?? true) ? $c->unsuitableDiets->map(fn ($d) => $d->name)->values() : [],
-                                                                                    'orderable' => false,
-                                                                                ],
-                                                                            ])->values(),
-                                                                            'componentsPrice' => $money($m->dish->componentsPrice()),
-                                                                            'savings' => (float) $m->dish->savings(),
-                                                                            'savingsMoney' => $money($m->dish->savings()),
-                                                                            'allergens' => ($season->show_allergens ?? true) ? $m->dish->effectiveAllergens()->map(fn ($a) => trim($a->code.' '.$a->name))->values() : [],
-                                                                            'additives' => ($season->show_additives ?? true) ? $m->dish->effectiveAdditives()->map(fn ($a) => trim($a->code.' '.$a->name))->values() : [],
-                                                                            'diets' => ($season->show_diets ?? true) ? $m->dish->effectiveUnsuitableDiets()->map(fn ($d) => $d->name)->values() : [],
+                                                                            'allergens' => ($season->show_allergens ?? true) ? $m->dish->allergens->map(fn ($a) => trim($a->code.' '.$a->name))->values() : [],
+                                                                            'additives' => ($season->show_additives ?? true) ? $m->dish->additives->map(fn ($a) => trim($a->code.' '.$a->name))->values() : [],
+                                                                            'diets' => ($season->show_diets ?? true) ? $m->dish->unsuitableDiets->map(fn ($d) => $d->name)->values() : [],
                                                                             // Bestell-Kontext, damit man auch aus dem Modal bestellen/abbestellen kann.
                                                                             'eaterId' => $eater->id,
                                                                             'date' => $dateStr,
@@ -324,9 +298,8 @@
                                                                         ];
 
                                                                         // Eine gewählte Kachel wird in ihrer KATEGORIEFARBE umrandet, nicht
-                                                                        // grün: Wo nur eine Kategorie bestellbar ist (z. B. nur
-                                                                        // Sparmenü), wäre sonst nach dem Bestellen alles grün und man
-                                                                        // unterschiede nichts mehr. Dass etwas bestellt ist, sagen weiterhin
+                                                                        // grün: Wo nur eine Kategorie bestellbar ist, wäre sonst nach dem
+                                                                        // Bestellen alles grün und man unterschiede nichts mehr. Dass etwas bestellt ist, sagen weiterhin
                                                                         // der grüne Haken, der grüne Preis und der Streifen an der linken
                                                                         // Kante (unten) – das Signal geht also nicht verloren.
                                                                         // Ohne Kategoriefarbe bleibt es beim bisherigen Grün.
@@ -358,7 +331,6 @@
                                                                                 <div class="min-w-0 flex-1 p-1.5 lg:py-1 lg:pl-2 lg:pr-1">
                                                                                     <div class="flex items-start justify-between gap-1">
                                                                                         <span class="text-xs font-semibold text-gray-800">{{ $m->dish->name }}<span x-data @click.stop.prevent="$dispatch('open-dish', @js($dishData))" role="button" tabindex="0" title="Details anzeigen" aria-label="Details anzeigen" class="ml-1 inline-flex translate-y-px cursor-pointer align-middle text-indigo-500 hover:text-indigo-700"><svg class="inline h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg></span></span>
-                                                                                        @php $comp = $m->dish->components; @endphp
                                                                                         <span class="flex flex-none items-center gap-1 text-xs font-bold {{ $isSel ? 'text-green-700' : 'text-gray-700' }}">
                                                                                             @if ($isSel)
                                                                                                 <span class="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] font-bold text-white">✓</span>
@@ -366,25 +338,9 @@
                                                                                             {{ $money($m->dish->price) }}
                                                                                         </span>
                                                                                     </div>
-                                                                                    @if ($comp->isNotEmpty())
-                                                                                        @php $compLine = $comp->pluck('name')->join(' + '); @endphp
-                                                                                        {{-- Sparmenü: Ohne die Bestandteile weiß niemand, was er bestellt.
-                                                                                             Heißt das Sparmenü ohnehin schon so (Auto-Name aus dem
-                                                                                             Speiseplan-Knopf), wäre die Zeile eine Dopplung. --}}
-                                                                                        @if ($compLine !== $m->dish->name)
-                                                                                            <div class="mt-0.5 text-[10px] font-medium text-teal-700">{{ $compLine }}</div>
-                                                                                        @endif
-                                                                                        <div class="text-[10px] text-gray-400">
-                                                                                            einzeln {{ $money($m->dish->componentsPrice()) }}
-                                                                                            @if ($m->dish->savings() > 0)
-                                                                                                · <span class="font-medium text-green-600">{{ $money($m->dish->savings()) }} gespart</span>
-                                                                                            @endif
-                                                                                        </div>
-                                                                                    @endif
                                                                                     @php
-                                                                                        // effective*: beim Sparmenü die Allergene der Bestandteile.
-                                                                                        $effAllergens = $m->dish->effectiveAllergens();
-                                                                                        $effAdditives = $m->dish->effectiveAdditives();
+                                                                                        $effAllergens = $m->dish->allergens;
+                                                                                        $effAdditives = $m->dish->additives;
                                                                                     @endphp
                                                                                     @if (($season->show_allergens ?? true) && $effAllergens->isNotEmpty())
                                                                                         <div class="mt-0.5 truncate text-[10px] {{ $warn ? 'text-red-500 font-medium' : 'text-gray-400' }}"
@@ -463,97 +419,37 @@
 
                 <p x-show="dish.description" class="mt-3 whitespace-pre-line text-sm text-gray-600" x-text="dish.description"></p>
 
-                {{-- Sparmenü: die Bestandteile direkt ausgeklappt, jeweils mit ihren Details. --}}
-                <template x-if="dish.components && dish.components.length">
+                {{-- Allergene/Zusatzstoffe/Diäten des Gerichts. --}}
+                <template x-if="dish.allergens && dish.allergens.length">
                     <div class="mt-4">
-                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Besteht aus</div>
-                        <div class="mt-2 space-y-3">
-                            <template x-for="c in dish.components" :key="c.name">
-                                <div class="overflow-hidden rounded-xl border border-gray-100">
-                                    <template x-if="c.detail && c.detail.photo">
-                                        <img :src="c.detail.photo" alt="" class="h-28 w-full object-cover">
-                                    </template>
-                                    <div class="p-3">
-                                        <div class="flex items-start justify-between gap-2">
-                                            <div>
-                                                <div class="text-sm font-semibold text-gray-800" x-text="c.name"></div>
-                                                <span x-show="c.detail && c.detail.category" class="mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium"
-                                                      :style="(c.detail && c.detail.categoryColor) ? ('background-color:'+c.detail.categoryColor+'22; color:'+c.detail.categoryColor) : 'background-color:#eef2ff; color:#4f46e5'"
-                                                      x-text="c.detail ? c.detail.category : ''"></span>
-                                            </div>
-                                            <span class="whitespace-nowrap text-sm font-bold text-indigo-700" x-text="c.price"></span>
-                                        </div>
-                                        <p x-show="c.detail && c.detail.description" class="mt-2 whitespace-pre-line text-xs text-gray-600" x-text="c.detail ? c.detail.description : ''"></p>
-                                        <template x-if="c.detail && c.detail.allergens && c.detail.allergens.length">
-                                            <div class="mt-2">
-                                                <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Allergene</div>
-                                                <div class="mt-0.5 flex flex-wrap gap-1">
-                                                    <template x-for="a in c.detail.allergens" :key="a"><span class="rounded bg-red-50 px-1.5 py-0.5 text-[11px] text-red-700" x-text="a"></span></template>
-                                                </div>
-                                            </div>
-                                        </template>
-                                        <template x-if="c.detail && c.detail.additives && c.detail.additives.length">
-                                            <div class="mt-1.5">
-                                                <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Zusatzstoffe</div>
-                                                <div class="mt-0.5 flex flex-wrap gap-1">
-                                                    <template x-for="a in c.detail.additives" :key="a"><span class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600" x-text="a"></span></template>
-                                                </div>
-                                            </div>
-                                        </template>
-                                        <template x-if="c.detail && c.detail.diets && c.detail.diets.length">
-                                            <div class="mt-1.5">
-                                                <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Nicht geeignet bei</div>
-                                                <div class="mt-0.5 flex flex-wrap gap-1">
-                                                    <template x-for="d in c.detail.diets" :key="d"><span class="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700" x-text="d"></span></template>
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
+                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Allergene</div>
+                        <div class="mt-1 flex flex-wrap gap-1">
+                            <template x-for="a in dish.allergens" :key="a">
+                                <span class="rounded bg-red-50 px-1.5 py-0.5 text-[11px] text-red-700" x-text="a"></span>
                             </template>
-                        </div>
-                        <div class="mt-2 text-xs text-gray-400">
-                            einzeln <span x-text="dish.componentsPrice"></span>
-                            <template x-if="dish.savings > 0"><span> · <span class="font-medium text-green-600"><span x-text="dish.savingsMoney"></span> gespart</span></span></template>
                         </div>
                     </div>
                 </template>
 
-                {{-- Einzelgericht (kein Sparmenü): eigene Allergene/Zusatzstoffe/Diäten. --}}
-                <template x-if="! (dish.components && dish.components.length)">
-                    <div>
-                        <template x-if="dish.allergens && dish.allergens.length">
-                            <div class="mt-4">
-                                <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Allergene</div>
-                                <div class="mt-1 flex flex-wrap gap-1">
-                                    <template x-for="a in dish.allergens" :key="a">
-                                        <span class="rounded bg-red-50 px-1.5 py-0.5 text-[11px] text-red-700" x-text="a"></span>
-                                    </template>
-                                </div>
-                            </div>
-                        </template>
+                <template x-if="dish.additives && dish.additives.length">
+                    <div class="mt-4">
+                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Zusatzstoffe</div>
+                        <div class="mt-1 flex flex-wrap gap-1">
+                            <template x-for="a in dish.additives" :key="a">
+                                <span class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600" x-text="a"></span>
+                            </template>
+                        </div>
+                    </div>
+                </template>
 
-                        <template x-if="dish.additives && dish.additives.length">
-                            <div class="mt-4">
-                                <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Zusatzstoffe</div>
-                                <div class="mt-1 flex flex-wrap gap-1">
-                                    <template x-for="a in dish.additives" :key="a">
-                                        <span class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600" x-text="a"></span>
-                                    </template>
-                                </div>
-                            </div>
-                        </template>
-
-                        <template x-if="dish.diets && dish.diets.length">
-                            <div class="mt-4">
-                                <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Nicht geeignet bei</div>
-                                <div class="mt-1 flex flex-wrap gap-1">
-                                    <template x-for="d in dish.diets" :key="d">
-                                        <span class="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700" x-text="d"></span>
-                                    </template>
-                                </div>
-                            </div>
-                        </template>
+                <template x-if="dish.diets && dish.diets.length">
+                    <div class="mt-4">
+                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Nicht geeignet bei</div>
+                        <div class="mt-1 flex flex-wrap gap-1">
+                            <template x-for="d in dish.diets" :key="d">
+                                <span class="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700" x-text="d"></span>
+                            </template>
+                        </div>
                     </div>
                 </template>
 

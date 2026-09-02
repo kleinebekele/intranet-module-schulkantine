@@ -20,16 +20,6 @@ Plan es steht – es gibt keine zusätzliche Freigabe-Tabelle.
 Die OGS-Gruppe bekommt je Öffnungstag **ein** Angebot. Was inhaltlich dahintersteckt,
 entscheidet die Küche; die Kinder wählen ohnehin nur ja oder nein.
 
-## Sparmenü
-
-rollen: admin
-
-Mehrere Bestandteile zu einem Angebot mit eigenem Preis, zum Beispiel Hauptgericht plus
-Nachtisch. Aus den gewählten Teilen entsteht ein zusammengesetztes Gericht.
-
-Gibt es dieses Sparmenü mit denselben Bestandteilen und demselben Preis schon, wird es
-wiederverwendet statt doppelt angelegt. Das hält nebenbei die Bewertungen zusammen.
-
 ## Wochenfreigabe
 
 rollen: admin

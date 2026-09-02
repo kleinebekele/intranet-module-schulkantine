@@ -28,7 +28,7 @@ evtl. späteres, schlankeres Modul reserviert.
   (Personal etc.) sind Esser → brauchen ebenfalls eine passende Kundengruppe (z. B. „Personal"). ❓ wie gruppiert?
 - **Vormund (guardianship)** — Verknüpfung Elternteil → Kind (Bestellrecht).
 - **Gericht (dish)** — Katalog-Eintrag; trägt Allergene/Zusatzstoffe; gehört zu **genau einer Kategorie**.
-- **Kategorie (category)** — z. B. Hauptmenü, Nachtisch, Getränk, Eis (admin-pflegbar). Steuert: **max. 1 Variante
+- **Kategorie (category)** — z. B. Hauptspeise, Nachtisch, Getränk, Eis (admin-pflegbar). Steuert: **max. 1 Variante
   je Esser/Tag** pro Kategorie; und ob **spontane Abholung** erlaubt ist (dann begrenzt durch **Vorrat**).
 - **Menü** — Angebot = Gruppe × Tag × Gericht (im Menü-Modus mehrere Linien, z. B. Menü 1 / 2 / vegetarisch).
 - **Öffnungstag (serving_day)** — Kalender: wann hat die Kantine (für wen) geöffnet.
@@ -105,10 +105,10 @@ evtl. späteres, schlankeres Modul reserviert.
     ermäßigten Sätze/Pauschalen). Feld `dishes.price`. Der **Preis-Snapshot** auf der Bestellung bleibt (falls
     sich der Gericht-Preis später einmal ändert, stimmt die alte Abrechnung weiterhin).
 - **Auswahl je Kategorie (entschieden):** Ein Esser bestellt **pro Kategorie max. 1 Variante** je Tag
-  (z. B. 1 Hauptmenü + 1 Nachtisch + 1 Getränk + 1 Eis). Kategorien sind admin-pflegbar.
+  (z. B. 1 Hauptspeise + 1 Nachtisch + 1 Getränk + 1 Eis). Kategorien sind admin-pflegbar.
 - **Spontane Abholung hängt an der Kategorie (entschieden):** Die Kategorie legt fest, ob spontane Abholung
   erlaubt ist — und dann nur **solange der Vorrat reicht**. Der Bestand bleibt jedoch **küchenintern** und wird
-  (vorerst) **nicht im Intranet erfasst**. Hauptmenü z. B. meist nur vorbestellbar (muss gekocht werden), Getränk/Eis auch spontan.
+  (vorerst) **nicht im Intranet erfasst**. Hauptspeise z. B. meist nur vorbestellbar (muss gekocht werden), Getränk/Eis auch spontan.
   - **Entschieden:** „max. 1 pro Kategorie" gilt **nur für Vorbestellungen (Menü-Modus)**. **Spontane Abholung
     hat kein Limit** (nur der physische Küchen-Vorrat begrenzt, nicht das System) — ein Kind darf mehrere Artikel
     nehmen (z. B. für einen Freund).

@@ -15,7 +15,7 @@
             <div>
                 <x-input-label for="name" value="Name der Kategorie" />
                 <x-text-input id="name" name="name" type="text" class="mt-1 block w-full"
-                              :value="old('name', $category->name)" placeholder="z. B. Hauptmenü, Nachtisch, Getränk, Eis" required />
+                              :value="old('name', $category->name)" placeholder="z. B. Hauptspeise, Nachtisch, Getränk, Eis" required />
                 <x-input-error :messages="$errors->get('name')" class="mt-2" />
             </div>
 
@@ -66,7 +66,7 @@
                             : (preorder && walkin)
                                 ? 'Wird vorbestellt und ist zusätzlich spontan am Tresen zu haben.'
                                 : (preorder
-                                    ? 'Muss vorbestellt werden – am Tresen gibt es sie nicht spontan (z. B. Hauptmenü).'
+                                    ? 'Muss vorbestellt werden – am Tresen gibt es sie nicht spontan (z. B. Hauptspeise).'
                                     : 'Nur spontan: steht auf dem Speiseplan und ist bei der Ausgabe zu haben, taucht aber in der Vorbestellung nicht auf.')"></p>
 
                 <x-input-error :messages="$errors->get('allows_preorder')" class="mt-2" />

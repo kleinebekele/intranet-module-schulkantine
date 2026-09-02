@@ -102,13 +102,7 @@ class OrderController
         if ($weekReleased) {
             $menus = Menu::where('season_id', $season->id)
                 ->whereBetween('date', [$weekStart->toDateString(), $weekEnd->toDateString()])
-                ->with([
-                    'dish.category', 'dish.allergens', 'dish.additives', 'dish.unsuitableDiets',
-                    // Bestandteile eines Sparmenüs: für die geerbten Allergene/Diäten
-                    // (effective*) und die belegten Kategorien.
-                    'dish.components.category', 'dish.components.allergens',
-                    'dish.components.additives', 'dish.components.unsuitableDiets',
-                ])
+                ->with(['dish.category', 'dish.allergens', 'dish.additives', 'dish.unsuitableDiets'])
                 ->orderBy('sort_order')->orderBy('id')
                 ->get();
             foreach ($menus as $m) {
@@ -369,7 +363,7 @@ class OrderController
         $menu = Menu::where('season_id', $season->id)
             ->whereDate('date', $date->toDateString())
             ->where('dish_id', (int) $data['dish_id'])
-            ->with(['dish.components', 'dish.category'])
+            ->with(['dish.category'])
             ->first();
 
         abort_if(! $menu, 422, 'Dieses Gericht steht an dem Tag nicht auf dem Speiseplan.');
@@ -379,14 +373,10 @@ class OrderController
             return back()->withErrors(['bestellung' => 'Die Bestellfrist für diesen Tag ist abgelaufen.']);
         }
 
-        // Die Kategorien, die diese Bestellung belegt. Bei einem Sparmenü sind das
-        // auch die Kategorien seiner Bestandteile – Basis für Eltern-Sperre & Verdrängung.
-        $occupied = $menu->dish->occupiedCategoryIds();
+        // Die Kategorie, die diese Bestellung belegt – Basis für Eltern-Sperre & Verdrängung.
+        $occupied = array_values(array_filter([$menu->dish->category_id]));
 
-        // 1. Vorbestellbar? Es zählt die EIGENE Kategorie des Gerichts. Ein Sparmenü
-        //    wird über seine (vorbestellbare) Sparmenü-Kategorie bestellt – dass ein
-        //    Bestandteil aus einer „nur spontan"-Kategorie stammt, blockiert das Bündel
-        //    NICHT (die Küche gibt die Bestandteile aus, einzeln bleiben sie spontan).
+        // 1. Vorbestellbar? Es zählt die Kategorie des Gerichts.
         $ownCategory = $menu->dish->category;
         if ($ownCategory && ! $ownCategory->allows_preorder) {
             return back()->withErrors(['bestellung' =>
@@ -394,9 +384,7 @@ class OrderController
         }
 
         // 2. Kategorie-Freigabe: Eltern können die Vorbestellung einzelner Kategorien
-        //    für ihre Kinder sperren (z. B. keinen Nachtisch). Bei einem Sparmenü muss
-        //    JEDE belegte Kategorie frei sein – sonst käme der gesperrte Nachtisch als
-        //    Teil des Sparmenüs doch durch.
+        //    für ihre Kinder sperren (z. B. keinen Nachtisch).
         $categories = Category::whereIn('id', $occupied)->get()->keyBy('id');
         foreach ($occupied as $catId) {
             if (! ChildCategoryPermission::canPreorder($eater->id, $catId)) {
@@ -408,9 +396,8 @@ class OrderController
             }
         }
 
-        // Verdrängung: Alles abräumen, was sich mit den belegten Kategorien
-        // überschneidet. Damit ersetzt ein Sparmenü einzeln bestelltes Hauptmenü +
-        // Nachspeise – und ein einzelnes Hauptmenü umgekehrt das Sparmenü.
+        // Verdrängung: eine vorhandene Bestellung derselben Kategorie an dem Tag
+        // wird durch die neue ersetzt (pro Kategorie höchstens ein Gericht).
         $displaced = $this->displaceConflicting($eater, $season, $date, $occupied, $existing);
 
         $attributes = [
@@ -440,12 +427,9 @@ class OrderController
     }
 
     /**
-     * Löscht die aktiven Bestellungen dieses Essers am selben Tag, die eine der
-     * belegten Kategorien beanspruchen – ausgenommen die Zeile, die der Aufrufer
-     * ohnehin gleich überschreibt.
-     *
-     * Ohne diese Regel könnte jemand ein Sparmenü UND dessen Einzelbestandteile
-     * bestellen und würde beides bezahlen.
+     * Löscht die aktiven Bestellungen dieses Essers am selben Tag, die dieselbe
+     * Kategorie beanspruchen – ausgenommen die Zeile, die der Aufrufer ohnehin
+     * gleich überschreibt. So bleibt es bei höchstens einem Gericht je Kategorie.
      *
      * @param  array<int>  $occupied
      * @return array<string> Namen der verdrängten Gerichte (für die Rückmeldung)
@@ -458,14 +442,12 @@ class OrderController
             ->where('status', Order::STATUS_ORDERED)
             ->whereNotNull('category_id') // NULL = OGS ja/nein, betrifft uns nicht
             ->when($keep, fn ($q) => $q->where('id', '!=', $keep->id))
-            ->with('dish.components')
+            ->with('dish')
             ->get();
 
         $displaced = [];
         foreach ($others as $o) {
-            // Fällt das Gericht weg (gelöscht → dish_id NULL), bleibt die Kategorie
-            // der Bestellung als beste Auskunft übrig.
-            $theirs = $o->dish ? $o->dish->occupiedCategoryIds() : array_filter([$o->category_id]);
+            $theirs = array_values(array_filter([$o->category_id]));
 
             if (array_intersect($theirs, $occupied) !== []) {
                 $displaced[] = $o->dish?->name ?? 'frühere Bestellung';

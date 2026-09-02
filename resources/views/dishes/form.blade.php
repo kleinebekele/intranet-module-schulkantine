@@ -9,36 +9,13 @@
         $selAllergens = old('allergens', $dish->exists ? $dish->allergens->pluck('id')->all() : []);
         $selAdditives = old('additives', $dish->exists ? $dish->additives->pluck('id')->all() : []);
         $selDiets = old('diets', $dish->exists ? $dish->unsuitableDiets->pluck('id')->all() : []);
-        $selComponents = array_map('intval', old('components', $dish->exists ? $dish->components->pluck('id')->all() : []));
-
-        // Preise aller wählbaren Bestandteile für die Live-Rechnung im Browser.
-        $partPrices = $componentCandidates->flatten()->mapWithKeys(fn ($d) => [$d->id => (float) $d->price]);
     @endphp
 
     <div class="max-w-2xl space-y-6">
-        {{-- Meldungen ohne eigenes Feld (z. B. Löschschutz „ist Bestandteil eines Sparmenüs"). --}}
-        @if ($errors->has('dish'))
-            <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ $errors->first('dish') }}</div>
-        @endif
-
         <form method="POST"
               action="{{ $dish->exists ? route('module.schulkantine.dishes.update', $dish) : route('module.schulkantine.dishes.store') }}"
               enctype="multipart/form-data"
-              class="space-y-6 rounded-xl border border-gray-200 bg-white p-6"
-              x-data="{
-                  parts: {{ Illuminate\Support\Js::from($selComponents) }},
-                  prices: {{ Illuminate\Support\Js::from($partPrices) }},
-                  price: {{ Illuminate\Support\Js::from((float) old('price', $dish->price ?? 0)) }},
-                  categoryId: {{ Illuminate\Support\Js::from((string) old('category_id', $dish->category_id)) }},
-                  bundleCat: {{ Illuminate\Support\Js::from((string) $bundleCategoryId) }},
-                  /* Sparmenü-Gericht? Steuert, ob die Bestandteil-Auswahl sichtbar ist
-                     und ob die Verträglichkeiten ausgeblendet werden (die erbt ein
-                     Sparmenü von seinen Bestandteilen). */
-                  get isBundle() { return this.bundleCat !== '' && this.categoryId === this.bundleCat },
-                  get single() { return this.parts.reduce((s, id) => s + (this.prices[id] ?? 0), 0) },
-                  get savings() { return this.single - (parseFloat(this.price) || 0) },
-                  euro(v) { return v.toFixed(2).replace('.', ',') + ' €' },
-              }">
+              class="space-y-6 rounded-xl border border-gray-200 bg-white p-6">
             @csrf
             @if ($dish->exists) @method('PUT') @endif
 
@@ -52,7 +29,7 @@
             <div class="grid gap-4 sm:grid-cols-2">
                 <div>
                     <x-input-label for="category_id" value="Kategorie" />
-                    <select id="category_id" name="category_id" x-model="categoryId"
+                    <select id="category_id" name="category_id"
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                         <option value="">— keine —</option>
                         @foreach ($categories as $category)
@@ -64,7 +41,6 @@
                 <div>
                     <x-input-label for="price" value="Preis (€)" />
                     <x-text-input id="price" name="price" type="number" step="0.01" min="0" class="mt-1 block w-full"
-                                  x-model="price"
                                   :value="old('price', $dish->price)" required />
                     <x-input-error :messages="$errors->get('price')" class="mt-2" />
                 </div>
@@ -76,80 +52,6 @@
                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                           placeholder="kurze Beschreibung, Zutaten …">{{ old('description', $dish->description) }}</textarea>
                 <x-input-error :messages="$errors->get('description')" class="mt-2" />
-            </div>
-
-            {{-- Sparmenü: Bestandteile. Nur in der Sparmenü-Kategorie – sonst wäre das
-                 Feld bei jedem normalen Gericht im Weg. --}}
-            <div x-show="isBundle" x-cloak class="rounded-xl border border-teal-200 bg-teal-50/50 p-4">
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <x-input-label value="Bestandteile des Sparmenüs" />
-                        <p class="mt-0.5 text-xs text-gray-500">
-                            Kreuze zwei oder mehr Gerichte an, um sie zu bündeln – z. B. ein Hauptmenü
-                            und eine Nachspeise. Der oben eingetragene Preis gilt dann für das ganze Sparmenü.
-                            <strong>Allergene, Zusatzstoffe und Diät-Warnungen erbt das Sparmenü automatisch</strong>
-                            von seinen Bestandteilen – deshalb sind die Felder dafür hier ausgeblendet.
-                        </p>
-                    </div>
-                </div>
-
-                @if (! $canBeBundle)
-                    <p class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                        Dieses Gericht ist selbst Bestandteil eines Sparmenüs und kann deshalb keins werden
-                        (Sparmenüs lassen sich nicht ineinander verschachteln).
-                    </p>
-                @elseif ($componentCandidates->isEmpty())
-                    <p class="mt-3 text-xs text-gray-400">Es gibt noch keine anderen Gerichte, die man bündeln könnte.</p>
-                @else
-                    <x-input-error :messages="$errors->get('components')" class="mt-2" />
-
-                    <div class="mt-3 space-y-3">
-                        @foreach ($componentCandidates as $catName => $catDishes)
-                            <fieldset>
-                                <legend class="text-[11px] font-medium uppercase tracking-wide text-gray-400">{{ $catName }}</legend>
-                                <div class="mt-1 grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
-                                    @foreach ($catDishes as $cand)
-                                        <label class="inline-flex items-center justify-between gap-2 rounded-md px-1.5 py-0.5 text-sm text-gray-700 hover:bg-white">
-                                            <span class="inline-flex min-w-0 items-center gap-2">
-                                                <input type="checkbox" name="components[]" value="{{ $cand->id }}"
-                                                       x-model.number="parts"
-                                                       {{-- Nicht nur ausblenden: Ein ausgeblendetes Kästchen würde beim
-                                                            Speichern trotzdem mitgeschickt. Inaktiv = wird nicht gesendet,
-                                                            behält aber seinen Haken, falls man die Kategorie zurückstellt. --}}
-                                                       :disabled="! isBundle"
-                                                       @checked(in_array($cand->id, $selComponents, true))
-                                                       class="flex-none rounded border-gray-300 text-teal-600 focus:ring-teal-500">
-                                                <span class="truncate">{{ $cand->name }}</span>
-                                            </span>
-                                            <span class="flex-none text-xs text-gray-400">{{ number_format((float) $cand->price, 2, ',', '.') }} €</span>
-                                        </label>
-                                    @endforeach
-                                </div>
-                            </fieldset>
-                        @endforeach
-                    </div>
-
-                    {{-- Live-Rechnung: lohnt sich das Sparmenü überhaupt? --}}
-                    <div x-show="parts.length > 0" x-cloak
-                         class="mt-4 rounded-lg border border-teal-200 bg-white px-3 py-2 text-sm">
-                        <div class="flex items-center justify-between text-gray-600">
-                            <span><span x-text="parts.length"></span> Bestandteile einzeln</span>
-                            <span x-text="euro(single)" class="font-medium"></span>
-                        </div>
-                        <div class="flex items-center justify-between text-gray-600">
-                            <span>Sparmenü-Preis</span>
-                            <span x-text="euro(parseFloat(price) || 0)" class="font-medium"></span>
-                        </div>
-                        <div class="mt-1 flex items-center justify-between border-t border-gray-100 pt-1 font-semibold"
-                             :class="savings > 0 ? 'text-green-700' : 'text-red-700'">
-                            <span x-text="savings > 0 ? 'Ersparnis' : 'Kein Sparpreis!'"></span>
-                            <span x-text="euro(savings)"></span>
-                        </div>
-                        <p x-show="savings <= 0" x-cloak class="mt-1 text-xs text-red-600">
-                            Das Sparmenü ist nicht günstiger als der Einzelkauf. Speichern geht trotzdem – gewollt?
-                        </p>
-                    </div>
-                @endif
             </div>
 
             {{-- Foto --}}
@@ -172,28 +74,13 @@
                 <x-input-error :messages="$errors->get('photo')" class="mt-2" />
             </div>
 
-            {{-- Verträglichkeiten. Bei einem Sparmenü komplett ausgeblendet: Die
-                 Allergene/Zusatzstoffe/Diät-Verstöße stecken per Definition in den
-                 Bestandteilen (Dish::effectiveAllergens() & Co. vereinen sie). Eigene
-                 Angaben am Bündel wären doppelte Pflege – und würden auseinanderlaufen,
-                 sobald sich ein Bestandteil ändert.
-                 Alle Kästchen zusätzlich :disabled, damit sie im Sparmenü-Fall gar nicht
-                 erst gesendet werden (ausgeblendet ≠ nicht abgeschickt). --}}
-            <template x-if="isBundle">
-                <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500">
-                    <span class="font-medium text-gray-700">Verträglichkeiten</span> – werden aus den Bestandteilen
-                    übernommen (Allergene, Zusatzstoffe und Diät-Warnungen). Ändere sie beim jeweiligen Gericht.
-                </div>
-            </template>
-
             {{-- Allergene --}}
-            <div x-show="! isBundle">
+            <div>
                 <x-input-label value="Allergene" />
                 <div class="mt-2 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
                     @foreach ($allergens as $allergen)
                         <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                             <input type="checkbox" name="allergens[]" value="{{ $allergen->id }}" @checked(in_array($allergen->id, $selAllergens))
-                                   :disabled="isBundle"
                                    class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
                             <span><span class="font-medium text-gray-400">{{ $allergen->code }}</span> {{ $allergen->name }}</span>
                         </label>
@@ -202,13 +89,12 @@
             </div>
 
             {{-- Zusatzstoffe --}}
-            <div x-show="! isBundle">
+            <div>
                 <x-input-label value="Zusatzstoffe" />
                 <div class="mt-2 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
                     @foreach ($additives as $additive)
                         <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                             <input type="checkbox" name="additives[]" value="{{ $additive->id }}" @checked(in_array($additive->id, $selAdditives))
-                                   :disabled="isBundle"
                                    class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
                             <span><span class="font-medium text-gray-400">{{ $additive->code }}</span> {{ $additive->name }}</span>
                         </label>
@@ -217,7 +103,7 @@
             </div>
 
             {{-- Diäten: NICHT geeignet für (nur Ausnahmen ankreuzen) --}}
-            <div x-show="! isBundle">
+            <div>
                 <x-input-label value="NICHT geeignet für (Diäten)" />
                 <p class="mt-0.5 text-xs text-gray-400">
                     Standard: für alles geeignet. Nur ankreuzen, wofür das Gericht <strong>nicht</strong> geeignet ist
@@ -227,7 +113,6 @@
                     @foreach ($diets as $diet)
                         <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                             <input type="checkbox" name="diets[]" value="{{ $diet->id }}" @checked(in_array($diet->id, $selDiets))
-                                   :disabled="isBundle"
                                    class="rounded border-gray-300 text-red-600 focus:ring-red-500">
                             {{ $diet->name }}
                         </label>

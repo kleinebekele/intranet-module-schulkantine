@@ -4,7 +4,6 @@ namespace Intranet\Modules\Schulkantine\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\ValidationException;
 use Intranet\Modules\Schulkantine\Models\Additive;
 use Intranet\Modules\Schulkantine\Models\Allergen;
 use Intranet\Modules\Schulkantine\Models\Category;
@@ -40,11 +39,7 @@ class DishController
         }
         [$sortColumn, $sortDirection] = $sortMap[$sort];
 
-        // components.* wird für isBundle() und die effective*-Sets gebraucht (sonst N+1).
-        $dishes = Dish::with([
-            'category', 'allergens', 'additives', 'unsuitableDiets',
-            'components.allergens', 'components.additives', 'components.unsuitableDiets',
-        ])
+        $dishes = Dish::with(['category', 'allergens', 'additives', 'unsuitableDiets'])
             ->when($search !== '', fn ($q) => $q->where('name', 'like', "%{$search}%"))
             ->when($categoryFilter !== '', fn ($q) => $categoryFilter === 'none'
                 ? $q->whereNull('category_id')
@@ -83,7 +78,6 @@ class DishController
         $this->authorizeAdmin($request);
 
         $data = $this->applyPhoto($request, $this->validated($request), null);
-        $this->validateComponents($request, null);
         $dish = Dish::create($data);
         $this->syncRelations($dish, $request);
 
@@ -96,7 +90,7 @@ class DishController
     {
         $this->authorizeAdmin($request);
 
-        $dish->load('allergens', 'additives', 'unsuitableDiets', 'components');
+        $dish->load('allergens', 'additives', 'unsuitableDiets');
 
         return view('schulkantine::dishes.form', $this->formData($dish));
     }
@@ -106,7 +100,6 @@ class DishController
         $this->authorizeAdmin($request);
 
         $data = $this->applyPhoto($request, $this->validated($request), $dish);
-        $this->validateComponents($request, $dish);
         $dish->update($data);
         $this->syncRelations($dish, $request);
 
@@ -118,17 +111,6 @@ class DishController
     public function destroy(Request $request, Dish $dish)
     {
         $this->authorizeAdmin($request);
-
-        // Löschschutz: Steckt das Gericht in einem Sparmenü, würde der
-        // Fremdschlüssel die Bestandteil-Zeile still mit abräumen – das Sparmenü
-        // verlöre einen Bestandteil, behielte aber seinen Preis. Erst das
-        // Sparmenü auflösen.
-        $bundles = $dish->partOfBundles()->pluck('name');
-        if ($bundles->isNotEmpty()) {
-            return back()->withErrors([
-                'dish' => 'Dieses Gericht kann nicht gelöscht werden – es ist Bestandteil von: '.$bundles->join(', ').'.',
-            ]);
-        }
 
         if ($dish->photo_path) {
             Storage::disk('public')->delete($dish->photo_path);
@@ -146,31 +128,12 @@ class DishController
     /** @return array<string, mixed> */
     private function formData(Dish $dish): array
     {
-        // Als Bestandteil taugt jedes Gericht, das selbst kein Sparmenü ist
-        // (keine Verschachtelung) und nicht das Gericht selbst.
-        $candidates = Dish::with('category')
-            ->whereDoesntHave('components')
-            ->when($dish->exists, fn ($q) => $q->where('id', '!=', $dish->id))
-            ->orderBy('name')
-            ->get()
-            // Nach Kategorie-Reihenfolge gruppieren (Hauptmenü vor Nachspeise),
-            // nicht nach Zufall der Namen.
-            ->sortBy(fn (Dish $d) => $d->category?->sort_order ?? PHP_INT_MAX)
-            ->values();
-
         return [
             'dish' => $dish,
             'categories' => Category::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(),
             'allergens' => Allergen::orderBy('code')->get(),
             'additives' => Additive::orderBy('id')->get(),
             'diets' => Diet::orderBy('name')->get(),
-            'componentCandidates' => $candidates->groupBy(fn (Dish $d) => $d->category?->name ?? 'Ohne Kategorie'),
-            // Nur in dieser Kategorie blendet das Formular die Bestandteil-Auswahl
-            // ein (und die Verträglichkeiten aus – die erbt ein Sparmenü).
-            'bundleCategoryId' => Category::bundleId(),
-            // Ein Gericht, das selbst schon Bestandteil ist, darf kein Sparmenü
-            // werden – das ergäbe eine Verschachtelung.
-            'canBeBundle' => ! $dish->exists || ! $dish->partOfBundles()->exists(),
         ];
     }
 
@@ -190,8 +153,6 @@ class DishController
             'additives.*' => ['integer', 'exists:kantine_additives,id'],
             'diets' => ['array'],
             'diets.*' => ['integer', 'exists:kantine_diets,id'],
-            'components' => ['array'],
-            'components.*' => ['integer', 'exists:kantine_dishes,id'],
         ]);
 
         return [
@@ -226,111 +187,9 @@ class DishController
 
     private function syncRelations(Dish $dish, Request $request): void
     {
-        // Ein Sparmenü hat KEINE eigenen Verträglichkeiten: Es erbt sie von seinen
-        // Bestandteilen (Dish::effectiveAllergens() & Co.). Das Formular blendet die
-        // Felder aus; hier wird es verbindlich, damit keine Altwerte unsichtbar
-        // hängen bleiben. Umgekehrt hat ein normales Gericht keine Bestandteile.
-        $isBundle = $this->isBundleCategory($dish->category_id);
-
-        $dish->allergens()->sync($isBundle ? [] : $request->input('allergens', []));
-        $dish->additives()->sync($isBundle ? [] : $request->input('additives', []));
-        $dish->unsuitableDiets()->sync($isBundle ? [] : $request->input('diets', []));
-
-        if (! $isBundle) {
-            $dish->components()->sync([]);
-
-            return;
-        }
-
-        // Bestandteile in der Reihenfolge der Speisefolge ablegen (Kategorie-
-        // Reihenfolge: Hauptmenü vor Nachspeise), damit ein Sparmenü sich überall
-        // gleich und sinnvoll liest – nicht in der zufälligen Klick-Reihenfolge.
-        $ids = $this->componentIds($request);
-        $ordered = Dish::with('category')->whereIn('id', $ids)->get()
-            ->sortBy(fn (Dish $d) => [$d->category?->sort_order ?? PHP_INT_MAX, $d->name])
-            ->pluck('id');
-
-        $components = [];
-        foreach ($ordered->values() as $i => $id) {
-            $components[$id] = ['sort_order' => $i];
-        }
-        $dish->components()->sync($components);
-    }
-
-    /** Gehört diese Kategorie zu den Sparmenüs? (siehe Category::bundleId()) */
-    private function isBundleCategory(?int $categoryId): bool
-    {
-        return $categoryId !== null && $categoryId === Category::bundleId();
-    }
-
-    /**
-     * Prüft die Bestandteile eines Sparmenüs. Bewusst hier und nicht per DB-Regel:
-     * SQLite/MySQL können „Bestandteil darf selbst kein Bündel sein" nicht abbilden.
-     *
-     * @throws ValidationException
-     */
-    private function validateComponents(Request $request, ?Dish $dish): void
-    {
-        $ids = $this->componentIds($request);
-        $isBundle = $this->isBundleCategory($request->input('category_id') ? (int) $request->input('category_id') : null);
-
-        if ($ids === []) {
-            // In der Sparmenü-Kategorie ohne Bestandteile: Das wäre ein „Sparmenü",
-            // das nichts enthält – überall als leeres Gericht zum Preis X sichtbar.
-            if ($isBundle) {
-                throw ValidationException::withMessages([
-                    'components' => 'Ein Sparmenü braucht Bestandteile – bitte mindestens zwei Gerichte ankreuzen.',
-                ]);
-            }
-
-            return; // normales Gericht – nichts zu prüfen
-        }
-
-        // Bestandteile nur in der Sparmenü-Kategorie (das Formular blendet sie sonst
-        // aus; ohne diese Hürde könnte ein Direktaufruf sie trotzdem setzen).
-        if (! $isBundle) {
-            throw ValidationException::withMessages([
-                'components' => 'Bestandteile gibt es nur in der Kategorie „'.Category::BUNDLE_NAME.'".',
-            ]);
-        }
-
-        if (count($ids) < 2) {
-            throw ValidationException::withMessages([
-                'components' => 'Ein Sparmenü muss aus mindestens zwei Gerichten bestehen.',
-            ]);
-        }
-
-        if ($dish && in_array($dish->id, $ids, true)) {
-            throw ValidationException::withMessages([
-                'components' => 'Ein Sparmenü kann sich nicht selbst enthalten.',
-            ]);
-        }
-
-        // Keine Verschachtelung: weder darf ein Bestandteil ein Sparmenü sein …
-        $nested = Dish::whereIn('id', $ids)->whereHas('components')->pluck('name');
-        if ($nested->isNotEmpty()) {
-            throw ValidationException::withMessages([
-                'components' => 'Ein Sparmenü darf kein anderes Sparmenü enthalten: '.$nested->join(', ').'.',
-            ]);
-        }
-
-        // … noch darf ein Gericht, das selbst Bestandteil ist, zum Sparmenü werden.
-        if ($dish && $dish->partOfBundles()->exists()) {
-            throw ValidationException::withMessages([
-                'components' => 'Dieses Gericht ist bereits Bestandteil eines Sparmenüs und kann deshalb selbst keins werden.',
-            ]);
-        }
-    }
-
-    /** @return array<int> */
-    private function componentIds(Request $request): array
-    {
-        return collect($request->input('components', []))
-            ->map(fn ($v) => (int) $v)
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+        $dish->allergens()->sync($request->input('allergens', []));
+        $dish->additives()->sync($request->input('additives', []));
+        $dish->unsuitableDiets()->sync($request->input('diets', []));
     }
 
     private function authorizeAdmin(Request $request): void

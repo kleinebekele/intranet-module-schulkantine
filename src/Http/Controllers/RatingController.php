@@ -47,60 +47,31 @@ class RatingController
 
         // Eine Ausgabe-Zeile existiert erst, wenn das Essen tatsächlich
         // ausgegeben wurde – das ist bereits das richtige Signal (kein
-        // zusätzlicher Datumsfilter nötig). Ein Sparmenü wird über seine
-        // Bestandteile bewertet (dish.components), darum diese mitladen.
+        // zusätzlicher Datumsfilter nötig).
         $servings = $this->ratableServings()
             ->whereIn('user_id', $members->pluck('id'))
-            ->with(['dish.components:id,name', 'ratings:id,serving_id,dish_id,rating'])
+            ->with(['dish:id,name', 'rating:id,serving_id,rating'])
             ->orderByDesc('date')
             ->get()
             ->groupBy('user_id');
 
         $households = $members->map(fn (User $m) => [
             'user' => $m,
-            'items' => $this->ratableItems($servings->get($m->id, collect())),
+            'items' => $servings->get($m->id, collect())
+                ->filter(fn (Serving $s) => $s->dish !== null)
+                ->map(fn (Serving $s) => [
+                    'serving' => $s,
+                    'dish_id' => $s->dish_id,
+                    'name' => $s->dish->name,
+                    'bundle' => null,
+                    'date' => $s->date,
+                    'current' => optional($s->rating)->rating,
+                ])->values(),
         ])->filter(fn ($row) => $row['items']->isNotEmpty())->values();
 
         return view('schulkantine::ratings.index', [
             'households' => $households,
         ]);
-    }
-
-    /**
-     * Zerlegt die Ausgaben einer Person in bewertbare Einzelposten: ein
-     * Sparmenü in seine Bestandteile, jedes andere Gericht in sich selbst.
-     * Je Posten die bereits abgegebene Bewertung (Serving + Gericht).
-     *
-     * @param  \Illuminate\Support\Collection<int, Serving>  $servings
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
-     */
-    private function ratableItems($servings): \Illuminate\Support\Collection
-    {
-        $items = collect();
-
-        foreach ($servings as $serving) {
-            $dish = $serving->dish;
-            if (! $dish) {
-                continue;
-            }
-
-            $isBundle = $dish->isBundle();
-            $parts = $isBundle ? $dish->components : collect([$dish]);
-            $ratingByDish = $serving->ratings->keyBy('dish_id');
-
-            foreach ($parts as $part) {
-                $items->push([
-                    'serving' => $serving,
-                    'dish_id' => $part->id,
-                    'name' => $part->name,
-                    'bundle' => $isBundle ? $dish->name : null,
-                    'date' => $serving->date,
-                    'current' => optional($ratingByDish->get($part->id))->rating,
-                ]);
-            }
-        }
-
-        return $items;
     }
 
     /** Bewertung setzen/ändern (jederzeit änderbar). */
@@ -203,21 +174,12 @@ class RatingController
     }
 
     /**
-     * Prüft, dass das zu bewertende Gericht wirklich zu dieser Ausgabe gehört:
-     * bei einem Einzelgericht das Gericht selbst, bei einem Sparmenü einer seiner
-     * Bestandteile. Liefert die geprüfte dish_id zurück.
+     * Prüft, dass das zu bewertende Gericht wirklich das dieser Ausgabe ist.
+     * Liefert die geprüfte dish_id zurück.
      */
     private function resolveRatedDish(Serving $serving, int $dishId): int
     {
-        $serving->loadMissing('dish.components');
-        $dish = $serving->dish;
-
-        $valid = $dish && (
-            $dish->id === $dishId
-            || ($dish->isBundle() && $dish->components->contains('id', $dishId))
-        );
-
-        abort_unless($valid, 422, 'Dieses Gericht gehört nicht zu dieser Ausgabe.');
+        abort_unless($serving->dish_id === $dishId, 422, 'Dieses Gericht gehört nicht zu dieser Ausgabe.');
 
         return $dishId;
     }

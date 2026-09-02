@@ -16,7 +16,7 @@
     <div class="max-w-4xl">
         <div class="rounded-xl border border-gray-200 bg-white p-6">
             @if ($categories->isEmpty())
-                <p class="text-sm text-gray-500">Noch keine Kategorien. Lege die erste an! (z. B. Hauptmenü, Nachtisch, Getränk, Eis)</p>
+                <p class="text-sm text-gray-500">Noch keine Kategorien. Lege die erste an! (z. B. Hauptspeise, Nachtisch, Getränk, Eis)</p>
             @else
                 <p class="mb-3 text-xs text-gray-400">
                     Die Reihenfolge bestimmt, in welcher Folge die Kategorien im Speiseplan und
