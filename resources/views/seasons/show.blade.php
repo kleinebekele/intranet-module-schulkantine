@@ -24,7 +24,17 @@
             'sonstiges' => 'bg-gray-100 text-gray-600',
         ];
         $typeLabels = ['feiertag' => 'Feiertag', 'ferien' => 'Ferien', 'sonstiges' => 'Sonstiges'];
-        $initialTab = in_array(request('tab'), ['schliesstage', 'menues', 'einstellungen'], true) ? request('tab') : 'schliesstage';
+        // Aktiver Tab: aus ?tab, sonst bei Validierungsfehlern der passende Tab
+        // (damit die Fehlermeldung im richtigen Tab sichtbar ist).
+        if (in_array(request('tab'), ['schliesstage', 'menues', 'einstellungen'], true)) {
+            $initialTab = request('tab');
+        } elseif ($errors->hasAny(['slots', 'price', 'weekdays'])) {
+            $initialTab = 'menues';
+        } elseif ($errors->hasAny(['start_date', 'end_date', 'bundesland', 'ogs_price', 'opening_weekdays', 'order_deadline_time', 'cancel_deadline_time', 'release_lead_weeks'])) {
+            $initialTab = 'einstellungen';
+        } else {
+            $initialTab = 'schliesstage';
+        }
     @endphp
 
     <div class="max-w-4xl space-y-6" x-data="{ tab: @js($initialTab) }">

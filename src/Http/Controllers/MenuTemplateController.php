@@ -3,6 +3,7 @@
 namespace Intranet\Modules\Schulkantine\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Intranet\Modules\Schulkantine\Models\MenuTemplate;
 use Intranet\Modules\Schulkantine\Models\Season;
 
@@ -94,7 +95,9 @@ class MenuTemplateController
             ->all();
 
         if ($slots === []) {
-            abort(422, 'Bitte mindestens eine Kategorie mit Anzahl wählen.');
+            throw ValidationException::withMessages([
+                'slots' => 'Bitte mindestens eine Kategorie mit Anzahl wählen.',
+            ]);
         }
 
         return [
