@@ -63,16 +63,19 @@
                     </span>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    {{-- Menüs dieser Woche nach aktuellen Vorlagen (neu) ausrollen – auch bei
-                         freigegebener Woche. Frischt vorhandene Menüs auf, löscht nichts. --}}
-                    <form method="POST" action="{{ route('module.schulkantine.menus.push-week') }}"
-                          onsubmit="return confirm('Menüs dieser Woche nach den aktuellen Einstellungen (neu) ausrollen?')">
-                        @csrf
-                        <input type="hidden" name="week" value="{{ $weekStart->toDateString() }}">
-                        <button type="submit" class="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-white px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50">
-                            <x-module-icon name="transfer" class="text-sm" /> Menüs dieser Woche pushen
-                        </button>
-                    </form>
+                    {{-- Menüs für diese Woche nach aktuellen Vorlagen anlegen/auffrischen.
+                         Nur bei zur Bearbeitung freigegebener (nicht festgeschriebener) Woche;
+                         löscht nichts, gewählte Gerichte bleiben. --}}
+                    @unless ($weekReleased)
+                        <form method="POST" action="{{ route('module.schulkantine.menus.push-week') }}"
+                              onsubmit="return confirm('Menüs für diese Woche nach den aktuellen Einstellungen anlegen?')">
+                            @csrf
+                            <input type="hidden" name="week" value="{{ $weekStart->toDateString() }}">
+                            <button type="submit" class="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-white px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50">
+                                <x-module-icon name="transfer" class="text-sm" /> Menüs für diese Woche anlegen
+                            </button>
+                        </form>
+                    @endunless
 
                     @if ($weekOverride !== 'released')
                         <form method="POST" action="{{ route('module.schulkantine.menus.release') }}">

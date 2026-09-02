@@ -35,14 +35,16 @@ Steht bei einer Kategorie der Hinweis **„Nur für spontane Abholung eingestell
 ihre Gerichte NICHT auf „Essen bestellen" (sie sind nur am Tresen zu haben). Ob eine Kategorie
 vorbestellbar ist, stellen Sie unter **Kategorien** ein.
 
-## Menüs dieser Woche pushen
+## Menüs für diese Woche anlegen
 
 rollen: admin
 
-Der Knopf **„Menüs dieser Woche pushen"** rollt die aktiven Menü-Vorlagen nach aktuellem Stand
-**nur auf die angezeigte Woche** aus – auch wenn sie bereits freigegeben ist. Vorhandene Menüs
-werden aufgefrischt, fehlende angelegt; gelöscht wird nichts, und bereits gewählte Gerichte
-bleiben erhalten, wo Kategorie und Position passen.
+Der Knopf **„Menüs für diese Woche anlegen"** legt die aktiven Menü-Vorlagen nach aktuellem
+Stand **nur für die angezeigte Woche** an (bzw. frischt sie auf). Er erscheint nur, solange die
+Woche **zur Bearbeitung freigegeben** (also nicht festgeschrieben) ist – ist die Woche
+freigegeben/festgeschrieben, schalten Sie sie erst mit „Zur Bearbeitung freigeben" frei.
+Gelöscht wird nichts, und bereits gewählte Gerichte bleiben erhalten, wo Kategorie und Position
+passen.
 
 ## Wochenfreigabe
 

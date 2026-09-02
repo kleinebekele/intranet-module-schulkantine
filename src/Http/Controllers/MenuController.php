@@ -177,9 +177,10 @@ class MenuController
     }
 
     /**
-     * „Push" nur für die angezeigte Woche: rollt die aktiven Menü-Vorlagen nach
-     * aktuellem Stand auf diese Woche aus – auch wenn sie bereits freigegeben ist.
-     * Bereits bestellte/angelegte Menüs bleiben erhalten (auffrischen, nichts löschen).
+     * Legt die aktiven Menü-Vorlagen nach aktuellem Stand für die angezeigte Woche
+     * an (bzw. frischt sie auf). Nur erlaubt, solange die Woche NICHT festgeschrieben
+     * (freigegeben) ist – erst „Zur Bearbeitung freigeben", dann anlegen. Bereits
+     * gewählte Gerichte bleiben erhalten, gelöscht wird nichts.
      */
     public function pushWeek(Request $request)
     {
@@ -189,11 +190,15 @@ class MenuController
         $season = Season::where('is_active', true)->firstOrFail();
         $week = Carbon::parse($data['week']);
 
+        if ($this->weekLocked($season, $week)) {
+            return $this->redirectToWeek($week)->withErrors(['menu' => $this->lockedMessage()]);
+        }
+
         $result = (new MenuRolloutService)->pushWeek($season, $week);
 
         $message = $result['menus'] === 0
-            ? 'Nichts auszurollen – keine aktiven Menüs für diese Woche.'
-            : $result['menus'].' Menüs auf '.$result['days'].' Öffnungstage dieser Woche ausgerollt (nach aktuellen Einstellungen).';
+            ? 'Keine aktiven Menüs zum Anlegen für diese Woche.'
+            : $result['menus'].' Menüs für '.$result['days'].' Öffnungstage dieser Woche angelegt (nach aktuellen Einstellungen).';
 
         return $this->redirectToWeek($week)->with('status', $message);
     }
