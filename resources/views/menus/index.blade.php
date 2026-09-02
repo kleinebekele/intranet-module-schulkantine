@@ -236,6 +236,10 @@
                                             $catColor = $category->color;
                                             $addOptions = ($dishesByCategory[$category->id] ?? collect())->map(fn ($x) => ['id' => $x->id, 'name' => $x->name])->values();
                                         @endphp
+                                        {{-- Freigegebene Woche: Kategorien ohne gesetztes Gericht komplett ausblenden. --}}
+                                        @if ($weekReleased && $catItems->isEmpty())
+                                            @continue
+                                        @endif
                                         <fieldset class="rounded-lg border px-2 pb-2 {{ $catColor ? '' : 'border-gray-200' }}"
                                                   @if ($catColor) style="border-color: {{ $catColor }}; background-color: {{ $catColor }}1a;" @endif>
                                             <legend class="px-1 text-[11px] font-medium uppercase tracking-wide {{ $catColor ? '' : 'text-gray-400' }}"
