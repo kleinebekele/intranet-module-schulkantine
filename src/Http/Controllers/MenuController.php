@@ -164,10 +164,24 @@ class MenuController
         if (! $season->isOpenOn($date)) {
             return back()->withErrors(['date' => 'Die Kantine hat an diesem Tag nicht geöffnet.']);
         }
+        if ($this->weekLocked($season, $date)) {
+            return $this->redirectToWeek($date)->withErrors(['menu' => $this->lockedMessage()]);
+        }
 
         $this->addDishToPlan($season, $date, (int) $data['dish_id']);
 
         return $this->redirectToWeek($date)->with('status', 'Speiseplan aktualisiert.');
+    }
+
+    /** Eine freigegebene (festgeschriebene) Woche ist im Speiseplan schreibgeschützt. */
+    private function weekLocked(Season $season, Carbon $date): bool
+    {
+        return (new ReleaseService)->isWeekReleased($season, $date);
+    }
+
+    private function lockedMessage(): string
+    {
+        return 'Diese Woche ist festgeschrieben (freigegeben) und kann nicht mehr bearbeitet werden – zum Bearbeiten oben „Zur Bearbeitung freigeben".';
     }
 
     /**
@@ -210,6 +224,11 @@ class MenuController
     {
         $this->authorizeAdmin($request);
 
+        $season = Season::where('is_active', true)->firstOrFail();
+        if ($this->weekLocked($season, $menu->date)) {
+            return $this->redirectToWeek($menu->date)->withErrors(['menu' => $this->lockedMessage()]);
+        }
+
         // Löschschutz: sobald auf dieses Angebot bestellt wurde, ist es nicht mehr
         // entfernbar (Hinzufügen bleibt immer erlaubt). Schützt bestehende
         // Bestellungen/Abrechnungen vor dem Verschwinden.
@@ -231,6 +250,11 @@ class MenuController
     public function fillMenuDay(Request $request, MenuDay $menuDay)
     {
         $this->authorizeAdmin($request);
+
+        $season = Season::where('is_active', true)->firstOrFail();
+        if ($this->weekLocked($season, $menuDay->date)) {
+            return $this->redirectToWeek($menuDay->date)->withErrors(['menu' => $this->lockedMessage()]);
+        }
 
         $data = $request->validate([
             'slots' => ['array'],

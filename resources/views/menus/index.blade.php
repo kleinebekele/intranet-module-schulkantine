@@ -72,18 +72,18 @@
                         </form>
                     @endif
 
-                    {{-- Zurückhalten nur, solange es noch keine Bestellungen für die Woche gibt:
-                         eine freigegebene Woche wieder zuzusperren würde bereits getätigte
-                         Bestellungen entwerten. Freigeben bleibt dagegen immer möglich. --}}
+                    {{-- Eine freigegebene Woche ist festgeschrieben und im Speiseplan nicht mehr
+                         bearbeitbar. Zum Bearbeiten muss sie zurückgehalten werden – das geht nur,
+                         solange es noch KEINE Bestellungen gibt (sonst würde man sie entwerten). --}}
                     @if ($weekHasOrders)
-                        <span class="text-xs text-gray-400">🔒 bereits bestellt – die Freigabe kann nicht mehr zurückgenommen werden</span>
+                        <span class="text-xs text-gray-400">🔒 bereits bestellt – die Woche ist festgeschrieben und nicht mehr bearbeitbar</span>
                     @else
                         @if ($weekOverride !== 'held')
                             <form method="POST" action="{{ route('module.schulkantine.menus.release') }}">
                                 @csrf
                                 <input type="hidden" name="week" value="{{ $weekStart->toDateString() }}">
                                 <input type="hidden" name="action" value="hold">
-                                <button type="submit" class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100">Zurückhalten</button>
+                                <button type="submit" class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100">{{ $weekReleased ? '🔓 Zur Bearbeitung freigeben' : 'Zurückhalten' }}</button>
                             </form>
                         @endif
                         @if ($weekOverride !== null)
@@ -129,6 +129,24 @@
                                     {{-- Menüs immer oben. Slots mit Gerichten füllen. --}}
                                     @php $dayMenus = $menuDaysByDate[$d['date']->toDateString()] ?? collect(); @endphp
                                     @foreach ($dayMenus as $md)
+                                        @if ($weekReleased)
+                                            {{-- Festgeschriebene Woche: Menü nur noch lesbar. --}}
+                                            <div class="rounded-lg border border-emerald-200 bg-emerald-50/40 px-2 py-2">
+                                                <div class="flex items-center justify-between gap-2">
+                                                    <span class="text-xs font-semibold text-emerald-800">🍽 {{ $md->name }}</span>
+                                                    <span class="text-xs font-bold text-emerald-700">{{ number_format((float) $md->price, 2, ',', '.') }} €</span>
+                                                </div>
+                                                <div class="mt-1 space-y-0.5">
+                                                    @foreach ($md->slots as $slot)
+                                                        <div class="text-xs">
+                                                            <span class="text-[10px] uppercase tracking-wide text-gray-400">{{ $slot->category?->name }}:</span>
+                                                            <span class="text-gray-800">{{ $slot->dish?->name ?? '—' }}</span>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                            @continue
+                                        @endif
                                         <form method="POST" action="{{ route('module.schulkantine.menus.fill-day', $md) }}"
                                               class="rounded-lg border border-emerald-200 bg-emerald-50/40 px-2 py-2">
                                             @csrf
@@ -197,7 +215,9 @@
                                                 @foreach ($catItems as $m)
                                                     <div class="flex items-center justify-between gap-2 rounded-md border border-gray-100 bg-white px-2 py-1 text-sm">
                                                         <span class="min-w-0 text-gray-800">{{ $m->dish->name }}</span>
-                                                        @if ($m->orders_count > 0)
+                                                        @if ($weekReleased)
+                                                            <span title="Festgeschriebene Woche – nicht mehr änderbar" class="text-gray-300">🔒</span>
+                                                        @elseif ($m->orders_count > 0)
                                                             <span title="Bereits bestellt – nicht mehr entfernbar" class="text-gray-300">🔒</span>
                                                         @else
                                                             <form method="POST" action="{{ route('module.schulkantine.menus.destroy', $m) }}"
@@ -211,30 +231,38 @@
                                                 @endforeach
                                             </div>
 
-                                            {{-- + hinzufügen: Such-Dropdown der Gerichte dieser Kategorie; Klick fügt hinzu. --}}
-                                            <form method="POST" action="{{ route('module.schulkantine.menus.store') }}" class="relative mt-1.5"
-                                                  x-data="{ open: false, query: '', options: @js($addOptions),
-                                                            get filtered() { const t = this.query.trim().toLowerCase(); const o = t ? this.options.filter(d => d.name.toLowerCase().includes(t)) : this.options; return o.slice(0, 50); } }"
-                                                  @click.outside="open = false">
-                                                @csrf
-                                                <input type="hidden" name="date" value="{{ $d['date']->toDateString() }}">
-                                                <input type="hidden" name="dish_id" x-ref="dishId">
-                                                <button type="button" @click="open = ! open"
-                                                        class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800">
-                                                    <x-module-icon name="plus" class="text-sm" /> hinzufügen
-                                                </button>
-                                                <div x-show="open" x-cloak class="mt-1">
-                                                    <input type="text" x-model="query" placeholder="Gericht suchen …" autocomplete="off"
-                                                           class="block w-full rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                                    <ul class="mt-1 max-h-40 overflow-auto rounded-md border border-gray-200 bg-white py-1 text-xs shadow">
-                                                        <template x-for="dd in filtered" :key="dd.id">
-                                                            <li @click="$refs.dishId.value = dd.id; $root.submit()" x-text="dd.name"
-                                                                class="cursor-pointer px-2 py-1 hover:bg-indigo-50"></li>
-                                                        </template>
-                                                        <li x-show="! filtered.length" class="px-2 py-1 text-gray-400">kein Gericht in dieser Kategorie</li>
-                                                    </ul>
-                                                </div>
-                                            </form>
+                                            {{-- + hinzufügen: Such-Dropdown der Gerichte dieser Kategorie; Klick fügt hinzu.
+                                                 In festgeschriebenen Wochen komplett ausgeblendet. --}}
+                                            @if (! $weekReleased)
+                                                <form method="POST" action="{{ route('module.schulkantine.menus.store') }}" class="relative mt-1.5"
+                                                      x-data="{ open: false, query: '', options: @js($addOptions),
+                                                                get filtered() { const t = this.query.trim().toLowerCase(); const o = t ? this.options.filter(d => d.name.toLowerCase().includes(t)) : this.options; return o.slice(0, 50); } }"
+                                                      @click.outside="open = false">
+                                                    @csrf
+                                                    <input type="hidden" name="date" value="{{ $d['date']->toDateString() }}">
+                                                    <input type="hidden" name="dish_id" x-ref="dishId">
+                                                    <button type="button" @click="open = ! open"
+                                                            class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800">
+                                                        <x-module-icon name="plus" class="text-sm" /> hinzufügen
+                                                    </button>
+                                                    <div x-show="open" x-cloak class="mt-1">
+                                                        <input type="text" x-model="query" placeholder="Gericht suchen …" autocomplete="off"
+                                                               class="block w-full rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                                        <ul class="mt-1 max-h-40 overflow-auto rounded-md border border-gray-200 bg-white py-1 text-xs shadow">
+                                                            <template x-for="dd in filtered" :key="dd.id">
+                                                                <li @click="$refs.dishId.value = dd.id; $root.submit()" x-text="dd.name"
+                                                                    class="cursor-pointer px-2 py-1 hover:bg-indigo-50"></li>
+                                                            </template>
+                                                            <li x-show="! filtered.length" class="px-2 py-1 text-gray-400">kein Gericht in dieser Kategorie</li>
+                                                        </ul>
+                                                    </div>
+                                                </form>
+                                                @unless ($category->allows_preorder)
+                                                    <p class="mt-1 text-[10px] leading-tight text-amber-600">
+                                                        ℹ️ Nur für spontane Abholung eingestellt – Gerichte dieser Kategorie erscheinen NICHT auf „Essen bestellen".
+                                                    </p>
+                                                @endunless
+                                            @endif
                                         </fieldset>
                                     @endforeach
 
