@@ -7,6 +7,7 @@ use Illuminate\Validation\ValidationException;
 use Intranet\Modules\Schulkantine\Models\Category;
 use Intranet\Modules\Schulkantine\Models\MenuTemplate;
 use Intranet\Modules\Schulkantine\Models\Season;
+use Intranet\Modules\Schulkantine\Support\MenuRolloutService;
 
 /**
  * Verwaltung der Menü-Vorlagen einer Saison (Ersatz für Sparmenüs). Gepflegt
@@ -67,6 +68,25 @@ class MenuTemplateController
         return redirect()
             ->route('module.schulkantine.seasons.show', ['season' => $menuTemplate->season_id, 'tab' => 'menues'])
             ->with('status', 'Menü wurde gespeichert.');
+    }
+
+    /**
+     * „Push": rollt die aktiven Menü-Vorlagen auf alle offenen (nicht
+     * freigegebenen) Wochen aus (siehe MenuRolloutService).
+     */
+    public function push(Request $request, Season $season)
+    {
+        $this->authorizeAdmin($request);
+
+        $result = (new MenuRolloutService)->pushSeason($season);
+
+        $message = $result['menus'] === 0
+            ? 'Nichts auszurollen – keine aktiven Menüs oder keine offenen Wochen.'
+            : $result['menus'].' Menüs auf '.$result['days'].' Öffnungstage in '.$result['weeks'].' offenen Wochen ausgerollt.';
+
+        return redirect()
+            ->route('module.schulkantine.seasons.show', ['season' => $season, 'tab' => 'menues'])
+            ->with('status', $message);
     }
 
     public function destroy(Request $request, MenuTemplate $menuTemplate)

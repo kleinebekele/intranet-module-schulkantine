@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Intranet\Modules\Schulkantine\Models\Dish;
 use Intranet\Modules\Schulkantine\Models\Menu;
+use Intranet\Modules\Schulkantine\Models\MenuDay;
 use Intranet\Modules\Schulkantine\Models\Order;
 use Intranet\Modules\Schulkantine\Models\Season;
 use Intranet\Modules\Schulkantine\Models\WeekRelease;
@@ -105,6 +106,19 @@ class MenuController
             ->sortBy(fn (Order $o) => mb_strtolower($o->user?->name ?? ''))
             ->groupBy(fn (Order $o) => $o->date->toDateString());
 
+        // Ausgerollte Menüs (MenuDay) der Woche je Tag – mit füllbaren Slots.
+        $menuDaysByDate = MenuDay::where('season_id', $season->id)
+            ->whereBetween('date', [$weekStart->toDateString(), $weekEnd->toDateString()])
+            ->with(['slots.category:id,name,color', 'slots.dish:id,name'])
+            ->orderBy('id')
+            ->get()
+            ->groupBy(fn (MenuDay $md) => $md->date->toDateString());
+
+        // Aktive Gerichte je Kategorie – für die Gericht-Auswahl in den Menü-Slots.
+        $dishesByCategory = Dish::where('is_active', true)
+            ->orderBy('name')->get(['id', 'name', 'category_id'])
+            ->groupBy('category_id');
+
         // Wochen-Freigabe (hybrid): effektiver Zustand + evtl. manueller Override.
         $release = new ReleaseService;
 
@@ -115,6 +129,8 @@ class MenuController
             'days' => $days,
             'plan' => $plan,
             'ordersByDate' => $ordersByDate,
+            'menuDaysByDate' => $menuDaysByDate,
+            'dishesByCategory' => $dishesByCategory,
             'dishes' => Dish::where('is_active', true)->with('category')->orderBy('name')->get(),
             'prevWeek' => $weekStart->copy()->subWeek()->toDateString(),
             'nextWeek' => $weekStart->copy()->addWeek()->toDateString(),
@@ -199,6 +215,35 @@ class MenuController
         $menu->delete();
 
         return $this->redirectToWeek($date)->with('status', 'Gericht aus dem Speiseplan entfernt.');
+    }
+
+    /**
+     * Die Gericht-Auswahl der Slots eines ausgerollten Menü-Tags speichern
+     * (Speiseplan). Jeder Slot bekommt ein Gericht seiner Kategorie (oder leer).
+     */
+    public function fillMenuDay(Request $request, MenuDay $menuDay)
+    {
+        $this->authorizeAdmin($request);
+
+        $data = $request->validate([
+            'slots' => ['array'],
+            'slots.*' => ['nullable', 'integer', 'exists:kantine_dishes,id'],
+        ]);
+        $picked = $data['slots'] ?? [];
+
+        // Gültige Gericht-IDs je Kategorie vorbereiten (ein Gericht muss zur
+        // Kategorie seines Slots passen – sonst wird die Auswahl verworfen).
+        $slots = $menuDay->slots()->get();
+        $dishCategory = Dish::whereIn('id', array_filter($picked))->pluck('category_id', 'id');
+
+        foreach ($slots as $slot) {
+            $dishId = $picked[$slot->id] ?? null;
+            $valid = $dishId && (int) ($dishCategory[$dishId] ?? 0) === (int) $slot->category_id;
+            $slot->update(['dish_id' => $valid ? (int) $dishId : null]);
+        }
+
+        return $this->redirectToWeek($menuDay->date)
+            ->with('status', 'Menü „'.$menuDay->name.'" ('.$menuDay->date->format('d.m.Y').') gespeichert.');
     }
 
     /**

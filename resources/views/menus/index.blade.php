@@ -183,6 +183,37 @@
                                         </form>
                                     </div>
 
+                                    {{-- Ausgerollte Menüs dieses Tages: Slots mit Gerichten füllen. --}}
+                                    @php $dayMenus = $menuDaysByDate[$d['date']->toDateString()] ?? collect(); @endphp
+                                    @foreach ($dayMenus as $md)
+                                        <form method="POST" action="{{ route('module.schulkantine.menus.fill-day', $md) }}"
+                                              class="rounded-lg border border-emerald-200 bg-emerald-50/40 px-2 py-2">
+                                            @csrf
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-xs font-semibold text-emerald-800">🍽 {{ $md->name }}</span>
+                                                <span class="text-xs font-bold text-emerald-700">{{ number_format((float) $md->price, 2, ',', '.') }} €</span>
+                                            </div>
+                                            <div class="mt-1.5 space-y-1.5">
+                                                @foreach ($md->slots as $slot)
+                                                    <div>
+                                                        <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400">{{ $slot->category?->name ?? 'Kategorie' }}</label>
+                                                        <select name="slots[{{ $slot->id }}]"
+                                                                class="mt-0.5 block w-full rounded-md border-gray-300 text-xs shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                                            <option value="">— Gericht wählen —</option>
+                                                            @foreach ($dishesByCategory[$slot->category_id] ?? [] as $dish)
+                                                                <option value="{{ $dish->id }}" @selected($slot->dish_id === $dish->id)>{{ $dish->name }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                            <button type="submit"
+                                                    class="mt-2 inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700">
+                                                <x-module-icon name="save" class="text-sm" /> Menü speichern
+                                            </button>
+                                        </form>
+                                    @endforeach
+
                                     {{-- Bestellungen dieses Tages (Admin): wer hat was bestellt, mit Löschen. --}}
                                     @php $dayOrders = $ordersByDate[$d['date']->toDateString()] ?? collect(); @endphp
                                     <div x-data="{ open: false }" class="mt-2 border-t border-gray-100 pt-2">

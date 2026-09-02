@@ -56,6 +56,8 @@ Route::middleware(['web', 'auth'])
 
         // Menü-Vorlagen einer Saison (Ersatz für Sparmenüs) – Tab „Menüs".
         Route::post('saisons/{season}/menues', [MenuTemplateController::class, 'store'])->name('menu-templates.store');
+        // Push: Menüs auf alle offenen Wochen ausrollen.
+        Route::post('saisons/{season}/menues/push', [MenuTemplateController::class, 'push'])->name('menu-templates.push');
         Route::get('menues/{menuTemplate}/bearbeiten', [MenuTemplateController::class, 'edit'])->name('menu-templates.edit');
         Route::put('menues/{menuTemplate}', [MenuTemplateController::class, 'update'])->name('menu-templates.update');
         Route::delete('menues/{menuTemplate}', [MenuTemplateController::class, 'destroy'])->name('menu-templates.destroy');
@@ -88,6 +90,8 @@ Route::middleware(['web', 'auth'])
         Route::post('speiseplan/freigabe', [MenuController::class, 'releaseWeek'])->name('menus.release');
         // Admin: einzelne Bestellung aus dem Speiseplan löschen.
         Route::delete('speiseplan/bestellung/{order}', [MenuController::class, 'destroyOrder'])->name('menus.order-destroy');
+        // Ausgerolltes Menü eines Tages mit Gerichten füllen.
+        Route::post('speiseplan/menue-tag/{menuDay}/fuellen', [MenuController::class, 'fillMenuDay'])->name('menus.fill-day');
         Route::delete('speiseplan/{menu}', [MenuController::class, 'destroy'])->name('menus.destroy');
 
         // Vorbestellung (für jeden eingeloggten Nutzer – sich selbst & seine Kinder)

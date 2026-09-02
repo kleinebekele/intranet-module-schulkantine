@@ -170,10 +170,23 @@
 
         {{-- ============================ TAB 2: MENÜS ============================ --}}
         <div x-show="tab === 'menues'" x-cloak class="space-y-6">
-            <p class="text-sm text-gray-500">
-                Ein Menü ist eine Hülle mit Name, Preis und Kategorie-Slots (aus welcher Kategorie wie viele Gerichte).
-                <strong>Welche</strong> Gerichte konkret enthalten sind, wählst du je Öffnungstag im Speiseplan.
-            </p>
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <p class="max-w-2xl text-sm text-gray-500">
+                    Ein Menü ist eine Hülle mit Name, Preis und Kategorie-Slots (aus welcher Kategorie wie viele Gerichte).
+                    <strong>Welche</strong> Gerichte konkret enthalten sind, wählst du je Öffnungstag im Speiseplan.
+                    Bearbeiten ändert nur die Vorlage – erst der <strong>Push</strong> rollt die Menüs auf alle
+                    offenen (noch nicht freigegebenen) Wochen aus.
+                </p>
+                <form method="POST" action="{{ route('module.schulkantine.menu-templates.push', $season) }}" class="shrink-0"
+                      onsubmit="return confirm('Alle aktiven Menüs auf die offenen Wochen ausrollen?')">
+                    @csrf
+                    <button type="submit" @disabled($season->menuTemplates->where('is_active', true)->isEmpty())
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
+                        <x-module-icon name="transfer" class="text-base" />
+                        Menüs ausrollen (Push)
+                    </button>
+                </form>
+            </div>
 
             {{-- Vorhandene Menüs --}}
             <div class="rounded-xl border border-gray-200 bg-white p-6">
