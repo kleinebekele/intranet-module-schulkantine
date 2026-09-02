@@ -113,7 +113,7 @@ class OrderController
 
             $menuDaysByDate = \Intranet\Modules\Schulkantine\Models\MenuDay::where('season_id', $season->id)
                 ->whereBetween('date', [$weekStart->toDateString(), $weekEnd->toDateString()])
-                ->with(['slots.dish.allergens', 'slots.dish.unsuitableDiets', 'slots.category'])
+                ->with(['slots.dish.allergens', 'slots.dish.additives', 'slots.dish.unsuitableDiets', 'slots.category'])
                 ->orderBy('id')
                 ->get()
                 // Nur Menüs, deren Slots alle ein Gericht haben (sonst nicht bestellbar).

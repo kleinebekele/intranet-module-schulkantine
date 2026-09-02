@@ -244,6 +244,32 @@
                                                                     && $md->slots->flatMap(fn ($s) => $s->dish?->allergens ?? collect())->pluck('id')->intersect($e['allergenIds'])->isNotEmpty())
                                                                 || (($season->show_diets ?? true)
                                                                     && $md->slots->flatMap(fn ($s) => $s->dish?->unsuitableDiets ?? collect())->pluck('id')->intersect($e['dietIds'])->isNotEmpty());
+                                                            // Detail-Daten fürs Info-Modal: Menü + beide (alle) Gerichte mit ihren Angaben.
+                                                            $menuData = [
+                                                                'name' => $md->name,
+                                                                'category' => 'Menü',
+                                                                'categoryColor' => '#059669',
+                                                                'price' => $money($md->price),
+                                                                'description' => null,
+                                                                'photo' => null,
+                                                                'isMenu' => true,
+                                                                'menuItems' => $md->slots->map(fn ($s) => [
+                                                                    'name' => $s->dish?->name,
+                                                                    'category' => $s->category?->name,
+                                                                    'categoryColor' => $s->category?->color,
+                                                                    'price' => $money($s->dish?->price ?? 0),
+                                                                    'description' => $s->dish?->description,
+                                                                    'photo' => $s->dish?->photoUrl(),
+                                                                    'allergens' => ($season->show_allergens ?? true) && $s->dish ? $s->dish->allergens->map(fn ($a) => trim($a->code.' '.$a->name))->values() : [],
+                                                                    'additives' => ($season->show_additives ?? true) && $s->dish ? $s->dish->additives->map(fn ($a) => trim($a->code.' '.$a->name))->values() : [],
+                                                                    'diets' => ($season->show_diets ?? true) && $s->dish ? $s->dish->unsuitableDiets->map(fn ($d) => $d->name)->values() : [],
+                                                                ])->values(),
+                                                                'menuDayId' => $md->id,
+                                                                'eaterId' => $eater->id,
+                                                                'date' => $dateStr,
+                                                                'isSel' => $isMenuOrdered,
+                                                                'clickable' => $menuClickable,
+                                                            ];
                                                         @endphp
                                                         <form method="POST" action="{{ route('module.schulkantine.orders.store') }}">
                                                             @csrf
@@ -256,7 +282,7 @@
                                                                            {{ $isMenuOrdered ? 'border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-300' : ($menuWarn ? 'border-red-300' : 'border-emerald-200') }}
                                                                            {{ $menuClickable ? 'cursor-pointer hover:border-emerald-400' : 'cursor-not-allowed opacity-60' }}">
                                                                 <div class="flex items-center justify-between gap-2">
-                                                                    <span class="text-sm font-semibold text-emerald-800">🍽 {{ $md->name }}</span>
+                                                                    <span class="text-sm font-semibold text-emerald-800">🍽 {{ $md->name }}<span x-data @click.stop.prevent="$dispatch('open-dish', @js($menuData))" role="button" tabindex="0" title="Details anzeigen" aria-label="Details anzeigen" class="ml-1 inline-flex translate-y-px cursor-pointer align-middle text-emerald-600 hover:text-emerald-800"><svg class="inline h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg></span></span>
                                                                     <span class="flex items-center gap-1 text-xs font-bold {{ $isMenuOrdered ? 'text-emerald-700' : 'text-gray-700' }}">
                                                                         @if ($isMenuOrdered)
                                                                             <span class="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">✓</span>
@@ -457,37 +483,93 @@
 
                 <p x-show="dish.description" class="mt-3 whitespace-pre-line text-sm text-gray-600" x-text="dish.description"></p>
 
-                {{-- Allergene/Zusatzstoffe/Diäten des Gerichts. --}}
-                <template x-if="dish.allergens && dish.allergens.length">
+                {{-- Menü: die enthaltenen Gerichte je mit ihren Details (wie früher beim Sparmenü). --}}
+                <template x-if="dish.isMenu && dish.menuItems && dish.menuItems.length">
                     <div class="mt-4">
-                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Allergene</div>
-                        <div class="mt-1 flex flex-wrap gap-1">
-                            <template x-for="a in dish.allergens" :key="a">
-                                <span class="rounded bg-red-50 px-1.5 py-0.5 text-[11px] text-red-700" x-text="a"></span>
+                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Enthält</div>
+                        <div class="mt-2 space-y-3">
+                            <template x-for="c in dish.menuItems" :key="c.name">
+                                <div class="overflow-hidden rounded-xl border border-gray-100">
+                                    <template x-if="c.photo">
+                                        <img :src="c.photo" alt="" class="h-28 w-full object-cover">
+                                    </template>
+                                    <div class="p-3">
+                                        <div class="flex items-start justify-between gap-2">
+                                            <div>
+                                                <div class="text-sm font-semibold text-gray-800" x-text="c.name"></div>
+                                                <span x-show="c.category" class="mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium"
+                                                      :style="c.categoryColor ? ('background-color:'+c.categoryColor+'22; color:'+c.categoryColor) : 'background-color:#eef2ff; color:#4f46e5'"
+                                                      x-text="c.category"></span>
+                                            </div>
+                                            <span class="whitespace-nowrap text-sm font-bold text-indigo-700" x-text="c.price"></span>
+                                        </div>
+                                        <p x-show="c.description" class="mt-2 whitespace-pre-line text-xs text-gray-600" x-text="c.description"></p>
+                                        <template x-if="c.allergens && c.allergens.length">
+                                            <div class="mt-2">
+                                                <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Allergene</div>
+                                                <div class="mt-0.5 flex flex-wrap gap-1">
+                                                    <template x-for="a in c.allergens" :key="a"><span class="rounded bg-red-50 px-1.5 py-0.5 text-[11px] text-red-700" x-text="a"></span></template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template x-if="c.additives && c.additives.length">
+                                            <div class="mt-1.5">
+                                                <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Zusatzstoffe</div>
+                                                <div class="mt-0.5 flex flex-wrap gap-1">
+                                                    <template x-for="a in c.additives" :key="a"><span class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600" x-text="a"></span></template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template x-if="c.diets && c.diets.length">
+                                            <div class="mt-1.5">
+                                                <div class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Nicht geeignet bei</div>
+                                                <div class="mt-0.5 flex flex-wrap gap-1">
+                                                    <template x-for="d in c.diets" :key="d"><span class="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700" x-text="d"></span></template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
                             </template>
                         </div>
                     </div>
                 </template>
 
-                <template x-if="dish.additives && dish.additives.length">
-                    <div class="mt-4">
-                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Zusatzstoffe</div>
-                        <div class="mt-1 flex flex-wrap gap-1">
-                            <template x-for="a in dish.additives" :key="a">
-                                <span class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600" x-text="a"></span>
-                            </template>
-                        </div>
-                    </div>
-                </template>
+                {{-- Einzelgericht (kein Menü): Allergene/Zusatzstoffe/Diäten des Gerichts. --}}
+                <template x-if="! dish.isMenu">
+                    <div>
+                        <template x-if="dish.allergens && dish.allergens.length">
+                            <div class="mt-4">
+                                <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Allergene</div>
+                                <div class="mt-1 flex flex-wrap gap-1">
+                                    <template x-for="a in dish.allergens" :key="a">
+                                        <span class="rounded bg-red-50 px-1.5 py-0.5 text-[11px] text-red-700" x-text="a"></span>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
 
-                <template x-if="dish.diets && dish.diets.length">
-                    <div class="mt-4">
-                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Nicht geeignet bei</div>
-                        <div class="mt-1 flex flex-wrap gap-1">
-                            <template x-for="d in dish.diets" :key="d">
-                                <span class="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700" x-text="d"></span>
-                            </template>
-                        </div>
+                        <template x-if="dish.additives && dish.additives.length">
+                            <div class="mt-4">
+                                <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Zusatzstoffe</div>
+                                <div class="mt-1 flex flex-wrap gap-1">
+                                    <template x-for="a in dish.additives" :key="a">
+                                        <span class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600" x-text="a"></span>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <template x-if="dish.diets && dish.diets.length">
+                            <div class="mt-4">
+                                <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Nicht geeignet bei</div>
+                                <div class="mt-1 flex flex-wrap gap-1">
+                                    <template x-for="d in dish.diets" :key="d">
+                                        <span class="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700" x-text="d"></span>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </template>
 
@@ -498,8 +580,19 @@
                         @csrf
                         <input type="hidden" name="eater_id" :value="dish.eaterId">
                         <input type="hidden" name="date" :value="dish.date">
-                        <input type="hidden" name="category_id" :value="dish.categoryId">
-                        <input type="hidden" name="dish_id" :value="dish.postDish">
+                        {{-- à-la-carte: category_id + dish_id · Menü: menu_day_id + attend --}}
+                        <template x-if="! dish.isMenu">
+                            <span>
+                                <input type="hidden" name="category_id" :value="dish.categoryId">
+                                <input type="hidden" name="dish_id" :value="dish.postDish">
+                            </span>
+                        </template>
+                        <template x-if="dish.isMenu">
+                            <span>
+                                <input type="hidden" name="menu_day_id" :value="dish.menuDayId">
+                                <input type="hidden" name="attend" :value="dish.isSel ? '0' : '1'">
+                            </span>
+                        </template>
                         <template x-if="dish.clickable">
                             <button type="submit"
                                     class="rounded-lg px-4 py-1.5 text-sm font-medium text-white"
