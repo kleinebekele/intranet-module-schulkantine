@@ -4,6 +4,7 @@ namespace Intranet\Modules\Schulkantine\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Intranet\Modules\Schulkantine\Models\Category;
 use Intranet\Modules\Schulkantine\Models\Dish;
 use Intranet\Modules\Schulkantine\Models\Menu;
 use Intranet\Modules\Schulkantine\Models\MenuDay;
@@ -114,10 +115,15 @@ class MenuController
             ->get()
             ->groupBy(fn (MenuDay $md) => $md->date->toDateString());
 
-        // Aktive Gerichte je Kategorie – für die Gericht-Auswahl in den Menü-Slots.
+        // Aktive Gerichte je Kategorie – für die Gericht-Auswahl in den Menü-Slots
+        // und den „+ hinzufügen"-Feldern je Kategorie.
         $dishesByCategory = Dish::where('is_active', true)
             ->orderBy('name')->get(['id', 'name', 'category_id'])
             ->groupBy('category_id');
+
+        // Echte Kategorien in Reihenfolge (sort_order) – „Ohne Kategorie" bleibt weg.
+        $categories = Category::where('is_active', true)
+            ->orderBy('sort_order')->orderBy('name')->get();
 
         // Wochen-Freigabe (hybrid): effektiver Zustand + evtl. manueller Override.
         $release = new ReleaseService;
@@ -131,6 +137,7 @@ class MenuController
             'ordersByDate' => $ordersByDate,
             'menuDaysByDate' => $menuDaysByDate,
             'dishesByCategory' => $dishesByCategory,
+            'categories' => $categories,
             'dishes' => Dish::where('is_active', true)->with('category')->orderBy('name')->get(),
             'prevWeek' => $weekStart->copy()->subWeek()->toDateString(),
             'nextWeek' => $weekStart->copy()->addWeek()->toDateString(),

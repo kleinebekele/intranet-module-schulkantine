@@ -124,37 +124,9 @@
                                 @if (! $d['open'])
                                     <p class="py-4 text-center text-xs text-amber-500">geschlossen</p>
                                 @else
-                                    @php $items = $plan[$d['date']->toDateString()] ?? []; @endphp
+                                    @php $items = collect($plan[$d['date']->toDateString()] ?? []); @endphp
 
-                                    @foreach (collect($items)->groupBy(fn ($m) => $m->dish->category?->name ?? 'Ohne Kategorie') as $catName => $catItems)
-                                        @php $catColor = $catItems->first()->dish->category?->color; @endphp
-                                        <fieldset class="rounded-lg border px-2 pb-2 {{ $catColor ? '' : 'border-gray-200' }}"
-                                                  @if ($catColor) style="border-color: {{ $catColor }}; background-color: {{ $catColor }}1a;" @endif>
-                                            <legend class="px-1 text-[11px] font-medium uppercase tracking-wide {{ $catColor ? '' : 'text-gray-400' }}"
-                                                    @if ($catColor) style="color: {{ $catColor }};" @endif>{{ $catName }}</legend>
-                                            <div class="space-y-1.5">
-                                                @foreach ($catItems as $m)
-                                                    <div class="flex items-center justify-between gap-2 rounded-md border border-gray-100 bg-white px-2 py-1 text-sm">
-                                                        <span class="min-w-0 text-gray-800">
-                                                            {{ $m->dish->name }}
-                                                        </span>
-                                                        @if ($m->orders_count > 0)
-                                                            <span title="Bereits bestellt – nicht mehr entfernbar" class="text-gray-300">🔒</span>
-                                                        @else
-                                                            <form method="POST" action="{{ route('module.schulkantine.menus.destroy', $m) }}"
-                                                                  onsubmit="return confirm('Gericht entfernen?')">
-                                                                @csrf @method('DELETE')
-                                                                <button type="submit" title="Entfernen"
-                                                                        class="text-gray-400 hover:text-red-600"><x-module-icon name="trash" class="text-sm" /></button>
-                                                            </form>
-                                                        @endif
-                                                    </div>
-                                                @endforeach
-                                            </div>
-                                        </fieldset>
-                                    @endforeach
-
-                                    {{-- Ausgerollte Menüs dieses Tages: Slots mit Gerichten füllen. --}}
+                                    {{-- Menüs immer oben. Slots mit Gerichten füllen. --}}
                                     @php $dayMenus = $menuDaysByDate[$d['date']->toDateString()] ?? collect(); @endphp
                                     @foreach ($dayMenus as $md)
                                         <form method="POST" action="{{ route('module.schulkantine.menus.fill-day', $md) }}"
@@ -205,34 +177,66 @@
                                         </form>
                                     @endforeach
 
-                                    {{-- Gericht hinzufügen (inline aufklappend) – immer unter den Menüs. --}}
-                                    <div x-data="{ open: false }">
-                                        <button type="button" @click="open = ! open" x-show="!open"
-                                                class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800">
-                                            <x-module-icon name="plus" class="text-sm" /> Gericht
-                                        </button>
-                                        <form x-show="open" x-cloak method="POST" action="{{ route('module.schulkantine.menus.store') }}" class="space-y-1.5">
-                                            @csrf
-                                            <input type="hidden" name="date" value="{{ $d['date']->toDateString() }}">
-                                            <select name="dish_id" required
-                                                    class="block w-full rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                                <option value="">— Gericht wählen —</option>
-                                                @foreach ($dishesByCat as $catName => $catDishes)
-                                                    <optgroup label="{{ $catName }}">
-                                                        @foreach ($catDishes as $dish)
-                                                            <option value="{{ $dish->id }}">{{ $dish->name }}</option>
-                                                        @endforeach
-                                                    </optgroup>
+                                    {{-- À-la-carte je Kategorie (Reihenfolge = sort_order, „Ohne Kategorie" bleibt weg).
+                                         Innerhalb der Kategorie: Preis absteigend, dann alphabetisch. Je Kategorie ein
+                                         „+ hinzufügen" mit Such-Dropdown der Gerichte genau dieser Kategorie. --}}
+                                    @foreach ($categories as $category)
+                                        @php
+                                            $catItems = $items->filter(fn ($m) => (int) ($m->dish->category_id ?? 0) === $category->id)
+                                                ->sort(fn ($a, $b) => [(float) $b->dish->price, mb_strtolower($a->dish->name)]
+                                                    <=> [(float) $a->dish->price, mb_strtolower($b->dish->name)])
+                                                ->values();
+                                            $catColor = $category->color;
+                                            $addOptions = ($dishesByCategory[$category->id] ?? collect())->map(fn ($x) => ['id' => $x->id, 'name' => $x->name])->values();
+                                        @endphp
+                                        <fieldset class="rounded-lg border px-2 pb-2 {{ $catColor ? '' : 'border-gray-200' }}"
+                                                  @if ($catColor) style="border-color: {{ $catColor }}; background-color: {{ $catColor }}1a;" @endif>
+                                            <legend class="px-1 text-[11px] font-medium uppercase tracking-wide {{ $catColor ? '' : 'text-gray-400' }}"
+                                                    @if ($catColor) style="color: {{ $catColor }};" @endif>{{ $category->name }}</legend>
+                                            <div class="space-y-1.5">
+                                                @foreach ($catItems as $m)
+                                                    <div class="flex items-center justify-between gap-2 rounded-md border border-gray-100 bg-white px-2 py-1 text-sm">
+                                                        <span class="min-w-0 text-gray-800">{{ $m->dish->name }}</span>
+                                                        @if ($m->orders_count > 0)
+                                                            <span title="Bereits bestellt – nicht mehr entfernbar" class="text-gray-300">🔒</span>
+                                                        @else
+                                                            <form method="POST" action="{{ route('module.schulkantine.menus.destroy', $m) }}"
+                                                                  onsubmit="return confirm('Gericht entfernen?')">
+                                                                @csrf @method('DELETE')
+                                                                <button type="submit" title="Entfernen"
+                                                                        class="text-gray-400 hover:text-red-600"><x-module-icon name="trash" class="text-sm" /></button>
+                                                            </form>
+                                                        @endif
+                                                    </div>
                                                 @endforeach
-                                            </select>
-                                            <div class="flex items-center gap-2">
-                                                <button type="submit"
-                                                        class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-700">Hinzufügen</button>
-                                                <button type="button" @click="open = false"
-                                                        class="text-xs text-gray-500 hover:text-gray-700">Abbrechen</button>
                                             </div>
-                                        </form>
-                                    </div>
+
+                                            {{-- + hinzufügen: Such-Dropdown der Gerichte dieser Kategorie; Klick fügt hinzu. --}}
+                                            <form method="POST" action="{{ route('module.schulkantine.menus.store') }}" class="relative mt-1.5"
+                                                  x-data="{ open: false, query: '', options: @js($addOptions),
+                                                            get filtered() { const t = this.query.trim().toLowerCase(); const o = t ? this.options.filter(d => d.name.toLowerCase().includes(t)) : this.options; return o.slice(0, 50); } }"
+                                                  @click.outside="open = false">
+                                                @csrf
+                                                <input type="hidden" name="date" value="{{ $d['date']->toDateString() }}">
+                                                <input type="hidden" name="dish_id" x-ref="dishId">
+                                                <button type="button" @click="open = ! open"
+                                                        class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800">
+                                                    <x-module-icon name="plus" class="text-sm" /> hinzufügen
+                                                </button>
+                                                <div x-show="open" x-cloak class="mt-1">
+                                                    <input type="text" x-model="query" placeholder="Gericht suchen …" autocomplete="off"
+                                                           class="block w-full rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                                    <ul class="mt-1 max-h-40 overflow-auto rounded-md border border-gray-200 bg-white py-1 text-xs shadow">
+                                                        <template x-for="dd in filtered" :key="dd.id">
+                                                            <li @click="$refs.dishId.value = dd.id; $root.submit()" x-text="dd.name"
+                                                                class="cursor-pointer px-2 py-1 hover:bg-indigo-50"></li>
+                                                        </template>
+                                                        <li x-show="! filtered.length" class="px-2 py-1 text-gray-400">kein Gericht in dieser Kategorie</li>
+                                                    </ul>
+                                                </div>
+                                            </form>
+                                        </fieldset>
+                                    @endforeach
 
                                     {{-- Bestellungen dieses Tages (Admin): wer hat was bestellt, mit Löschen. --}}
                                     @php $dayOrders = $ordersByDate[$d['date']->toDateString()] ?? collect(); @endphp
