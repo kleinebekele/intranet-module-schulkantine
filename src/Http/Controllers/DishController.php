@@ -70,7 +70,8 @@ class DishController
     {
         $this->authorizeAdmin($request);
 
-        return view('schulkantine::dishes.form', $this->formData(new Dish(['is_active' => true, 'price' => 0])));
+        return view('schulkantine::dishes.form',
+            $this->formData(new Dish(['is_active' => true, 'price' => 0])) + ['filters' => $this->filterParams($request)]);
     }
 
     public function store(Request $request)
@@ -82,7 +83,7 @@ class DishController
         $this->syncRelations($dish, $request);
 
         return redirect()
-            ->route('module.schulkantine.dishes.index')
+            ->route('module.schulkantine.dishes.index', $this->filterParams($request))
             ->with('status', 'Gericht „'.$dish->name.'" wurde angelegt.');
     }
 
@@ -92,7 +93,7 @@ class DishController
 
         $dish->load('allergens', 'additives', 'unsuitableDiets');
 
-        return view('schulkantine::dishes.form', $this->formData($dish));
+        return view('schulkantine::dishes.form', $this->formData($dish) + ['filters' => $this->filterParams($request)]);
     }
 
     public function update(Request $request, Dish $dish)
@@ -104,7 +105,7 @@ class DishController
         $this->syncRelations($dish, $request);
 
         return redirect()
-            ->route('module.schulkantine.dishes.index')
+            ->route('module.schulkantine.dishes.index', $this->filterParams($request))
             ->with('status', 'Gericht wurde gespeichert.');
     }
 
@@ -119,7 +120,7 @@ class DishController
         $dish->delete();
 
         return redirect()
-            ->route('module.schulkantine.dishes.index')
+            ->route('module.schulkantine.dishes.index', $this->filterParams($request))
             ->with('status', 'Gericht wurde gelöscht.');
     }
 
@@ -190,6 +191,20 @@ class DishController
         $dish->allergens()->sync($request->input('allergens', []));
         $dish->additives()->sync($request->input('additives', []));
         $dish->unsuitableDiets()->sync($request->input('diets', []));
+    }
+
+    /**
+     * Die aktiven Listen-Filter (Suche/Kategorie/Status/Sortierung), damit die
+     * Gerichte-Liste nach dem Bearbeiten wieder mit demselben Filter erscheint.
+     *
+     * @return array<string, string>
+     */
+    private function filterParams(Request $request): array
+    {
+        return array_filter(
+            $request->only(['search', 'category', 'status', 'sort']),
+            fn ($v) => $v !== null && $v !== '',
+        );
     }
 
     private function authorizeAdmin(Request $request): void

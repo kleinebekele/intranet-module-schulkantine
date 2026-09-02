@@ -18,6 +18,10 @@
               class="space-y-6 rounded-xl border border-gray-200 bg-white p-6">
             @csrf
             @if ($dish->exists) @method('PUT') @endif
+            {{-- Listen-Filter mitführen, damit nach dem Speichern wieder derselbe Filter greift. --}}
+            @foreach ($filters ?? [] as $fKey => $fVal)
+                <input type="hidden" name="{{ $fKey }}" value="{{ $fVal }}">
+            @endforeach
 
             <div>
                 <x-input-label for="name" value="Name des Gerichts" />
@@ -132,7 +136,7 @@
                     <x-module-icon name="{{ $dish->exists ? 'save' : 'plus' }}" class="text-base" />
                     {{ $dish->exists ? 'Speichern' : 'Gericht anlegen' }}
                 </button>
-                <a href="{{ route('module.schulkantine.dishes.index') }}"
+                <a href="{{ route('module.schulkantine.dishes.index', $filters ?? []) }}"
                    class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
                     <x-module-icon name="x" class="text-base" />
                     Abbrechen
@@ -166,6 +170,9 @@
                                         class="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100">Abbrechen</button>
                                 <form method="POST" action="{{ route('module.schulkantine.dishes.destroy', $dish) }}">
                                     @csrf @method('DELETE')
+                                    @foreach ($filters ?? [] as $fKey => $fVal)
+                                        <input type="hidden" name="{{ $fKey }}" value="{{ $fVal }}">
+                                    @endforeach
                                     <button type="submit"
                                             class="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">
                                         <x-module-icon name="trash" class="text-base" />
