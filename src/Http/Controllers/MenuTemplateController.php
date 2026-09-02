@@ -4,6 +4,7 @@ namespace Intranet\Modules\Schulkantine\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Intranet\Modules\Schulkantine\Models\Category;
 use Intranet\Modules\Schulkantine\Models\MenuTemplate;
 use Intranet\Modules\Schulkantine\Models\Season;
 
@@ -33,6 +34,19 @@ class MenuTemplateController
         return redirect()
             ->route('module.schulkantine.seasons.show', ['season' => $season, 'tab' => 'menues'])
             ->with('status', 'Menü „'.$template->name.'" wurde angelegt.');
+    }
+
+    public function edit(Request $request, MenuTemplate $menuTemplate)
+    {
+        $this->authorizeAdmin($request);
+
+        $menuTemplate->load('slots');
+
+        return view('schulkantine::seasons.menu-form', [
+            'season' => $menuTemplate->season,
+            'template' => $menuTemplate,
+            'categories' => Category::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(),
+        ]);
     }
 
     public function update(Request $request, MenuTemplate $menuTemplate)

@@ -56,6 +56,7 @@ Route::middleware(['web', 'auth'])
 
         // Menü-Vorlagen einer Saison (Ersatz für Sparmenüs) – Tab „Menüs".
         Route::post('saisons/{season}/menues', [MenuTemplateController::class, 'store'])->name('menu-templates.store');
+        Route::get('menues/{menuTemplate}/bearbeiten', [MenuTemplateController::class, 'edit'])->name('menu-templates.edit');
         Route::put('menues/{menuTemplate}', [MenuTemplateController::class, 'update'])->name('menu-templates.update');
         Route::delete('menues/{menuTemplate}', [MenuTemplateController::class, 'destroy'])->name('menu-templates.destroy');
 
