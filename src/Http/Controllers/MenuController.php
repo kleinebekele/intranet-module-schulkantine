@@ -93,6 +93,18 @@ class MenuController
             $plan[$m->date->toDateString()][] = $m;
         }
 
+        // Bestellungen der Woche je Tag (Admin sieht im Speiseplan, wer was bestellt
+        // hat, und kann einzelne Bestellungen löschen). Aktive Bestellungen –
+        // Menü (mit Gericht) und OGS (ohne Gericht = „OGS-Essen").
+        $ordersByDate = Order::where('season_id', $season->id)
+            ->whereBetween('date', [$weekStart->toDateString(), $weekEnd->toDateString()])
+            ->where('status', Order::STATUS_ORDERED)
+            ->with(['user:id,name', 'dish:id,name', 'category:id,name'])
+            ->orderBy('date')
+            ->get()
+            ->sortBy(fn (Order $o) => mb_strtolower($o->user?->name ?? ''))
+            ->groupBy(fn (Order $o) => $o->date->toDateString());
+
         // Wochen-Freigabe (hybrid): effektiver Zustand + evtl. manueller Override.
         $release = new ReleaseService;
 
@@ -102,6 +114,7 @@ class MenuController
             'weekEnd' => $weekEnd,
             'days' => $days,
             'plan' => $plan,
+            'ordersByDate' => $ordersByDate,
             'dishes' => Dish::where('is_active', true)->with('category')->orderBy('name')->get(),
             'prevWeek' => $weekStart->copy()->subWeek()->toDateString(),
             'nextWeek' => $weekStart->copy()->addWeek()->toDateString(),
@@ -186,6 +199,24 @@ class MenuController
         $menu->delete();
 
         return $this->redirectToWeek($date)->with('status', 'Gericht aus dem Speiseplan entfernt.');
+    }
+
+    /**
+     * Eine einzelne Bestellung löschen (Admin, aus dem Speiseplan). Umgeht bewusst
+     * die Eltern-Fristen – das ist die Superadmin-Korrektur. Ausgabe-Zeilen bleiben
+     * bestehen (order_id wird per Fremdschlüssel auf NULL gesetzt), damit die
+     * Historie nicht reißt.
+     */
+    public function destroyOrder(Request $request, Order $order)
+    {
+        $this->authorizeAdmin($request);
+
+        $date = $order->date->copy();
+        $name = $order->user?->name;
+        $order->delete();
+
+        return $this->redirectToWeek($date)
+            ->with('status', 'Bestellung'.($name ? ' von '.$name : '').' gelöscht.');
     }
 
     /**

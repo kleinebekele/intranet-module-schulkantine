@@ -86,6 +86,8 @@ Route::middleware(['web', 'auth'])
         Route::get('speiseplan', [MenuController::class, 'index'])->name('menus.index');
         Route::post('speiseplan', [MenuController::class, 'store'])->name('menus.store');
         Route::post('speiseplan/freigabe', [MenuController::class, 'releaseWeek'])->name('menus.release');
+        // Admin: einzelne Bestellung aus dem Speiseplan löschen.
+        Route::delete('speiseplan/bestellung/{order}', [MenuController::class, 'destroyOrder'])->name('menus.order-destroy');
         Route::delete('speiseplan/{menu}', [MenuController::class, 'destroy'])->name('menus.destroy');
 
         // Vorbestellung (für jeden eingeloggten Nutzer – sich selbst & seine Kinder)

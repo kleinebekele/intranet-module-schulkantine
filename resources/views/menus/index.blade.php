@@ -183,6 +183,37 @@
                                         </form>
                                     </div>
 
+                                    {{-- Bestellungen dieses Tages (Admin): wer hat was bestellt, mit Löschen. --}}
+                                    @php $dayOrders = $ordersByDate[$d['date']->toDateString()] ?? collect(); @endphp
+                                    <div x-data="{ open: false }" class="mt-2 border-t border-gray-100 pt-2">
+                                        <button type="button" @click="open = ! open"
+                                                class="flex w-full items-center justify-between text-xs font-medium text-gray-500 hover:text-gray-700">
+                                            <span class="inline-flex items-center gap-1">
+                                                <x-module-icon name="users" class="text-sm" /> Bestellungen ({{ $dayOrders->count() }})
+                                            </span>
+                                            <span class="text-gray-400" x-text="open ? '▲' : '▼'"></span>
+                                        </button>
+                                        <div x-show="open" x-cloak class="mt-1 space-y-1">
+                                            @forelse ($dayOrders as $o)
+                                                <div class="flex items-center justify-between gap-2 rounded-md bg-gray-50 px-2 py-1 text-xs">
+                                                    <span class="min-w-0 truncate">
+                                                        <span class="font-medium text-gray-700">{{ $o->user?->name ?? 'Unbekannt' }}</span>
+                                                        <span class="text-gray-400">·</span>
+                                                        <span class="text-gray-600">{{ $o->dish?->name ?? 'OGS-Essen' }}</span>
+                                                    </span>
+                                                    <form method="POST" action="{{ route('module.schulkantine.menus.order-destroy', $o) }}"
+                                                          onsubmit="return confirm('Bestellung von {{ $o->user?->name }} löschen?')">
+                                                        @csrf @method('DELETE')
+                                                        <button type="submit" title="Bestellung löschen"
+                                                                class="shrink-0 text-gray-400 hover:text-red-600"><x-module-icon name="trash" class="text-sm" /></button>
+                                                    </form>
+                                                </div>
+                                            @empty
+                                                <p class="text-xs text-gray-400">Noch keine Bestellungen.</p>
+                                            @endforelse
+                                        </div>
+                                    </div>
+
                                 @endif
                             </div>
                         </div>
