@@ -231,9 +231,47 @@
                                                             <span class="font-medium">isst an diesem Tag</span>
                                                         </label>
                                                     </form>
-                                                @elseif ($items->isEmpty())
+                                                @elseif ($items->isEmpty() && ($menuDaysByDate[$dateStr] ?? collect())->isEmpty())
                                                     <p class="py-6 text-center text-xs text-gray-400">kein Angebot</p>
                                                 @else
+                                                    {{-- Menüs des Tages: als Ganzes bestellbar (Festpreis). --}}
+                                                    @foreach (($menuDaysByDate[$dateStr] ?? collect()) as $md)
+                                                        @php
+                                                            $isMenuOrdered = isset($orderedMenus[$eater->id][$dateStr][$md->id]);
+                                                            $menuClickable = $day['canOrder'] || ($isMenuOrdered && $day['canCancel']);
+                                                            $menuAttend = $isMenuOrdered ? '0' : '1';
+                                                            $menuWarn = (($season->show_allergens ?? true)
+                                                                    && $md->slots->flatMap(fn ($s) => $s->dish?->allergens ?? collect())->pluck('id')->intersect($e['allergenIds'])->isNotEmpty())
+                                                                || (($season->show_diets ?? true)
+                                                                    && $md->slots->flatMap(fn ($s) => $s->dish?->unsuitableDiets ?? collect())->pluck('id')->intersect($e['dietIds'])->isNotEmpty());
+                                                        @endphp
+                                                        <form method="POST" action="{{ route('module.schulkantine.orders.store') }}">
+                                                            @csrf
+                                                            <input type="hidden" name="eater_id" value="{{ $eater->id }}">
+                                                            <input type="hidden" name="date" value="{{ $dateStr }}">
+                                                            <input type="hidden" name="menu_day_id" value="{{ $md->id }}">
+                                                            <input type="hidden" name="attend" value="{{ $menuAttend }}">
+                                                            <button type="submit" @disabled(! $menuClickable)
+                                                                    class="w-full rounded-lg border p-2 text-left transition
+                                                                           {{ $isMenuOrdered ? 'border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-300' : ($menuWarn ? 'border-red-300' : 'border-emerald-200') }}
+                                                                           {{ $menuClickable ? 'cursor-pointer hover:border-emerald-400' : 'cursor-not-allowed opacity-60' }}">
+                                                                <div class="flex items-center justify-between gap-2">
+                                                                    <span class="text-sm font-semibold text-emerald-800">🍽 {{ $md->name }}</span>
+                                                                    <span class="flex items-center gap-1 text-xs font-bold {{ $isMenuOrdered ? 'text-emerald-700' : 'text-gray-700' }}">
+                                                                        @if ($isMenuOrdered)
+                                                                            <span class="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">✓</span>
+                                                                        @endif
+                                                                        {{ $money($md->price) }}
+                                                                    </span>
+                                                                </div>
+                                                                <div class="mt-0.5 text-[11px] text-gray-500">{{ $md->slots->map(fn ($s) => $s->dish?->name)->filter()->join(' + ') }}</div>
+                                                                @if ($menuWarn)
+                                                                    <div class="mt-1 inline-flex items-center gap-1 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white">⚠️ Nicht geeignet</div>
+                                                                @endif
+                                                            </button>
+                                                        </form>
+                                                    @endforeach
+
                                                     {{-- Menü-Modus: pro Kategorie auswählbare Gericht-Karten --}}
                                                     @foreach ($items->groupBy(fn ($m) => $m->dish->category?->name ?? 'Ohne Kategorie') as $catName => $catItems)
                                                         @php

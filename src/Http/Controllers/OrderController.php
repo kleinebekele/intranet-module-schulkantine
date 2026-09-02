@@ -99,6 +99,8 @@ class OrderController
 
         // Tagesangebot der Woche (mit Allergenen/Diäten für die Warnungen).
         $plan = [];
+        // Vollständig zusammengestellte Menüs der Woche je Tag (bestellbar).
+        $menuDaysByDate = collect();
         if ($weekReleased) {
             $menus = Menu::where('season_id', $season->id)
                 ->whereBetween('date', [$weekStart->toDateString(), $weekEnd->toDateString()])
@@ -108,6 +110,15 @@ class OrderController
             foreach ($menus as $m) {
                 $plan[$m->date->toDateString()][] = $m;
             }
+
+            $menuDaysByDate = \Intranet\Modules\Schulkantine\Models\MenuDay::where('season_id', $season->id)
+                ->whereBetween('date', [$weekStart->toDateString(), $weekEnd->toDateString()])
+                ->with(['slots.dish.allergens', 'slots.dish.unsuitableDiets', 'slots.category'])
+                ->orderBy('id')
+                ->get()
+                // Nur Menüs, deren Slots alle ein Gericht haben (sonst nicht bestellbar).
+                ->filter(fn ($md) => $md->slots->isNotEmpty() && $md->slots->every(fn ($s) => $s->dish_id !== null))
+                ->groupBy(fn ($md) => $md->date->toDateString());
         }
 
         // Bestehende Bestellungen dieser Esser in dieser Woche.
@@ -125,14 +136,24 @@ class OrderController
         $ogsOrdered = [];
         // Tages-Summe je (Esser, Tag) aus den aktiven Bestellungen (Preis-Snapshot).
         $dayTotals = [];
+        // Bestellte Menüs je (Esser, Tag): menu_day_id → true.
+        $orderedMenus = [];
         foreach ($orders as $o) {
             $dateStr = $o->date->toDateString();
-            if ($o->category_id) {
+            if ($o->menu_day_id) {
+                // Menü-Bestellung (Slot). Zählt zur Tages-Summe, aber NICHT zur
+                // à-la-carte-Auswahl (sonst erschienen die Menü-Gerichte als einzeln
+                // gewählt). Das Menü selbst wird als Ganzes markiert.
+                if ($o->isActive()) {
+                    $orderedMenus[$o->user_id][$dateStr][$o->menu_day_id] = true;
+                    $dayTotals[$o->user_id][$dateStr] = ($dayTotals[$o->user_id][$dateStr] ?? 0) + (float) $o->price_snapshot;
+                }
+            } elseif ($o->category_id) {
                 if ($o->isActive()) {
                     $selected[$o->user_id][$dateStr][$o->category_id] = $o->dish_id;
                     $dayTotals[$o->user_id][$dateStr] = ($dayTotals[$o->user_id][$dateStr] ?? 0) + (float) $o->price_snapshot;
                 }
-            } else { // OGS (keine Kategorie)
+            } else { // OGS (keine Kategorie, kein Menü)
                 if ($o->isCancelled()) {
                     $ogsCancelled[$o->user_id][$dateStr] = true;
                 } elseif ($o->isActive()) {
@@ -230,6 +251,8 @@ class OrderController
             'eaters' => $eaterData,
             'weekReleased' => $weekReleased,
             'selected' => $selected,
+            'menuDaysByDate' => $menuDaysByDate,
+            'orderedMenus' => $orderedMenus,
             'ogsCancelled' => $ogsCancelled,
             'ogsOrdered' => $ogsOrdered,
             'subscribed' => $subscribed,
@@ -256,6 +279,8 @@ class OrderController
             // Menü-Modus:
             'category_id' => ['nullable', 'integer', 'exists:kantine_categories,id'],
             'dish_id' => ['nullable', 'integer', 'exists:kantine_dishes,id'],
+            // Menü (Bündel) als Ganzes:
+            'menu_day_id' => ['nullable', 'integer', 'exists:kantine_menu_days,id'],
             // OGS ja/nein:
             'attend' => ['nullable', 'in:0,1'],
         ]);
@@ -278,11 +303,121 @@ class OrderController
         $mode = $group?->ordering_mode;
         $deadline = new DeadlineService;
 
+        // Ganzes Menü bestellen/abbestellen (nicht für OGS-Esser).
+        if (! empty($data['menu_day_id']) && $mode !== CustomerGroup::MODE_JA_NEIN) {
+            return $this->handleMenuDay($season, $eater, $date, $deadline, (int) $data['menu_day_id'], $data['attend'] ?? '1');
+        }
+
         if ($mode === CustomerGroup::MODE_JA_NEIN) {
             return $this->handleOgs($request, $season, $eater, $date, $deadline, $data['attend'] ?? '1');
         }
 
         return $this->handleMenu($request, $season, $eater, $date, $deadline, $data);
+    }
+
+    /**
+     * Ein ganzes Menü bestellen (attend=1) oder abbestellen (attend=0). Ein Menü
+     * wird in seine gefüllten Slots zerlegt: je Slot eine normale Gericht-Bestellung
+     * (Kategorie + Gericht), alle mit derselben menu_day_id gruppiert. Der Festpreis
+     * des Menüs wird auf die Gerichte verteilt (Summe = Menü-Preis).
+     *
+     * Beim Bestellen werden vorherige Bestellungen des Essers an dem Tag verdrängt
+     * (à-la-carte wie andere Menüs) – ein Esser bekommt an einem Tag ein Menü ODER
+     * einzelne Gerichte, nicht beides doppelt.
+     */
+    private function handleMenuDay(Season $season, User $eater, Carbon $date, DeadlineService $deadline, int $menuDayId, string $attend)
+    {
+        $menuDay = \Intranet\Modules\Schulkantine\Models\MenuDay::with('slots.dish')
+            ->where('season_id', $season->id)
+            ->whereDate('date', $date->toDateString())
+            ->find($menuDayId);
+
+        abort_if(! $menuDay, 422, 'Dieses Menü steht an dem Tag nicht zur Verfügung.');
+
+        // Bereits für dieses Menü an dem Tag bestellt?
+        $existing = Order::where('season_id', $season->id)
+            ->where('user_id', $eater->id)
+            ->whereDate('date', $date->toDateString())
+            ->where('menu_day_id', $menuDay->id)
+            ->where('status', Order::STATUS_ORDERED)
+            ->exists();
+
+        if ($attend !== '1') {
+            // Abbestellen.
+            if ($existing && ! $deadline->canCancel($season, $date)) {
+                return back()->withErrors(['bestellung' => 'Die Abbestell-Frist für diesen Tag ist abgelaufen.']);
+            }
+            Order::where('season_id', $season->id)->where('user_id', $eater->id)
+                ->whereDate('date', $date->toDateString())->where('menu_day_id', $menuDay->id)->delete();
+
+            return back()->with('status', 'Abbestellt: '.$menuDay->name.' für '.$eater->name.' am '.$date->format('d.m.Y').'.');
+        }
+
+        // Bestellen – nur wenn alle Slots ein Gericht haben.
+        $slots = $menuDay->slots;
+        if ($slots->isEmpty() || $slots->contains(fn ($s) => $s->dish_id === null)) {
+            return back()->withErrors(['bestellung' => 'Dieses Menü ist noch nicht vollständig zusammengestellt.']);
+        }
+        if (! $deadline->canOrder($season, $date)) {
+            return back()->withErrors(['bestellung' => 'Die Bestellfrist für diesen Tag ist abgelaufen.']);
+        }
+
+        // Verdrängung: alle aktiven Gericht-/Menü-Bestellungen des Essers an dem Tag
+        // (nicht OGS) räumen, dann das Menü frisch anlegen.
+        Order::where('season_id', $season->id)->where('user_id', $eater->id)
+            ->whereDate('date', $date->toDateString())
+            ->where('status', Order::STATUS_ORDERED)
+            ->where(fn ($q) => $q->whereNotNull('category_id')->orWhereNotNull('menu_day_id'))
+            ->delete();
+
+        $prices = $this->distributeMenuPrice((float) $menuDay->price, $slots->map(fn ($s) => (float) ($s->dish->price ?? 0))->all());
+
+        foreach ($slots->values() as $i => $slot) {
+            Order::create([
+                'season_id' => $season->id,
+                'user_id' => $eater->id,
+                'date' => $date->toDateString(),
+                'menu_day_id' => $menuDay->id,
+                'dish_id' => $slot->dish_id,
+                'category_id' => $slot->category_id,
+                'price_snapshot' => $prices[$i] ?? 0,
+                'status' => Order::STATUS_ORDERED,
+            ]);
+        }
+
+        return back()->with('status', 'Bestellt: '.$menuDay->name.' für '.$eater->name.' am '.$date->format('d.m.Y').'.');
+    }
+
+    /**
+     * Verteilt den Menü-Festpreis auf die Bestandteil-Gerichte – proportional zu
+     * ihren Einzelpreisen, damit die Summe exakt dem Menü-Preis entspricht. Ohne
+     * Einzelpreise (alle 0) wird gleichmäßig geteilt. Rundungsrest landet auf dem
+     * ersten Posten.
+     *
+     * @param  array<int,float>  $dishPrices
+     * @return array<int,float>
+     */
+    private function distributeMenuPrice(float $menuPrice, array $dishPrices): array
+    {
+        $n = count($dishPrices);
+        if ($n === 0) {
+            return [];
+        }
+        $sum = array_sum($dishPrices);
+
+        $parts = [];
+        if ($sum > 0) {
+            foreach ($dishPrices as $p) {
+                $parts[] = round($menuPrice * $p / $sum, 2);
+            }
+        } else {
+            $each = round($menuPrice / $n, 2);
+            $parts = array_fill(0, $n, $each);
+        }
+        // Rundungsrest auf den ersten Posten legen, damit die Summe exakt stimmt.
+        $parts[0] = round($parts[0] + ($menuPrice - array_sum($parts)), 2);
+
+        return $parts;
     }
 
     /**
@@ -442,16 +577,29 @@ class OrderController
             ->where('status', Order::STATUS_ORDERED)
             ->whereNotNull('category_id') // NULL = OGS ja/nein, betrifft uns nicht
             ->when($keep, fn ($q) => $q->where('id', '!=', $keep->id))
-            ->with('dish')
+            ->with(['dish', 'menuDay'])
             ->get();
 
         $displaced = [];
+        $droppedMenus = [];
         foreach ($others as $o) {
             $theirs = array_values(array_filter([$o->category_id]));
 
             if (array_intersect($theirs, $occupied) !== []) {
-                $displaced[] = $o->dish?->name ?? 'frühere Bestellung';
-                $o->delete();
+                // Gehört die Zeile zu einem Menü, fällt das GANZE Menü (kein
+                // verwaister Slot); sonst nur diese Gericht-Bestellung.
+                if ($o->menu_day_id) {
+                    if (! in_array($o->menu_day_id, $droppedMenus, true)) {
+                        $droppedMenus[] = $o->menu_day_id;
+                        $displaced[] = $o->menuDay?->name ?? 'Menü';
+                        Order::where('user_id', $eater->id)->where('season_id', $season->id)
+                            ->whereDate('date', $date->toDateString())
+                            ->where('menu_day_id', $o->menu_day_id)->delete();
+                    }
+                } else {
+                    $displaced[] = $o->dish?->name ?? 'frühere Bestellung';
+                    $o->delete();
+                }
             }
         }
 

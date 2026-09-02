@@ -22,6 +22,7 @@ class Order extends Model
         'user_id',
         'date',
         'menu_id',
+        'menu_day_id',
         'dish_id',
         'category_id',
         'price_snapshot',
@@ -60,6 +61,12 @@ class Order extends Model
     public function menu(): BelongsTo
     {
         return $this->belongsTo(Menu::class);
+    }
+
+    /** Der Menü-Tag, zu dem diese Bestellung gehört (Slot-Bestellung eines Menüs). */
+    public function menuDay(): BelongsTo
+    {
+        return $this->belongsTo(MenuDay::class);
     }
 
     public function dish(): BelongsTo
