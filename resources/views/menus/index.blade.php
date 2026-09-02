@@ -143,31 +143,46 @@
                                     {{-- Menüs immer oben. Slots mit Gerichten füllen. --}}
                                     @php $dayMenus = $menuDaysByDate[$d['date']->toDateString()] ?? collect(); @endphp
                                     @foreach ($dayMenus as $md)
+                                        @php $menuIncomplete = $md->slots->isEmpty() || $md->slots->contains(fn ($s) => $s->dish_id === null); @endphp
                                         @if ($weekReleased)
                                             {{-- Festgeschriebene Woche: Menü nur noch lesbar. --}}
-                                            <div class="rounded-lg border border-emerald-200 bg-emerald-50/40 px-2 py-2">
-                                                <div class="flex items-center justify-between gap-2">
-                                                    <span class="text-xs font-semibold text-emerald-800">🍽 {{ $md->name }}</span>
+                                            <div class="rounded-lg border {{ $menuIncomplete ? 'border-amber-300 bg-amber-50/50' : 'border-emerald-200 bg-emerald-50/40' }} px-2 py-2">
+                                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                                    <span class="text-xs font-semibold text-emerald-800">🍽 {{ $md->name }}
+                                                        @if ($menuIncomplete)
+                                                            <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">unvollständig</span>
+                                                        @endif
+                                                    </span>
                                                     <span class="text-xs font-bold text-emerald-700">{{ number_format((float) $md->price, 2, ',', '.') }} €</span>
                                                 </div>
                                                 <div class="mt-1 space-y-0.5">
                                                     @foreach ($md->slots as $slot)
                                                         <div class="text-xs">
                                                             <span class="text-[10px] uppercase tracking-wide text-gray-400">{{ $slot->category?->name }}:</span>
-                                                            <span class="text-gray-800">{{ $slot->dish?->name ?? '—' }}</span>
+                                                            <span class="{{ $slot->dish_id ? 'text-gray-800' : 'font-medium text-amber-600' }}">{{ $slot->dish?->name ?? '— fehlt —' }}</span>
                                                         </div>
                                                     @endforeach
                                                 </div>
+                                                @if ($menuIncomplete)
+                                                    <p class="mt-1 text-[10px] leading-tight text-amber-600">⚠️ Unvollständig – kann nicht bestellt werden, solange nicht alle Plätze ein Gericht haben.</p>
+                                                @endif
                                             </div>
                                             @continue
                                         @endif
                                         <form method="POST" action="{{ route('module.schulkantine.menus.fill-day', $md) }}"
-                                              class="rounded-lg border border-emerald-200 bg-emerald-50/40 px-2 py-2">
+                                              class="rounded-lg border {{ $menuIncomplete ? 'border-amber-300 bg-amber-50/50' : 'border-emerald-200 bg-emerald-50/40' }} px-2 py-2">
                                             @csrf
-                                            <div class="flex items-center justify-between gap-2">
-                                                <span class="text-xs font-semibold text-emerald-800">🍽 {{ $md->name }}</span>
+                                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                                <span class="text-xs font-semibold text-emerald-800">🍽 {{ $md->name }}
+                                                    @if ($menuIncomplete)
+                                                        <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">unvollständig</span>
+                                                    @endif
+                                                </span>
                                                 <span class="text-xs font-bold text-emerald-700">{{ number_format((float) $md->price, 2, ',', '.') }} €</span>
                                             </div>
+                                            @if ($menuIncomplete)
+                                                <p class="mt-1 text-[10px] leading-tight text-amber-600">⚠️ Kann nicht bestellt werden, solange nicht alle Plätze ein Gericht haben.</p>
+                                            @endif
                                             <div class="mt-1.5 space-y-1.5">
                                                 @foreach ($md->slots as $slot)
                                                     @php $slotDishes = ($dishesByCategory[$slot->category_id] ?? collect())->map(fn ($x) => ['id' => $x->id, 'name' => $x->name])->values(); @endphp

@@ -22,6 +22,10 @@ Sie z. B. „Kartoffel", bleiben nur passende Gerichte der Kategorie übrig; ein
 Gericht. Mit **Menü speichern** wird die Auswahl übernommen. Ein Menü ist erst bestellbar,
 wenn alle Slots gefüllt sind.
 
+Fehlt noch ein Gericht, trägt das Menü die Markierung **„unvollständig"** und einen Hinweis,
+dass es so nicht bestellt werden kann; auf „Essen bestellen" taucht es dann gar nicht erst
+auf. Sobald alle Plätze ein Gericht haben, verschwindet die Markierung.
+
 ## Einzelgerichte je Kategorie
 
 rollen: admin
