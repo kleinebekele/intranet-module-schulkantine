@@ -341,13 +341,19 @@ class MenuController
         ]);
     }
 
-    /** Gibt es für die Woche von $anyDayInWeek (irgend)eine Bestellung? */
+    /**
+     * Gibt es für die Woche von $anyDayInWeek eine AKTIVE Bestellung? Nur aktive
+     * (status = bestellt) zählen – eine stornierte Zeile (z. B. OGS-Abbestellung
+     * legt eine „storniert"-Zeile an) ist keine Bestellung, die man schützen müsste,
+     * und darf das Zurückhalten/Bearbeiten der Woche nicht blockieren.
+     */
     private function weekHasOrders(Season $season, Carbon $anyDayInWeek): bool
     {
         $weekStart = $anyDayInWeek->copy()->startOfWeek(Carbon::MONDAY);
         $weekEnd = $weekStart->copy()->addDays(6);
 
         return Order::where('season_id', $season->id)
+            ->where('status', Order::STATUS_ORDERED)
             ->whereBetween('date', [$weekStart->toDateString(), $weekEnd->toDateString()])
             ->exists();
     }
