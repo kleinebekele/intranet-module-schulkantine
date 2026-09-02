@@ -86,6 +86,58 @@ class MenuRolloutService
     }
 
     /**
+     * Rollt die aktiven Vorlagen auf EINE Woche aus – unabhängig vom Freigabe-Status
+     * (bewusst: ein per-Woche-Push aktualisiert auch eine bereits freigegebene Woche).
+     * Frischt vorhandene Menü-Tage auf und legt fehlende an; entfernt nichts (bereits
+     * bestellte Menüs bleiben erhalten).
+     *
+     * @return array{days:int, menus:int}
+     */
+    public function pushWeek(Season $season, Carbon $anyDayInWeek, ?Carbon $today = null): array
+    {
+        $today = ($today ?? Carbon::today())->startOfDay();
+
+        $templates = $season->menuTemplates()
+            ->where('is_active', true)
+            ->with('slots')
+            ->get();
+
+        if ($templates->isEmpty()) {
+            return ['days' => 0, 'menus' => 0];
+        }
+
+        $monday = $this->release->weekStart($anyDayInWeek);
+        $weekEnd = $monday->copy()->addWeek();
+
+        $days = 0;
+        $menus = 0;
+        for ($day = $monday->copy(); $day->lt($weekEnd); $day->addDay()) {
+            // Vergangene Tage und Tage außerhalb der Saison überspringen.
+            if ($day->lt($today) || $day->lt($season->start_date) || $day->gt($season->end_date)) {
+                continue;
+            }
+            if (! $season->isOpenOn($day)) {
+                continue;
+            }
+
+            $touched = false;
+            foreach ($templates as $template) {
+                if (! $template->availableOn($day)) {
+                    continue;
+                }
+                $this->materialize($season, $template, $day);
+                $menus++;
+                $touched = true;
+            }
+            if ($touched) {
+                $days++;
+            }
+        }
+
+        return ['days' => $days, 'menus' => $menus];
+    }
+
+    /**
      * Legt einen Menü-Tag an bzw. frischt ihn auf (Snapshot Name/Preis) und
      * synchronisiert seine Slots mit der Vorlage – gewählte Gerichte bleiben,
      * solange Kategorie und Position passen.

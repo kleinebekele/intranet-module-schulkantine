@@ -88,6 +88,8 @@ Route::middleware(['web', 'auth'])
         Route::get('speiseplan', [MenuController::class, 'index'])->name('menus.index');
         Route::post('speiseplan', [MenuController::class, 'store'])->name('menus.store');
         Route::post('speiseplan/freigabe', [MenuController::class, 'releaseWeek'])->name('menus.release');
+        // Menüs dieser Woche neu ausrollen (auch bei freigegebener Woche).
+        Route::post('speiseplan/menues-pushen', [MenuController::class, 'pushWeek'])->name('menus.push-week');
         // Admin: einzelne Bestellung aus dem Speiseplan löschen.
         Route::delete('speiseplan/bestellung/{order}', [MenuController::class, 'destroyOrder'])->name('menus.order-destroy');
         // Ausgerolltes Menü eines Tages mit Gerichten füllen.

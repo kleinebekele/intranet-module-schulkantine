@@ -11,6 +11,7 @@ use Intranet\Modules\Schulkantine\Models\MenuDay;
 use Intranet\Modules\Schulkantine\Models\Order;
 use Intranet\Modules\Schulkantine\Models\Season;
 use Intranet\Modules\Schulkantine\Models\WeekRelease;
+use Intranet\Modules\Schulkantine\Support\MenuRolloutService;
 use Intranet\Modules\Schulkantine\Support\ReleaseService;
 
 /**
@@ -173,6 +174,28 @@ class MenuController
         $this->addDishToPlan($season, $date, (int) $data['dish_id']);
 
         return $this->redirectToWeek($date)->with('status', 'Speiseplan aktualisiert.');
+    }
+
+    /**
+     * „Push" nur für die angezeigte Woche: rollt die aktiven Menü-Vorlagen nach
+     * aktuellem Stand auf diese Woche aus – auch wenn sie bereits freigegeben ist.
+     * Bereits bestellte/angelegte Menüs bleiben erhalten (auffrischen, nichts löschen).
+     */
+    public function pushWeek(Request $request)
+    {
+        $this->authorizeAdmin($request);
+
+        $data = $request->validate(['week' => ['required', 'date']]);
+        $season = Season::where('is_active', true)->firstOrFail();
+        $week = Carbon::parse($data['week']);
+
+        $result = (new MenuRolloutService)->pushWeek($season, $week);
+
+        $message = $result['menus'] === 0
+            ? 'Nichts auszurollen – keine aktiven Menüs für diese Woche.'
+            : $result['menus'].' Menüs auf '.$result['days'].' Öffnungstage dieser Woche ausgerollt (nach aktuellen Einstellungen).';
+
+        return $this->redirectToWeek($week)->with('status', $message);
     }
 
     /** Eine freigegebene (festgeschriebene) Woche ist im Speiseplan schreibgeschützt. */
