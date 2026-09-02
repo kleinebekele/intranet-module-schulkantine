@@ -96,11 +96,13 @@ class MenuController
         }
 
         // Bestellungen der Woche je Tag (Admin sieht im Speiseplan, wer was bestellt
-        // hat, und kann einzelne Bestellungen löschen). Aktive Bestellungen –
-        // Menü (mit Gericht) und OGS (ohne Gericht = „OGS-Essen").
+        // hat, und kann einzelne Bestellungen löschen). Nur Speiseplan-Bestellungen:
+        // à-la-carte-Gerichte und Menüs (category_id gesetzt). OGS (ja/nein) taucht
+        // hier bewusst NICHT auf – das gehört nicht zum Speiseplan und verwirrt nur.
         $ordersByDate = Order::where('season_id', $season->id)
             ->whereBetween('date', [$weekStart->toDateString(), $weekEnd->toDateString()])
             ->where('status', Order::STATUS_ORDERED)
+            ->whereNotNull('category_id')
             ->with(['user:id,name', 'dish:id,name', 'category:id,name'])
             ->orderBy('date')
             ->get()
@@ -342,10 +344,11 @@ class MenuController
     }
 
     /**
-     * Gibt es für die Woche von $anyDayInWeek eine AKTIVE Bestellung? Nur aktive
-     * (status = bestellt) zählen – eine stornierte Zeile (z. B. OGS-Abbestellung
-     * legt eine „storniert"-Zeile an) ist keine Bestellung, die man schützen müsste,
-     * und darf das Zurückhalten/Bearbeiten der Woche nicht blockieren.
+     * Gibt es für die Woche von $anyDayInWeek eine AKTIVE Speiseplan-Bestellung?
+     * Nur aktive (status = bestellt) zählen, und nur solche, die den Speiseplan
+     * betreffen: à-la-carte-Gerichte und Menüs (category_id gesetzt). OGS (ja/nein,
+     * category_id NULL) und stornierte Zeilen zählen NICHT – sie haben mit dem
+     * Speiseplan nichts zu tun und dürfen das Zurückhalten/Bearbeiten nicht sperren.
      */
     private function weekHasOrders(Season $season, Carbon $anyDayInWeek): bool
     {
@@ -354,6 +357,7 @@ class MenuController
 
         return Order::where('season_id', $season->id)
             ->where('status', Order::STATUS_ORDERED)
+            ->whereNotNull('category_id')
             ->whereBetween('date', [$weekStart->toDateString(), $weekEnd->toDateString()])
             ->exists();
     }
