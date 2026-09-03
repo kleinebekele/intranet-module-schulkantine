@@ -189,30 +189,73 @@ class BillingService
             ->whereBetween('date', [$from, $to])
             ->get()->keyBy('order_id');
 
-        // 1) Menü-Bestellungen (verbindlich) – je Datum/Gericht, inkl. Ausgabe-Ergebnis.
+        // 1) Vorbestellungen (verbindlich) – Einzelgerichte einzeln, Menüs zu EINER Zeile
+        //    gebündelt (Menüname + Gerichte, echter Menüpreis – keine verteilten Einzelpreise).
         $menuOrders = Order::where('season_id', $season->id)
             ->where('user_id', $userId)
             ->where('status', Order::STATUS_ORDERED)
             ->whereNotNull('category_id')
             ->whereBetween('date', [$from, $to])
-            ->with(['dish.category', 'category'])
+            ->with(['dish.category', 'category', 'menuDay'])
             ->orderBy('date')->get();
-        $menu = $menuOrders->map(function (Order $o) use ($servedByOrder) {
-            $sv = $servedByOrder->get($o->id);
-            // outcome: none = nicht abgehakt (No-Show) · taken · alternative · declined
-            $outcome = $sv === null
+
+        // Ausgabe-Ergebnis einer Bestellung: none = nicht abgehakt (No-Show).
+        $outcomeOf = function ($sv) {
+            return $sv === null
                 ? 'none'
                 : ($sv->declined ? 'declined' : ($sv->alternative ? 'alternative' : 'taken'));
+        };
 
-            return [
+        $menu = [];
+
+        // À-la-carte (ohne Menü): jede Bestellung eine Zeile.
+        foreach ($menuOrders->whereNull('menu_day_id') as $o) {
+            $sv = $servedByOrder->get($o->id);
+            $menu[] = [
                 'date' => $o->date,
+                'is_menu' => false,
+                'menu_name' => null,
                 'dish' => $o->dish?->name ?? '—',
                 'category' => $o->dish?->category?->name ?? $o->category?->name ?? '—',
                 'price' => (float) $o->price_snapshot,
-                'outcome' => $outcome,
+                'outcome' => $outcomeOf($sv),
                 'reason' => $sv?->decline_reason,
             ];
-        })->all();
+        }
+
+        // Menüs: je menu_day_id eine Zeile. Preis = Summe der Slot-Snapshots (= Menüpreis).
+        foreach ($menuOrders->whereNotNull('menu_day_id')->groupBy('menu_day_id') as $group) {
+            $first = $group->first();
+            $svs = $group->map(fn (Order $o) => $servedByOrder->get($o->id));
+            $declined = $svs->first(fn ($s) => $s !== null && $s->declined);
+            if ($svs->every(fn ($s) => $s === null)) {
+                $outcome = 'none';
+            } elseif ($declined) {
+                $outcome = 'declined';
+            } elseif ($svs->contains(fn ($s) => $s !== null && $s->alternative)) {
+                $outcome = 'alternative';
+            } else {
+                $outcome = 'taken';
+            }
+
+            $menu[] = [
+                'date' => $first->date,
+                'is_menu' => true,
+                'menu_name' => $first->menuDay?->name ?? 'Menü',
+                'dish' => $group->map(fn (Order $o) => $o->dish?->name ?? '—')->implode(' + '),
+                'category' => 'Menü',
+                'price' => (float) $group->sum(fn (Order $o) => (float) $o->price_snapshot),
+                'outcome' => $outcome,
+                'reason' => $declined?->decline_reason,
+            ];
+        }
+
+        // Nach Datum sortieren; bei gleichem Tag Menüs zuerst.
+        usort($menu, function ($a, $b) {
+            return [$a['date']->toDateString(), $a['is_menu'] ? 0 : 1]
+                <=> [$b['date']->toDateString(), $b['is_menu'] ? 0 : 1];
+        });
+
         $menuTotal = array_sum(array_column($menu, 'price'));
 
         // 2) OGS – teilgenommene Tage (Abo minus Abbestellungen bzw. bestellte Tage).

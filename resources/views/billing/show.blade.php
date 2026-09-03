@@ -59,7 +59,12 @@
                                 <tr>
                                     <td class="px-4 py-2 whitespace-nowrap text-gray-600">{{ $day($row['date']) }}</td>
                                     <td class="px-3 py-2 font-medium text-gray-800">
-                                        {{ $row['dish'] }}
+                                        @if ($row['is_menu'] ?? false)
+                                            <span class="font-semibold text-gray-900">{{ $row['menu_name'] }}:</span>
+                                            <span class="text-gray-700">{{ $row['dish'] }}</span>
+                                        @else
+                                            {{ $row['dish'] }}
+                                        @endif
                                         @if ($row['outcome'] === 'none')
                                             <span class="ml-1 rounded-full bg-rose-50 px-1.5 py-0.5 text-xs font-medium text-rose-600"
                                                   title="Bestellt, aber nicht abgeholt – wird trotzdem berechnet">No-Show</span>
