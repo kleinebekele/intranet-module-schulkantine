@@ -74,6 +74,11 @@
             // Kennung an denselben Ablauf wie Web-NFC. UID wird serverseitig normalisiert.
             wedgeBuf: '',
             wedgeAt: 0,
+            // Serieller Chipleser (alter 125-kHz-Leser am USB-COM-Adapter) per Web Serial
+            // (Chrome/Edge am PC). Rahmen: STX + Kennung + ETX CR LF. Einmal „verbinden",
+            // danach öffnet der Browser den freigegebenen Port beim Laden von selbst.
+            serialOk: false,
+            serialBuf: '',
             servedOnLoad: false,   // war beim Stempeln schon etwas gebucht?
             mode: 'vorbesteller',  // 'vorbesteller' | 'ogs' | 'overview'
             hasOgs: @js($hasOgs ?? false),   // gibt/gab es OGS in der Saison? (steuert den Umschalter)
@@ -122,6 +127,63 @@
                 // USB-Hardware-Scanner (Tastatur-Emulation) immer global mithören –
                 // kein „Scan starten" nötig, der Reader ist auf OS-Ebene dauerhaft aktiv.
                 window.addEventListener('keydown', (e) => this.onWedgeKey(e));
+                // Bereits freigegebener COM-Leser: ohne Klick wieder verbinden.
+                if (this.hasSerial()) this.serialConnect(false);
+            },
+
+            // ---- Serieller Chipleser (Web Serial) ----
+            hasSerial() { return 'serial' in navigator; },
+            async serialConnect(ask) {
+                if (!this.hasSerial()) { this.banner = { ok:false, text:'Web Serial fehlt: Chrome oder Edge am PC verwenden.' }; return; }
+                try {
+                    let port = null;
+                    if (ask) port = await navigator.serial.requestPort();
+                    else port = (await navigator.serial.getPorts())[0] || null;
+                    if (!port) return;
+                    await port.open({ baudRate: 9600 });
+                    this.serialOk = true;
+                    this.serialRead(port);
+                } catch (err) {
+                    this.serialOk = false;
+                    if (ask) this.banner = { ok:false, text:'COM-Leser: ' + (err && err.message ? err.message : err) };
+                }
+            },
+            async serialRead(port) {
+                const dec = new TextDecoder();
+                try {
+                    while (port.readable) {
+                        const reader = port.readable.getReader();
+                        try {
+                            while (true) {
+                                const { value, done } = await reader.read();
+                                if (done) break;
+                                this.serialChunk(dec.decode(value));
+                            }
+                        } finally { reader.releaseLock(); }
+                    }
+                } catch (e) { /* Leser abgezogen */ }
+                this.serialOk = false;
+            },
+            serialChunk(text) {
+                for (const ch of text) {
+                    if (ch.charCodeAt(0) === 2) { this.serialBuf = ''; continue; }
+                    const c = ch.charCodeAt(0); if (c === 3 || c === 13 || c === 10) {
+                        const raw = this.serialBuf; this.serialBuf = '';
+                        const uid = this.serialUid(raw);
+                        if (uid) { if (this.searchOpen) this.closeSearch(); this.openFor(uid); }
+                        continue;
+                    }
+                    this.serialBuf += ch;
+                }
+            },
+            // Alter Leser: 12 Zeichen = führende „0" + 10 Hex Kennung + Prüfzeichen.
+            // Die Kennung ist genau das, was im Altsystem (ohne führende 0, ohne
+            // Prüfzeichen) gespeichert war und per Import übernommen wurde.
+            serialUid(raw) {
+                const s = raw.trim();
+                if (/^0[0-9A-Fa-f]{10}.$/.test(s)) return s.slice(1, 11);
+                if (/^[0-9A-Fa-f]{10}.$/.test(s)) return s.slice(0, 10);
+                return s.length >= 4 ? s : '';
             },
             hashForMode(m) { return ({ vorbesteller: 'vorbesteller', ogs: 'ogs', overview: 'uebersicht' })[m] || 'vorbesteller'; },
             // Breite der vertikalen Scrollleiste – damit die Übersicht-Matrix (scrollt)
@@ -1116,6 +1178,10 @@
                  class="absolute bottom-12 left-0 max-h-[60vh] w-72 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 shadow-2xl">
                 <div class="mb-2 rounded-lg bg-green-50 px-2 py-1.5 text-xs leading-tight text-green-700">
                     🔌 <strong>USB-Scanner</strong> (Tastatur-Modus): einfach Chip auflegen – läuft automatisch, ohne „Scan starten".
+                </div>
+                <div x-show="hasSerial()" class="mb-2 flex items-center gap-2">
+                    <button x-show="!serialOk" @click="serialConnect(true)" class="flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white">COM-Leser verbinden (alter Leser)</button>
+                    <span x-show="serialOk" x-cloak class="flex-1 rounded-lg bg-green-100 px-3 py-2 text-sm font-medium text-green-800">🟢 COM-Leser aktiv</span>
                 </div>
                 <div class="mb-2 flex items-center gap-2">
                     <button x-show="!scanning" @click="startScan()" class="flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white">NFC-Scan starten (Android)</button>

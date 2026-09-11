@@ -69,7 +69,9 @@ class ImportChips extends Command
 
         foreach ($zeilen as $z) {
             $adrNr = $z['adrnr'];
-            $uid = NfcChip::normalize($z['code']);
+            // Altsystem: 10 Hex-Zeichen + 1 Prüfzeichen (z. B. 0112E3D95CO) – nur die Kennung zählt.
+            $code = preg_match('/^([0-9A-Fa-f]{10})[0-9:;<=>?@A-O]$/', $z['code'], $m) ? $m[1] : $z['code'];
+            $uid = NfcChip::normalize($code);
             $label = "AdrNr {$adrNr} / Code {$z['code']}";
 
             if ($uid === '') {
