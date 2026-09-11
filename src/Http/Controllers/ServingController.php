@@ -252,6 +252,28 @@ class ServingController
     }
 
     /**
+     * Kurzes Etikett neben dem Namen im Terminal: die Klasse (importierte
+     * Teilnehmer-Info), sonst die Personengruppe nach Rolle (Lehrer, Mitarbeiter,
+     * Eltern, Schüler), sonst die Kundengruppe. „Klasse: Sonstige" war irreführend.
+     */
+    public static function personLabel(User $user, ?CustomerGroup $group): string
+    {
+        $info = trim((string) $user->kantineInfo?->info);
+        if ($info !== '') {
+            return preg_match('/^\d/', $info) ? 'Klasse '.$info : $info;
+        }
+
+        $roleIds = $user->roles->pluck('role_id');
+        foreach (['teacher' => 'Lehrer', 'staff' => 'Mitarbeiter', 'parent' => 'Eltern', 'student' => 'Schüler'] as $rolle => $text) {
+            if ($roleIds->contains($rolle)) {
+                return $text;
+            }
+        }
+
+        return $group?->name ?? '–';
+    }
+
+    /**
      * Aufbereitete Ausgabe-Info eines Essers für Modal/Lookup: Gruppe, Bestellung
      * (mit Sonderkost-Warnungen), Ausgabe-Status. Verändert nichts.
      *
@@ -259,7 +281,7 @@ class ServingController
      */
     private function eaterServingInfo(Season $season, User $eater, Carbon $date): array
     {
-        $eater->loadMissing(['kantineAllergens', 'kantineDiets', 'roles']);
+        $eater->loadMissing(['kantineAllergens', 'kantineDiets', 'roles', 'kantineInfo']);
         $group = CustomerGroup::forUser($eater);
         $mode = $group?->ordering_mode;
 
@@ -336,6 +358,7 @@ class ServingController
             'user_id' => $eater->id,
             'name' => $eater->name,
             'group' => $group?->name,
+            'label' => self::personLabel($eater, $group),
             'mode' => $mode,
             'served' => $this->isServed($season, $eater, $date),
             'hasOrder' => $hasOrder,
@@ -1148,6 +1171,7 @@ class ServingController
                     'id' => $u->id,
                     'name' => $u->name,
                     'group' => 'OGS',
+                    'label' => 'OGS',
                 ])->values(),
             ]);
         }
@@ -1157,7 +1181,7 @@ class ServingController
 
         $users = User::where('name', 'like', '%'.$q.'%')
             ->whereDoesntHave('roles', fn ($r) => $r->whereIn('roles.role_id', $ogsRoleIds))
-            ->with('roles')
+            ->with(['roles', 'kantineInfo'])
             ->orderBy('name')
             ->limit(3)
             ->get();
@@ -1166,7 +1190,8 @@ class ServingController
             'results' => $users->map(fn (User $u) => [
                 'id' => $u->id,
                 'name' => $u->name,
-                'group' => CustomerGroup::forUser($u, $groups)?->name,
+                'group' => ($g = CustomerGroup::forUser($u, $groups))?->name,
+                'label' => self::personLabel($u, $g),
             ])->values(),
         ]);
     }

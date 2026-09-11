@@ -793,7 +793,7 @@
                  nicht gequetscht. Aktionsknöpfe liegen jetzt im rechten Footer. --}}
             <div x-show="person" x-cloak class="flex h-full items-center gap-3 px-5">
                 <span class="truncate text-3xl font-bold text-gray-800" x-text="person?.name"></span>
-                <span class="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-lg font-semibold text-indigo-700" x-text="'Klasse: ' + (person?.group || '–')"></span>
+                <span class="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-lg font-semibold text-indigo-700" x-text="person?.label || '–'"></span>
                 <span x-show="person?.warn" x-cloak class="shrink-0 rounded-full bg-red-600 px-3 py-1 text-base font-bold text-white">⚠️ Verträglichkeiten prüfen</span>
                 <span x-show="servedOnLoad" x-cloak class="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-base font-semibold text-amber-800">↺ bereits gebucht – änderbar</span>
                 <span class="min-w-0 truncate text-sm text-gray-500" x-show="person && (person.allergens.length || person.diets.length)">
@@ -1256,7 +1256,7 @@
                     <button @click="pickSearch(r.id)"
                             class="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-200 p-4 text-left hover:border-indigo-400 hover:bg-indigo-50">
                         <span class="truncate text-xl font-semibold text-gray-800" x-text="r.name"></span>
-                        <span class="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-base font-semibold text-indigo-700" x-text="'Klasse: ' + (r.group || '–')"></span>
+                        <span class="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-base font-semibold text-indigo-700" x-text="r.label || '–'"></span>
                     </button>
                 </template>
                 <div x-show="searchQuery.trim().length >= 3 && !searchResults.length && !searching" x-cloak class="py-3 text-center text-sm text-gray-400">Keine Treffer.</div>
