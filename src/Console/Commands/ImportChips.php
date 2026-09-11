@@ -156,12 +156,17 @@ class ImportChips extends Command
             $inhalt = mb_convert_encoding($inhalt, 'UTF-8', 'Windows-1252');
         }
 
-        $trenner = ';';
+        // Trennzeichen = das häufigste in der ersten Zeile. (Nicht über die ganze
+        // Datei zählen: das Prüfzeichen eines Codes kann selbst ein ";" sein.)
+        $ersteZeile = strtok($inhalt, "\r\n") ?: '';
+        $zaehler = [];
         foreach ([';', "\t", ','] as $t) {
-            if (substr_count($inhalt, $t) > 0) {
-                $trenner = $t;
-                break;
-            }
+            $zaehler[$t] = substr_count($ersteZeile, $t);
+        }
+        arsort($zaehler);
+        $trenner = (string) array_key_first($zaehler);
+        if ($zaehler[$trenner] === 0) {
+            $trenner = ';';
         }
 
         $zeilen = [];
