@@ -46,6 +46,7 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
                 \Intranet\Modules\Schulkantine\Console\Commands\SeedOgsTestkinder::class,
                 \Intranet\Modules\Schulkantine\Console\Commands\SeedDishes::class,
                 \Intranet\Modules\Schulkantine\Console\Commands\ImportInfos::class,
+                \Intranet\Modules\Schulkantine\Console\Commands\ImportChips::class,
             ]);
 
             // Stündlich nach neuen Teilnehmer-Info-CSVs schauen. Modul-lokal
