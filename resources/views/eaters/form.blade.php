@@ -152,8 +152,7 @@
                                 else port = (await navigator.serial.getPorts())[0] || null;
                                 if (!port) return;
                                 await port.open({ baudRate: 9600 });
-                                this.serialOk = true; this.ok = false;
-                                this.msg = 'COM-Leser verbunden – Chip jetzt an den Leser halten.';
+                                this.serialOk = true;
                                 this.serialRead(port);
                             } catch (err) {
                                 this.serialOk = false;
@@ -220,8 +219,6 @@
                                     class="inline-flex items-center justify-center gap-1.5 rounded-md border border-indigo-300 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
                                 COM-Leser verbinden (alter Leser)
                             </button>
-                            <span x-show="serialOk" x-cloak
-                                  class="inline-flex items-center rounded-md bg-green-100 px-3 py-2 text-sm font-medium text-green-800">🟢 COM-Leser aktiv</span>
                             <button type="submit"
                                     class="inline-flex items-center justify-center gap-1.5 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
                                 Ausgeben
