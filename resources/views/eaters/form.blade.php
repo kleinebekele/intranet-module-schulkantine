@@ -140,6 +140,61 @@
                      x-data="{
                         msg: '', ok: false,
                         supported: typeof NDEFReader !== 'undefined',
+                        // Alter 125-kHz-Leser am USB-COM-Adapter per Web Serial (wie im
+                        // Ausgabeterminal): Rahmen STX + '0' + 10 Hex + Prüfzeichen + ETX CR LF.
+                        hasSerial: 'serial' in navigator,
+                        serialOk: false, serialBuf: '',
+                        init() { if (this.hasSerial) this.serialConnect(false); },
+                        async serialConnect(ask) {
+                            try {
+                                let port = null;
+                                if (ask) port = await navigator.serial.requestPort();
+                                else port = (await navigator.serial.getPorts())[0] || null;
+                                if (!port) return;
+                                await port.open({ baudRate: 9600 });
+                                this.serialOk = true; this.ok = false;
+                                this.msg = 'COM-Leser verbunden – Chip jetzt an den Leser halten.';
+                                this.serialRead(port);
+                            } catch (err) {
+                                this.serialOk = false;
+                                if (ask) { this.ok = false; this.msg = 'COM-Leser: ' + (err && err.message ? err.message : err); }
+                            }
+                        },
+                        async serialRead(port) {
+                            const dec = new TextDecoder();
+                            try {
+                                while (port.readable) {
+                                    const reader = port.readable.getReader();
+                                    try {
+                                        while (true) {
+                                            const { value, done } = await reader.read();
+                                            if (done) break;
+                                            this.serialChunk(dec.decode(value));
+                                        }
+                                    } finally { reader.releaseLock(); }
+                                }
+                            } catch (e) { /* Leser abgezogen */ }
+                            this.serialOk = false;
+                        },
+                        serialChunk(text) {
+                            for (const ch of text) {
+                                const c = ch.charCodeAt(0);
+                                if (c === 2) { this.serialBuf = ''; continue; }
+                                if (c === 3 || c === 13 || c === 10) {
+                                    const raw = this.serialBuf; this.serialBuf = '';
+                                    const uid = this.serialUid(raw);
+                                    if (uid) { this.$refs.uid.value = uid; this.ok = true; this.msg = 'Chip gelesen: ' + uid; }
+                                    continue;
+                                }
+                                this.serialBuf += ch;
+                            }
+                        },
+                        serialUid(raw) {
+                            const s = raw.trim();
+                            if (/^0[0-9A-Fa-f]{10}.$/.test(s)) return s.slice(1, 11);
+                            if (/^[0-9A-Fa-f]{10}.$/.test(s)) return s.slice(0, 10);
+                            return s.length >= 4 ? s : '';
+                        },
                         async scan() {
                             if (!this.supported) { this.ok=false; this.msg='Web-NFC geht nur auf einem Gerät mit NFC (Android/Chrome). Du kannst die Kennung auch manuell eintragen.'; return; }
                             try {
@@ -161,6 +216,12 @@
                                     class="inline-flex items-center justify-center gap-1.5 rounded-md border border-indigo-300 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
                                 <x-module-icon name="search" class="text-base" /> Chip scannen
                             </button>
+                            <button type="button" x-show="hasSerial && !serialOk" @click="serialConnect(true)"
+                                    class="inline-flex items-center justify-center gap-1.5 rounded-md border border-indigo-300 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
+                                COM-Leser verbinden (alter Leser)
+                            </button>
+                            <span x-show="serialOk" x-cloak
+                                  class="inline-flex items-center rounded-md bg-green-100 px-3 py-2 text-sm font-medium text-green-800">🟢 COM-Leser aktiv</span>
                             <button type="submit"
                                     class="inline-flex items-center justify-center gap-1.5 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
                                 Ausgeben
