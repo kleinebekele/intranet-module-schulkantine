@@ -59,6 +59,32 @@
             </div>
 
             {{-- Foto --}}
+            @if ($dish->exists)
+            {{-- Bestehendes Gericht: Foto wird sofort bei Auswahl per Ajax gespeichert,
+                 unabhängig vom Rest des Formulars. Fehler erscheinen direkt darunter. --}}
+            <div x-data="dishPhoto({
+                    url: @js($dish->photoUrl()),
+                    uploadUrl: @js(route('module.schulkantine.dishes.photo.upload', $dish)),
+                    deleteUrl: @js(route('module.schulkantine.dishes.photo.delete', $dish)),
+                 })">
+                <x-input-label value="Foto (optional)" />
+                <div class="mt-2 flex items-center gap-4" x-show="url" style="display: none;">
+                    <img :src="url" alt="{{ $dish->name }}"
+                         class="h-32 w-32 rounded-lg border border-gray-200 object-cover">
+                    <button type="button" @click="remove()" :disabled="busy"
+                            class="inline-flex items-center gap-1.5 text-sm text-red-600 hover:text-red-800 disabled:opacity-50">
+                        <x-module-icon name="trash" class="text-base" />
+                        Foto entfernen
+                    </button>
+                </div>
+                <input type="file" accept="image/*" x-ref="file" @change="upload($event)" :disabled="busy"
+                       class="mt-2 block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50">
+                <p class="mt-1 text-xs text-gray-400">JPG, PNG oder WebP, max. 4 MB. Wird sofort gespeichert.</p>
+                <p class="mt-1 text-sm text-gray-500" x-show="busy" style="display: none;">Foto wird hochgeladen …</p>
+                <p class="mt-1 text-sm text-green-700" x-show="notice" x-text="notice" style="display: none;"></p>
+                <p class="mt-1 text-sm text-red-600" x-show="error" x-text="error" style="display: none;"></p>
+            </div>
+            @else
             <div>
                 <x-input-label value="Foto (optional)" />
                 @if ($dish->photoUrl())
@@ -77,6 +103,7 @@
                 <p class="mt-1 text-xs text-gray-400">JPG, PNG oder WebP, max. 4 MB.</p>
                 <x-input-error :messages="$errors->get('photo')" class="mt-2" />
             </div>
+            @endif
 
             {{-- Allergene --}}
             <div>
@@ -186,4 +213,79 @@
             </div>
         @endif
     </div>
+
+    @if ($dish->exists)
+    {{-- Sofort-Upload des Fotos: speichert bei Dateiauswahl per fetch, zeigt Vorschau
+         und Fehlermeldung (Validierung, Upload-Limit, Session abgelaufen) direkt an. --}}
+    <script>
+    (function () {
+        const register = function () {
+            Alpine.data('dishPhoto', (cfg) => ({
+                url: cfg.url,
+                busy: false,
+                notice: '',
+                error: '',
+                token() {
+                    return document.querySelector('meta[name="csrf-token"]')?.content || '';
+                },
+                async upload(event) {
+                    const file = event.target.files && event.target.files[0];
+                    if (!file) return;
+                    this.notice = '';
+                    this.error = '';
+                    if (file.size > 4 * 1024 * 1024) {
+                        this.error = 'Die Datei ist größer als 4 MB (' + (file.size / 1024 / 1024).toFixed(1) + ' MB).';
+                        event.target.value = '';
+                        return;
+                    }
+                    const body = new FormData();
+                    body.append('photo', file);
+                    await this.send(cfg.uploadUrl, 'POST', body);
+                    event.target.value = '';
+                },
+                async remove() {
+                    this.notice = '';
+                    this.error = '';
+                    await this.send(cfg.deleteUrl, 'DELETE', null);
+                },
+                async send(url, method, body) {
+                    this.busy = true;
+                    try {
+                        const res = await fetch(url, {
+                            method: method,
+                            body: body,
+                            credentials: 'same-origin',
+                            headers: {
+                                'X-CSRF-TOKEN': this.token(),
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'Accept': 'application/json',
+                            },
+                        });
+                        let data = null;
+                        try { data = await res.json(); } catch (e) { /* keine JSON-Antwort (z. B. 413 vom Webserver) */ }
+                        if (!res.ok) {
+                            if (res.status === 413) {
+                                this.error = 'Der Webserver lehnt die Datei als zu groß ab (Upload-Limit des Servers).';
+                            } else if (res.status === 419) {
+                                this.error = 'Die Sitzung ist abgelaufen. Bitte Seite neu laden und erneut versuchen.';
+                            } else {
+                                const first = data && data.errors ? Object.values(data.errors).flat()[0] : null;
+                                this.error = first || (data && data.message) || ('Fehler ' + res.status);
+                            }
+                            return;
+                        }
+                        this.url = data && 'url' in data ? data.url : null;
+                        this.notice = (data && data.message) || '';
+                    } catch (e) {
+                        this.error = 'Verbindung fehlgeschlagen: ' + e.message;
+                    } finally {
+                        this.busy = false;
+                    }
+                },
+            }));
+        };
+        if (window.Alpine) { register(); } else { document.addEventListener('alpine:init', register); }
+    })();
+    </script>
+    @endif
 </x-app-layout>

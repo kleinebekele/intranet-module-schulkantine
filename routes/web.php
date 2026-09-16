@@ -83,6 +83,9 @@ Route::middleware(['web', 'auth'])
         Route::get('gerichte/{dish}/bearbeiten', [DishController::class, 'edit'])->name('dishes.edit');
         Route::put('gerichte/{dish}', [DishController::class, 'update'])->name('dishes.update');
         Route::delete('gerichte/{dish}', [DishController::class, 'destroy'])->name('dishes.destroy');
+        // Foto sofort bei Auswahl speichern (Ajax, JSON-Antwort).
+        Route::post('gerichte/{dish}/foto', [DishController::class, 'uploadPhoto'])->name('dishes.photo.upload');
+        Route::delete('gerichte/{dish}/foto', [DishController::class, 'deletePhoto'])->name('dishes.photo.delete');
 
         // Speiseplan (Menü je Öffnungstag & Bestellmodus)
         Route::get('speiseplan', [MenuController::class, 'index'])->name('menus.index');

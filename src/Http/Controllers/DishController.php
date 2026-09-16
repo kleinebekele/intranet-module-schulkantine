@@ -124,6 +124,47 @@ class DishController
             ->with('status', 'Gericht wurde gelöscht.');
     }
 
+    /**
+     * Foto per Ajax speichern – sofort bei der Dateiauswahl, unabhängig vom
+     * restlichen Formular. Antwortet mit JSON (URL des neuen Fotos).
+     */
+    public function uploadPhoto(Request $request, Dish $dish)
+    {
+        $this->authorizeAdmin($request);
+
+        // Größer als post_max_size: PHP verwirft den ganzen Request, die Datei
+        // kommt gar nicht erst an – dann eine klare Meldung statt „nichts passiert".
+        if (! $request->hasFile('photo')) {
+            return response()->json([
+                'message' => 'Die Datei ist nicht angekommen. Vermutlich ist sie größer, als der Server zulässt (Upload-Limit von PHP/Webserver).',
+            ], 422);
+        }
+
+        $request->validate([
+            'photo' => ['required', 'image', 'max:4096'],
+        ]);
+
+        $dish->update($this->applyPhoto($request, [], $dish));
+
+        return response()->json([
+            'message' => 'Foto gespeichert.',
+            'url' => $dish->fresh()->photoUrl(),
+        ]);
+    }
+
+    /** Foto per Ajax entfernen. */
+    public function deletePhoto(Request $request, Dish $dish)
+    {
+        $this->authorizeAdmin($request);
+
+        if ($dish->photo_path) {
+            Storage::disk('public')->delete($dish->photo_path);
+            $dish->update(['photo_path' => null]);
+        }
+
+        return response()->json(['message' => 'Foto entfernt.']);
+    }
+
     // ---------------------------------------------------------------- Helfer
 
     /** @return array<string, mixed> */
