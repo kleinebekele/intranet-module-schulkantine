@@ -215,10 +215,19 @@ class DishController
     private function applyPhoto(Request $request, array $data, ?Dish $dish): array
     {
         if ($request->hasFile('photo')) {
-            if ($dish?->photo_path) {
+            // store() liefert false, wenn die Datei nicht geschrieben werden konnte
+            // (typisch: Verzeichnisrechte auf dem Server). Dann klar abbrechen,
+            // statt "0" als Pfad zu speichern.
+            $pfad = $request->file('photo')->store('kantine/dishes', 'public');
+            if ($pfad === false) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'photo' => 'Die Datei konnte nicht gespeichert werden. Der Webserver darf vermutlich nicht in storage/app/public/kantine/dishes schreiben.',
+                ]);
+            }
+            if ($dish?->photo_path && $dish->photo_path !== '0') {
                 Storage::disk('public')->delete($dish->photo_path);
             }
-            $data['photo_path'] = $request->file('photo')->store('kantine/dishes', 'public');
+            $data['photo_path'] = $pfad;
         } elseif ($request->boolean('remove_photo') && $dish?->photo_path) {
             Storage::disk('public')->delete($dish->photo_path);
             $data['photo_path'] = null;
