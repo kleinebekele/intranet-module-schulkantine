@@ -129,7 +129,7 @@ class BillingService
         }
 
         $returned = NfcChip::where('source', NfcChip::SOURCE_SCHULE)
-            ->whereBetween('returned_at', [$from, $to])
+            ->whereBetween('returned_at', [$from, $to])->whereNull('lost_at')
             ->selectRaw('user_id, SUM(deposit) as total')
             ->groupBy('user_id')->get();
         foreach ($returned as $row) {
@@ -350,7 +350,7 @@ class BillingService
             $chips[] = ['uid' => $c->uid, 'type' => 'aus', 'date' => $c->lent_at, 'amount' => (float) $c->deposit];
         }
         $returned = NfcChip::where('user_id', $userId)->where('source', NfcChip::SOURCE_SCHULE)
-            ->whereBetween('returned_at', [$from, $to])->get();
+            ->whereBetween('returned_at', [$from, $to])->whereNull('lost_at')->get();
         foreach ($returned as $c) {
             $chips[] = ['uid' => $c->uid, 'type' => 'zurueck', 'date' => $c->returned_at, 'amount' => -(float) $c->deposit];
         }

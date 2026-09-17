@@ -20,6 +20,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *  - lent_at      Ausgabe-Datum (Pfand fällt in diesem Monat an).
  *  - returned_at  Rückgabe-Datum (Rückgabe in diesem Monat); danach INAKTIV
  *                 (zählt nicht mehr bei der Essensausgabe).
+ *  - lost_at      Chip verloren: ebenfalls inaktiv (returned_at gesetzt), aber das Pfand
+ *                 wird NICHT erstattet.
  *
  * OGS-Kinder bekommen bewusst KEINEN Chip.
  */
@@ -41,6 +43,7 @@ class NfcChip extends Model
         'deposit',
         'lent_at',
         'returned_at',
+        'lost_at',
     ];
 
     protected function casts(): array
@@ -49,6 +52,7 @@ class NfcChip extends Model
             'deposit' => 'decimal:2',
             'lent_at' => 'date',
             'returned_at' => 'date',
+            'lost_at' => 'date',
         ];
     }
 
