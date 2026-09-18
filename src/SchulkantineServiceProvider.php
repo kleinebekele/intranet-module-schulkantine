@@ -66,6 +66,11 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
     public function manifest(): ModuleManifest
     {
         return ModuleManifest::make('schulkantine', 'Schulkantine', icon: 'restaurant')
+            ->rolle('kantine_koch', 'Kantine: Koch')
+            ->rolle('kantine_kellner', 'Kantine: Ausgabe (Kellner)')
+            ->rolle('kantine_ogs_betreuer', 'Kantine: OGS-Betreuer')
+            ->rolle('kantine_ogs', 'Kantine: OGS')
+            ->rolle('kantine_student', 'Kantine: Schüler')
             ->item('orders', 'Essen bestellen', 'module.schulkantine.orders.index', icon: 'cart')
             ->item('abrechnung', 'Meine Abrechnung', 'module.schulkantine.abrechnung.index', icon: 'tag')
             ->item('sonderkost', 'Meine Daten', 'module.schulkantine.sonderkost.index', icon: 'diet')
