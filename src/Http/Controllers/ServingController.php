@@ -256,6 +256,26 @@ class ServingController
      * Teilnehmer-Info), sonst die Personengruppe nach Rolle (Lehrer, Mitarbeiter,
      * Eltern, Schüler), sonst die Kundengruppe. „Klasse: Sonstige" war irreführend.
      */
+    /**
+     * Welche Personengruppe zählt, wenn jemand mehrere Rollen hat (erste gewinnt,
+     * gleiche Priorität wie personLabel) – und ihr Rang in der Terminal-Suche
+     * (kleiner = weiter oben: Schüler zuerst, Eltern zuletzt).
+     */
+    public const PERSONEN_RANG = ['teacher' => 2, 'staff' => 1, 'parent' => 3, 'student' => 0];
+
+    /** Personengruppe für Sortierung und Farbe: student/staff/teacher/parent, sonst 'other'. */
+    public static function personenRolle(User $user): string
+    {
+        $roleIds = $user->roles->pluck('role_id');
+        foreach (array_keys(self::PERSONEN_RANG) as $rolle) {
+            if ($roleIds->contains($rolle)) {
+                return $rolle;
+            }
+        }
+
+        return 'other';
+    }
+
     public static function personLabel(User $user, ?CustomerGroup $group): string
     {
         $info = trim((string) $user->kantineInfo?->info);
@@ -1179,9 +1199,19 @@ class ServingController
         $ogsRoleIds = CustomerGroup::where('ordering_mode', CustomerGroup::MODE_JA_NEIN)->pluck('role_id');
         $groups = CustomerGroup::all()->keyBy('role_id');
 
+        // Reihenfolge: erst nach Personengruppe (Schüler zuerst – die haben am
+        // ehesten den Chip vergessen; Eltern zuletzt, die sind fast nie hier),
+        // dann alphabetisch. Sortiert in der Abfrage, damit das limit(3) die
+        // richtigen drei liefert und nicht die ersten drei nach Name.
+        $rang = 'CASE '.implode(' ', array_map(
+            fn (string $rolle, int $i) => "WHEN EXISTS (SELECT 1 FROM user_roles WHERE user_roles.user_id = users.id AND user_roles.role_id = '{$rolle}') THEN {$i}",
+            array_keys(self::PERSONEN_RANG), array_values(self::PERSONEN_RANG),
+        )).' ELSE 9 END';
+
         $users = User::where('name', 'like', '%'.$q.'%')
             ->whereDoesntHave('roles', fn ($r) => $r->whereIn('roles.role_id', $ogsRoleIds))
             ->with(['roles', 'kantineInfo'])
+            ->orderByRaw($rang)
             ->orderBy('name')
             ->limit(3)
             ->get();
@@ -1192,6 +1222,7 @@ class ServingController
                 'name' => $u->name,
                 'group' => ($g = CustomerGroup::forUser($u, $groups))?->name,
                 'label' => self::personLabel($u, $g),
+                'rolle' => self::personenRolle($u),
             ])->values(),
         ]);
     }

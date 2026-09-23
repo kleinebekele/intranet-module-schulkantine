@@ -1253,10 +1253,24 @@
                  nicht springt, wenn Treffer erscheinen oder verschwinden. --}}
             <div class="mt-3 h-[13.5rem] space-y-2 overflow-hidden">
                 <template x-for="r in searchResults" :key="r.id">
+                    {{-- Farbe je Personengruppe: Schüler indigo, Mitarbeiter amber,
+                         Lehrer emerald, Eltern grau (Reihenfolge kommt vom Server). --}}
                     <button @click="pickSearch(r.id)"
-                            class="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-200 p-4 text-left hover:border-indigo-400 hover:bg-indigo-50">
+                            class="flex w-full items-center justify-between gap-3 rounded-xl border p-4 text-left"
+                            :class="{
+                                'border-indigo-200 bg-indigo-50 hover:border-indigo-400 hover:bg-indigo-50': r.rolle === 'student',
+                                'border-amber-200 bg-amber-50 hover:border-amber-400 hover:bg-amber-50': r.rolle === 'staff',
+                                'border-emerald-200 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-50': r.rolle === 'teacher',
+                                'border-gray-200 bg-gray-50 hover:border-gray-400 hover:bg-gray-100': r.rolle === 'parent' || !r.rolle || r.rolle === 'other',
+                            }">
                         <span class="truncate text-xl font-semibold text-gray-800" x-text="r.name"></span>
-                        <span class="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-base font-semibold text-indigo-700" x-text="r.label || '–'"></span>
+                        <span class="shrink-0 rounded-full px-3 py-1 text-base font-semibold"
+                              :class="{
+                                'bg-indigo-100 text-indigo-700': r.rolle === 'student',
+                                'bg-amber-100 text-amber-800': r.rolle === 'staff',
+                                'bg-emerald-100 text-emerald-800': r.rolle === 'teacher',
+                                'bg-gray-200 text-gray-700': r.rolle === 'parent' || !r.rolle || r.rolle === 'other',
+                              }" x-text="r.label || '–'"></span>
                     </button>
                 </template>
                 <div x-show="searchQuery.trim().length >= 3 && !searchResults.length && !searching" x-cloak class="py-3 text-center text-sm text-gray-400">Keine Treffer.</div>
