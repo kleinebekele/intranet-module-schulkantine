@@ -1180,13 +1180,13 @@ class ServingController
         if ($request->input('mode') === 'ogs') {
             $ogsRoleIds = CustomerGroup::where('ordering_mode', CustomerGroup::MODE_JA_NEIN)->pluck('role_id');
 
-            $users = User::where('name', 'like', '%'.$q.'%')
-                ->whereHas('roles', fn ($r) => $r->whereIn('roles.role_id', $ogsRoleIds))
-                ->orderBy('name')
-                ->limit(3)
-                ->get();
+            $abfrage = User::where('name', 'like', '%'.$q.'%')
+                ->whereHas('roles', fn ($r) => $r->whereIn('roles.role_id', $ogsRoleIds));
+            $gesamt = (clone $abfrage)->count();
+            $users = $abfrage->orderBy('name')->limit(6)->get();
 
             return response()->json([
+                'total' => $gesamt,
                 'results' => $users->map(fn (User $u) => [
                     'id' => $u->id,
                     'name' => $u->name,
@@ -1201,22 +1201,28 @@ class ServingController
 
         // Reihenfolge: erst nach Personengruppe (Schüler zuerst – die haben am
         // ehesten den Chip vergessen; Eltern zuletzt, die sind fast nie hier),
-        // dann alphabetisch. Sortiert in der Abfrage, damit das limit(3) die
+        // dann alphabetisch. Sortiert in der Abfrage, damit das limit(6) die
         // richtigen drei liefert und nicht die ersten drei nach Name.
         $rang = 'CASE '.implode(' ', array_map(
             fn (string $rolle, int $i) => "WHEN EXISTS (SELECT 1 FROM user_roles WHERE user_roles.user_id = users.id AND user_roles.role_id = '{$rolle}') THEN {$i}",
             array_keys(self::PERSONEN_RANG), array_values(self::PERSONEN_RANG),
         )).' ELSE 9 END';
 
-        $users = User::where('name', 'like', '%'.$q.'%')
-            ->whereDoesntHave('roles', fn ($r) => $r->whereIn('roles.role_id', $ogsRoleIds))
+        $abfrage = User::where('name', 'like', '%'.$q.'%')
+            ->whereDoesntHave('roles', fn ($r) => $r->whereIn('roles.role_id', $ogsRoleIds));
+        // Gesamtzahl mitgeben: sieht man mehr als die sechs Angezeigten, weiß
+        // man am Terminal, dass weiter eingeschränkt werden muss.
+        $gesamt = (clone $abfrage)->count();
+
+        $users = $abfrage
             ->with(['roles', 'kantineInfo'])
             ->orderByRaw($rang)
             ->orderBy('name')
-            ->limit(3)
+            ->limit(6)
             ->get();
 
         return response()->json([
+            'total' => $gesamt,
             'results' => $users->map(fn (User $u) => [
                 'id' => $u->id,
                 'name' => $u->name,

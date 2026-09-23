@@ -96,6 +96,7 @@
             searchOpen: false,
             searchQuery: '',
             searchResults: [],
+            searchTotal: 0,
             searching: false,
             searchDebounce: null,
             keyboardRows: [
@@ -328,11 +329,11 @@
             },
             keyPress(ch) { this.searchQuery += (ch === ' ' ? ' ' : ch.toLowerCase()); this.queueSearch(); },
             keyBackspace() { this.searchQuery = this.searchQuery.slice(0, -1); this.queueSearch(); },
-            keyClear() { this.searchQuery = ''; this.searchResults = []; clearTimeout(this.searchDebounce); },
+            keyClear() { this.searchQuery = ''; this.searchResults = []; this.searchTotal = 0; clearTimeout(this.searchDebounce); },
             async doSearch() {
                 const q = this.searchQuery.trim();
                 // Erst ab dem 3. Buchstaben suchen (spart Anfragen, gezieltere Treffer).
-                if (q.length < 3) { this.searchResults = []; this.searching = false; return; }
+                if (q.length < 3) { this.searchResults = []; this.searchTotal = 0; this.searching = false; return; }
                 this.searching = true;
                 try {
                     const res = await fetch(this.urls.search, {
@@ -343,6 +344,7 @@
                     });
                     const data = await res.json();
                     this.searchResults = data.results || [];
+                    this.searchTotal = typeof data.total === 'number' ? data.total : this.searchResults.length;
                 } catch (e) {
                     this.banner = { ok:false, text:'Suche fehlgeschlagen: ' + e };
                 }
@@ -1234,24 +1236,32 @@
         </div>
     </div>
 
-    {{-- Such-Modal: Live-Suche nach Person (max. 3 Treffer, Name + Klasse) mit
+    {{-- Such-Modal: Live-Suche nach Person (max. 6 Treffer in zwei Spalten, Name + Klasse) mit
          eingebauter Bildschirmtastatur (Touch). --}}
     <div x-show="searchOpen" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-6"
          @click.self="closeSearch()" @keydown.escape.window="closeSearch()">
-        <div class="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl">
+        <div class="w-full max-w-4xl rounded-2xl bg-white p-5 shadow-2xl">
             <div class="mb-3 flex items-center justify-between">
                 <h3 class="text-lg font-bold text-gray-800">Person suchen</h3>
                 <button @click="closeSearch()" class="rounded-lg px-3 py-1 text-xl text-gray-400 hover:bg-gray-100">✕</button>
             </div>
             {{-- inputmode=none: die OS-Tastatur bleibt aus, es zählt die Bildschirmtastatur unten. --}}
-            <input type="search" x-model="searchQuery" @input="queueSearch()" x-ref="searchInput" inputmode="none"
-                   placeholder="Namen eingeben …" readonly
-                   class="w-full rounded-xl border-gray-300 px-4 py-3 text-xl shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            <div class="relative">
+                <input type="search" x-model="searchQuery" @input="queueSearch()" x-ref="searchInput" inputmode="none"
+                       placeholder="Namen eingeben …" readonly
+                       class="w-full rounded-xl border-gray-300 px-4 py-3 pr-40 text-xl shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                {{-- Trefferzahl rechts im Feld: mehr als sechs = weiter eingrenzen. --}}
+                <span x-show="searchQuery.trim().length >= 3 && !searching" x-cloak
+                      class="absolute inset-y-0 right-3 flex items-center rounded-full px-3 text-sm font-semibold"
+                      :class="searchTotal > 6 ? 'text-amber-700' : 'text-gray-500'"
+                      x-text="searchTotal === 1 ? '1 Treffer' : searchTotal + ' Treffer' + (searchTotal > 6 ? ' – weiter eingrenzen' : '')"></span>
+            </div>
 
-            {{-- Feste Höhe für bis zu drei Trefferzeilen, damit die Tastatur darunter
+            {{-- Feste Höhe für bis zu drei Trefferzeilen à zwei Spalten, damit die Tastatur darunter
                  nicht springt, wenn Treffer erscheinen oder verschwinden. --}}
-            <div class="mt-3 h-[13.5rem] space-y-2 overflow-hidden">
+            <div class="mt-3 h-[13.5rem] overflow-hidden">
+                <div class="grid grid-cols-2 gap-2">
                 <template x-for="r in searchResults" :key="r.id">
                     {{-- Farbe je Personengruppe: Schüler indigo, Mitarbeiter amber,
                          Lehrer emerald, Eltern grau (Reihenfolge kommt vom Server). --}}
@@ -1273,6 +1283,7 @@
                               }" x-text="r.label || '–'"></span>
                     </button>
                 </template>
+                </div>
                 <div x-show="searchQuery.trim().length >= 3 && !searchResults.length && !searching" x-cloak class="py-3 text-center text-sm text-gray-400">Keine Treffer.</div>
                 <div x-show="searchQuery.trim().length < 3" x-cloak class="py-3 text-center text-sm text-gray-400">
                     <span x-show="searchQuery.trim().length === 0">Namen eingeben – ab dem 3. Buchstaben wird gesucht.</span>
