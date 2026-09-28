@@ -45,10 +45,12 @@
                                     @endif
                                 </td>
                                 <td class="px-3 py-2 text-right">
+                                    @darfRoute('module.schulkantine.customer-groups.edit')
                                     <a href="{{ route('module.schulkantine.customer-groups.edit', $group) }}" title="Bearbeiten"
                                        class="inline-flex items-center rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
                                         <x-module-icon name="edit" class="text-base" />
                                     </a>
+                                    @enddarfRoute
                                 </td>
                             </tr>
                         @endforeach

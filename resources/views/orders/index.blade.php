@@ -19,6 +19,7 @@
     </x-slot>
 
     <div class="max-w-full" id="orders-content">
+        @include('schulkantine::partials.nur-lesen', ['route' => 'module.schulkantine.orders.store', 'text' => 'bestellen und abbestellen ist nicht möglich.'])
         {{-- Erfolgsmeldungen zeigt das App-Layout bereits global; hier nur Fehler. --}}
         @if ($errors->any())
             <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ $errors->first() }}</div>

@@ -5,11 +5,13 @@
                 <x-module-icon name="folder" class="text-2xl text-indigo-600" />
                 <h1 class="text-xl font-semibold text-gray-800">Kategorien</h1>
             </div>
+            @darfRoute('module.schulkantine.categories.create')
             <a href="{{ route('module.schulkantine.categories.create') }}"
                class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
                 <x-module-icon name="plus" class="text-base" />
                 Neue Kategorie
             </a>
+            @enddarfRoute
         </div>
     </x-slot>
 
@@ -36,13 +38,21 @@
                         </thead>
                         {{-- Ziehen erledigt der Core (resources/js/app.js): `data-sortable`
                              POSTet die ids der direkten Kinder in neuer Reihenfolge. --}}
+                        @php
+                            // Sortieren und Bearbeiten nur mit Stufe „bearbeiten".
+                            $zugriff = app(\App\Modules\Support\Modulzugriff::class);
+                            $kannSortieren = $zugriff->darfRoute('module.schulkantine.categories.reorder');
+                            $kannBearbeiten = $zugriff->darfRoute('module.schulkantine.categories.edit');
+                        @endphp
                         <tbody class="divide-y divide-gray-100"
+                               @if ($kannSortieren)
                                data-sortable="{{ route('module.schulkantine.categories.reorder') }}"
-                               data-handle="[data-drag-handle=category]">
+                               data-handle="[data-drag-handle=category]"
+                               @endif>
                             @foreach ($categories as $category)
                                 <tr class="hover:bg-gray-50" data-id="{{ $category->id }}">
                                     <td class="px-3 py-2">
-                                        <button type="button" data-drag-handle="category"
+                                        <button type="button" data-drag-handle="category" @unless ($kannSortieren) hidden @endunless
                                                 class="cursor-grab text-gray-300 hover:text-gray-500 active:cursor-grabbing"
                                                 title="Ziehen zum Sortieren">
                                             <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
@@ -80,10 +90,12 @@
                                         @endif
                                     </td>
                                     <td class="px-3 py-2 text-right">
+                                        @if ($kannBearbeiten)
                                         <a href="{{ route('module.schulkantine.categories.edit', $category) }}" title="Bearbeiten"
                                            class="inline-flex items-center rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
                                             <x-module-icon name="edit" class="text-base" />
                                         </a>
+                                        @endif
                                     </td>
                                 </tr>
                             @endforeach

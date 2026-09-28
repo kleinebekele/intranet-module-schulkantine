@@ -5,10 +5,12 @@
                 <x-module-icon name="calendar" class="text-2xl text-indigo-600" />
                 <h1 class="text-xl font-semibold text-gray-800">Saisons &amp; Kalender</h1>
             </div>
+            @darfRoute('module.schulkantine.seasons.create')
             <a href="{{ route('module.schulkantine.seasons.create') }}"
                class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
                 + Neue Saison
             </a>
+            @enddarfRoute
         </div>
     </x-slot>
 

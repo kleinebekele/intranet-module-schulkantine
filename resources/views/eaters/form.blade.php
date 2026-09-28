@@ -124,18 +124,21 @@
                                     <button type="submit" class="text-xs font-medium text-amber-700 hover:text-amber-900">zurücknehmen</button>
                                 </form>
                             @endif
+                            @darfRoute('module.schulkantine.eaters.chip.remove')
                             <form method="POST" action="{{ route('module.schulkantine.eaters.chip.remove', $chip) }}"
                                   onsubmit="return confirm('Chip endgültig entfernen (ohne Pfand-Buchung)?')">
                                 @csrf @method('DELETE')
                                 <button type="submit" class="text-xs font-medium text-gray-400 hover:text-red-600">entfernen</button>
                             </form>
+                            @enddarfRoute
                         </div>
                     </div>
                 @empty
                     <p class="mt-2 text-sm text-gray-400">Noch kein Chip zugeordnet.</p>
                 @endforelse
 
-                {{-- Schul-Chip ausgeben --}}
+                {{-- Schul-Chip ausgeben – legt einen Chip an, daher „verwalten" --}}
+                @darfRoute('module.schulkantine.eaters.chip.issue')
                 <div class="mt-4 border-t border-gray-100 pt-4"
                      x-data="{
                         msg: '', ok: false,
@@ -232,6 +235,7 @@
                     </form>
                     <p class="mt-1 text-xs" :class="ok ? 'text-green-600' : 'text-gray-500'" x-text="msg"></p>
                 </div>
+                @enddarfRoute
             @endif
         </div>
     </div>

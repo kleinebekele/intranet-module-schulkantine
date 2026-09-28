@@ -7,6 +7,7 @@
     </x-slot>
 
     <div class="max-w-3xl space-y-5">
+        @include('schulkantine::partials.nur-lesen', ['route' => 'module.schulkantine.ratings.rate', 'text' => 'bewerten ist nicht möglich.'])
         @if (session('status'))
             <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
                 {{ session('status') }}

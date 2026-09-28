@@ -57,7 +57,8 @@
 
         {{-- ========================= TAB 1: SCHLIESSTAGE ========================= --}}
         <div x-show="tab === 'schliesstage'" class="space-y-6">
-            {{-- Schließtag manuell hinzufügen --}}
+            {{-- Schließtag manuell hinzufügen (legt an → „verwalten") --}}
+            @darfRoute('module.schulkantine.seasons.closed-days.store')
             <div class="rounded-xl border border-gray-200 bg-white p-6">
                 <h2 class="text-base font-semibold text-gray-800">Schließtag hinzufügen</h2>
                 <form method="POST" action="{{ route('module.schulkantine.seasons.closed-days.store', $season) }}"
@@ -98,11 +99,13 @@
                 <x-input-error :messages="$errors->get('date_from')" class="mt-2" />
                 <x-input-error :messages="$errors->get('date_to')" class="mt-2" />
             </div>
+            @enddarfRoute
 
             {{-- Tabelle der Schließtage --}}
             <div class="rounded-xl border border-gray-200 bg-white p-6">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <h2 class="text-base font-semibold text-gray-800">Schließtage ({{ $season->closedDays->count() }})</h2>
+                    @darfRoute('module.schulkantine.seasons.import')
                     <form method="POST" action="{{ route('module.schulkantine.seasons.import', $season) }}" class="shrink-0">
                         @csrf
                         <button type="submit"
@@ -115,6 +118,7 @@
                             <p class="mt-1 text-right text-xs text-gray-400">Zuerst ein Bundesland hinterlegen (Einstellungen).</p>
                         @endunless
                     </form>
+                    @enddarfRoute
                 </div>
 
                 @if ($season->closedDays->isEmpty())
@@ -151,6 +155,7 @@
                                             @endif
                                         </td>
                                         <td class="px-3 py-2 text-right">
+                                            @darfRoute('module.schulkantine.seasons.closed-days.destroy')
                                             <form method="POST" action="{{ route('module.schulkantine.seasons.closed-days.destroy', [$season, $tag]) }}">
                                                 @csrf @method('DELETE')
                                                 <button type="submit" title="Schließtag entfernen"
@@ -158,6 +163,7 @@
                                                     <x-module-icon name="trash" class="text-base" />
                                                 </button>
                                             </form>
+                                            @enddarfRoute
                                         </td>
                                     </tr>
                                 @endforeach
@@ -177,6 +183,7 @@
                     Bearbeiten ändert nur die Vorlage – erst der <strong>Push</strong> rollt die Menüs auf alle
                     offenen (noch nicht freigegebenen) Wochen aus.
                 </p>
+                @darfRoute('module.schulkantine.menu-templates.push')
                 <form method="POST" action="{{ route('module.schulkantine.menu-templates.push', $season) }}" class="shrink-0"
                       onsubmit="return confirm('Alle aktiven Menüs auf die offenen Wochen ausrollen?')">
                     @csrf
@@ -186,6 +193,7 @@
                         Menüs ausrollen (Push)
                     </button>
                 </form>
+                @enddarfRoute
             </div>
 
             {{-- Vorhandene Menüs --}}
@@ -215,10 +223,13 @@
                                     <div class="text-xs text-gray-400">Angeboten: {{ $tage }}</div>
                                 </div>
                                 <div class="flex shrink-0 items-center gap-1">
+                                    @darfRoute('module.schulkantine.menu-templates.edit')
                                     <a href="{{ route('module.schulkantine.menu-templates.edit', $t) }}" title="Menü bearbeiten"
                                        class="inline-flex items-center rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
                                         <x-module-icon name="edit" class="text-base" />
                                     </a>
+                                    @enddarfRoute
+                                    @darfRoute('module.schulkantine.menu-templates.destroy')
                                     <form method="POST" action="{{ route('module.schulkantine.menu-templates.destroy', $t) }}"
                                           onsubmit="return confirm('Menü „{{ $t->name }}“ löschen?')">
                                         @csrf @method('DELETE')
@@ -227,6 +238,7 @@
                                             <x-module-icon name="trash" class="text-base" />
                                         </button>
                                     </form>
+                                    @enddarfRoute
                                 </div>
                             </li>
                         @endforeach
@@ -235,14 +247,20 @@
             </div>
 
             {{-- Neues Menü anlegen --}}
+            @darfRoute('module.schulkantine.menu-templates.store')
             @include('schulkantine::seasons._menu-form')
+            @enddarfRoute
         </div>
 
         {{-- ========================= TAB 3: EINSTELLUNGEN ========================= --}}
         <div x-show="tab === 'einstellungen'" x-cloak class="space-y-6">
-            @include('schulkantine::seasons._settings-form')
+            {{-- Ohne Stufe „bearbeiten" nur ansehen: alle Felder gesperrt. --}}
+            <fieldset @disabled(! app(\App\Modules\Support\Modulzugriff::class)->darfRoute('module.schulkantine.seasons.update'))>
+                @include('schulkantine::seasons._settings-form')
+            </fieldset>
 
             {{-- Gefahrenzone: Saison löschen --}}
+            @darfRoute('module.schulkantine.seasons.destroy')
             <div class="rounded-xl border border-red-200 bg-red-50 p-6">
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <div>
@@ -283,6 +301,7 @@
                     </div>
                 </div>
             </div>
+            @enddarfRoute
         </div>
     </div>
 </x-app-layout>

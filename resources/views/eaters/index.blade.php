@@ -7,6 +7,7 @@
             </div>
             <div class="flex items-center gap-2">
                 {{-- Infos werden zusätzlich stündlich automatisch eingelesen; der Button ist für „jetzt sofort". --}}
+                @darfRoute('module.schulkantine.eaters.info-import')
                 <form method="POST" action="{{ route('module.schulkantine.eaters.info-import') }}">
                     @csrf
                     <button type="submit"
@@ -22,6 +23,7 @@
                         @endif
                     </button>
                 </form>
+                @enddarfRoute
 
                 @if (Route::has('module.userimport.index'))
                     <a href="{{ route('module.userimport.index') }}"
@@ -145,10 +147,12 @@
                                         @endif
                                     </td>
                                     <td class="px-3 py-2 text-right">
+                                        @darfRoute('module.schulkantine.eaters.edit')
                                         <a href="{{ route('module.schulkantine.eaters.edit', $user) }}" title="Verträglichkeiten bearbeiten"
                                            class="inline-flex items-center rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
                                             <x-module-icon name="edit" class="text-base" />
                                         </a>
+                                        @enddarfRoute
                                     </td>
                                 </tr>
                             @endforeach

@@ -1,4 +1,13 @@
 <x-app-layout>
+    @php
+        // Zugriffsstufen: ohne „bearbeiten" ist der Speiseplan nur lesbar; Gerichte
+        // hinzufügen/entfernen und Bestellungen löschen braucht „verwalten".
+        $zugriff = app(\App\Modules\Support\Modulzugriff::class);
+        $darfPlanen = $zugriff->darfRoute('module.schulkantine.menus.release');
+        $darfGerichtHinzufuegen = $zugriff->darfRoute('module.schulkantine.menus.store');
+        $darfGerichtEntfernen = $zugriff->darfRoute('module.schulkantine.menus.destroy');
+        $darfBestellungLoeschen = $zugriff->darfRoute('module.schulkantine.menus.order-destroy');
+    @endphp
     <x-slot name="header">
         <div class="flex items-center gap-2">
             <x-module-icon name="restaurant" class="text-2xl text-indigo-600" />
@@ -63,6 +72,7 @@
                     </span>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
+                    @if ($darfPlanen)
                     {{-- Menüs für diese Woche nach aktuellen Vorlagen anlegen/auffrischen.
                          Nur bei zur Bearbeitung freigegebener (nicht festgeschriebener) Woche;
                          löscht nichts, gewählte Gerichte bleiben. --}}
@@ -109,6 +119,7 @@
                             </form>
                         @endif
                     @endif
+                    @endif
                 </div>
             </div>
 
@@ -144,8 +155,8 @@
                                     @php $dayMenus = $menuDaysByDate[$d['date']->toDateString()] ?? collect(); @endphp
                                     @foreach ($dayMenus as $md)
                                         @php $menuIncomplete = $md->slots->isEmpty() || $md->slots->contains(fn ($s) => $s->dish_id === null); @endphp
-                                        @if ($weekReleased)
-                                            {{-- Festgeschriebene Woche: Menü nur noch lesbar. --}}
+                                        @if ($weekReleased || ! $darfPlanen)
+                                            {{-- Festgeschriebene Woche oder nur Leserechte: Menü nur lesbar. --}}
                                             <div class="rounded-lg border {{ $menuIncomplete ? 'border-amber-300 bg-amber-50/50' : 'border-emerald-200 bg-emerald-50/40' }} px-2 py-2">
                                                 <div class="flex flex-wrap items-center justify-between gap-2">
                                                     <span class="text-xs font-semibold text-emerald-800">🍽 {{ $md->name }}
@@ -252,7 +263,7 @@
                                                             <span title="Festgeschriebene Woche – nicht mehr änderbar" class="text-gray-300">🔒</span>
                                                         @elseif ($m->orders_count > 0)
                                                             <span title="Bereits bestellt – nicht mehr entfernbar" class="text-gray-300">🔒</span>
-                                                        @else
+                                                        @elseif ($darfGerichtEntfernen)
                                                             <form method="POST" action="{{ route('module.schulkantine.menus.destroy', $m) }}"
                                                                   onsubmit="return confirm('Gericht entfernen?')">
                                                                 @csrf @method('DELETE')
@@ -266,7 +277,7 @@
 
                                             {{-- + hinzufügen: Such-Dropdown der Gerichte dieser Kategorie; Klick fügt hinzu.
                                                  In festgeschriebenen Wochen komplett ausgeblendet. --}}
-                                            @if (! $weekReleased)
+                                            @if (! $weekReleased && $darfGerichtHinzufuegen)
                                                 <form method="POST" action="{{ route('module.schulkantine.menus.store') }}" class="relative mt-1.5"
                                                       x-data="{ open: false, query: '', options: @js($addOptions),
                                                                 get filtered() { const t = this.query.trim().toLowerCase(); const o = t ? this.options.filter(d => d.name.toLowerCase().includes(t)) : this.options; return o.slice(0, 50); } }"
@@ -317,12 +328,14 @@
                                                         <span class="text-gray-400">·</span>
                                                         <span class="text-gray-600">{{ $o->dish?->name ?? 'OGS-Essen' }}</span>
                                                     </span>
+                                                    @if ($darfBestellungLoeschen)
                                                     <form method="POST" action="{{ route('module.schulkantine.menus.order-destroy', $o) }}"
                                                           onsubmit="return confirm('Bestellung von {{ $o->user?->name }} löschen?')">
                                                         @csrf @method('DELETE')
                                                         <button type="submit" title="Bestellung löschen"
                                                                 class="shrink-0 text-gray-400 hover:text-red-600"><x-module-icon name="trash" class="text-sm" /></button>
                                                     </form>
+                                                    @endif
                                                 </div>
                                             @empty
                                                 <p class="text-xs text-gray-400">Noch keine Bestellungen.</p>

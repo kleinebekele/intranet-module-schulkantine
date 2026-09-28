@@ -95,8 +95,8 @@
             </div>
         </form>
 
-        @if ($category->exists)
-            {{-- Gefahrenzone --}}
+        {{-- Gefahrenzone – nur, wer löschen darf (Zugriffsstufe „verwalten") --}}
+        @if ($category->exists && app(\App\Modules\Support\Modulzugriff::class)->darfRoute('module.schulkantine.categories.destroy'))
             <div class="rounded-xl border border-red-200 bg-red-50 p-6">
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <div>

@@ -17,6 +17,14 @@
 </head>
 <body class="h-full bg-gray-100 font-sans antialiased text-gray-800">
 
+{{-- Nur Leserechte am Terminal: suchen geht, buchen nicht – das vorher sagen
+     statt erst beim Buchen mit einem Fehler. --}}
+@unless (app(\App\Modules\Support\Modulzugriff::class)->darfRoute('module.schulkantine.servings.terminal.commit'))
+    <div class="bg-amber-100 px-4 py-2 text-center text-sm font-medium text-amber-800">
+        Du hast hier nur Leserechte – Ausgaben können nicht gebucht werden.
+    </div>
+@endunless
+
 @if (! $season)
     <div class="flex h-full items-center justify-center p-10 text-center">
         <div>

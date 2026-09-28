@@ -5,11 +5,13 @@
                 <x-module-icon name="restaurant" class="text-2xl text-indigo-600" />
                 <h1 class="text-xl font-semibold text-gray-800">Gerichte</h1>
             </div>
+            @darfRoute('module.schulkantine.dishes.create')
             <a href="{{ route('module.schulkantine.dishes.create', request()->only(['search', 'category', 'status', 'sort'])) }}"
                class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
                 <x-module-icon name="plus" class="text-base" />
                 Neues Gericht
             </a>
+            @enddarfRoute
         </div>
     </x-slot>
 
@@ -120,10 +122,16 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
+                            @php
+                                // Nur mit Stufe „bearbeiten" führen Bild/Name zum Formular.
+                                $kannBearbeiten = app(\App\Modules\Support\Modulzugriff::class)->darfRoute('module.schulkantine.dishes.edit');
+                            @endphp
                             @foreach ($dishes as $dish)
                                 <tr class="hover:bg-gray-50">
                                     <td class="w-24 px-3 py-2">
+                                        @if ($kannBearbeiten)
                                         <a href="{{ route('module.schulkantine.dishes.edit', ['dish' => $dish] + request()->only(['search', 'category', 'status', 'sort'])) }}" title="Bearbeiten" class="block">
+                                        @endif
                                             @if ($dish->photoUrl())
                                                 <img src="{{ $dish->photoUrl() }}" alt="" class="h-20 w-20 max-w-none shrink-0 rounded-lg border border-gray-200 object-cover">
                                             @else
@@ -131,11 +139,17 @@
                                                     <x-module-icon name="restaurant" class="text-3xl" />
                                                 </div>
                                             @endif
+                                        @if ($kannBearbeiten)
                                         </a>
+                                        @endif
                                     </td>
                                     <td class="px-3 py-2 font-medium text-gray-800">
+                                        @if ($kannBearbeiten)
                                         <a href="{{ route('module.schulkantine.dishes.edit', ['dish' => $dish] + request()->only(['search', 'category', 'status', 'sort'])) }}"
                                            class="text-gray-800 hover:text-indigo-700 hover:underline">{{ $dish->name }}</a>
+                                        @else
+                                        {{ $dish->name }}
+                                        @endif
                                         @unless ($dish->is_active)
                                             {{-- Inaktiv-Hinweis, solange die Status-Spalte ausgeblendet ist --}}
                                             <span class="ml-1 text-xs font-medium text-gray-400 sm:hidden">(inaktiv)</span>
@@ -237,10 +251,12 @@
                                         {{ optional($dish->created_at)->format('d.m.Y') ?? '—' }}
                                     </td>
                                     <td class="px-3 py-2 text-right">
+                                        @if ($kannBearbeiten)
                                         <a href="{{ route('module.schulkantine.dishes.edit', ['dish' => $dish] + request()->only(['search', 'category', 'status', 'sort'])) }}" title="Bearbeiten"
                                            class="inline-flex items-center rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
                                             <x-module-icon name="edit" class="text-base" />
                                         </a>
+                                        @endif
                                     </td>
                                 </tr>
                             @endforeach

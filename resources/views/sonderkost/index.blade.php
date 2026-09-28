@@ -7,6 +7,7 @@
     </x-slot>
 
     <div class="max-w-3xl space-y-6">
+        @include('schulkantine::partials.nur-lesen', ['route' => 'module.schulkantine.sonderkost.update', 'text' => 'Angaben und Chips lassen sich nicht ändern.'])
         {{-- Erfolgsmeldung zeigt das App-Layout global; hier nur Fehler. --}}
         @if ($errors->any())
             <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ $errors->first() }}</div>
