@@ -3,11 +3,12 @@
 namespace Intranet\Modules\Schulkantine\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Intranet\Modules\Schulkantine\Support\Access;
 use Illuminate\Validation\ValidationException;
 use Intranet\Modules\Schulkantine\Models\Category;
 
 /**
- * Verwaltung der Kategorien. Vorerst nur für Administratoren.
+ * Verwaltung der Kategorien. Zugriff über die Rollen am Menüpunkt (Access::darfMenuepunkt).
  */
 class CategoryController
 {
@@ -132,6 +133,6 @@ class CategoryController
 
     private function authorizeAdmin(Request $request): void
     {
-        abort_unless($request->user()?->isAdmin(), 403, 'Nur Administratoren dürfen die Kantine verwalten.');
+        abort_unless(Access::darfMenuepunkt($request->user(), 'categories'), 403, 'Kein Zugriff auf diese Kantinen-Seite. Freigabe über die Rollen am Menüpunkt (Verwaltung → Module).');
     }
 }

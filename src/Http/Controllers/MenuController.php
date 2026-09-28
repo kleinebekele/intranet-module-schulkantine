@@ -3,6 +3,7 @@
 namespace Intranet\Modules\Schulkantine\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Intranet\Modules\Schulkantine\Support\Access;
 use Illuminate\Support\Carbon;
 use Intranet\Modules\Schulkantine\Models\Category;
 use Intranet\Modules\Schulkantine\Models\Dish;
@@ -392,6 +393,6 @@ class MenuController
 
     private function authorizeAdmin(Request $request): void
     {
-        abort_unless($request->user()?->isAdmin(), 403, 'Nur Administratoren dürfen die Kantine verwalten.');
+        abort_unless(Access::darfMenuepunkt($request->user(), 'menus'), 403, 'Kein Zugriff auf diese Kantinen-Seite. Freigabe über die Rollen am Menüpunkt (Verwaltung → Module).');
     }
 }

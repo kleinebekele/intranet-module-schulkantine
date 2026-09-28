@@ -46,6 +46,31 @@ class Access
             || self::hasAnyRole($user, self::ROLE_KELLNER);
     }
 
+    /**
+     * Darf der Benutzer die Verwaltungsseite hinter diesem Menüpunkt öffnen?
+     * Entscheidet wie im übrigen Intranet über die Rollen am Menüpunkt
+     * (Verwaltung → Module), Admins immer. Explizit im Controller statt nur
+     * über die Core-Prüfung, weil manche Routen keinem Menüpunkt zugeordnet
+     * sind (z. B. Menü-Vorlagen gehören zum Speiseplan) und sonst nur die
+     * Sichtbarkeit des ganzen Moduls zählen würde.
+     */
+    public static function darfMenuepunkt(?User $user, string $key): bool
+    {
+        if ((bool) $user?->isAdmin()) {
+            return true;
+        }
+        if (! $user) {
+            return false;
+        }
+
+        $item = \App\Models\ModuleMenuItem::query()
+            ->whereHas('module', fn ($m) => $m->where('key', 'schulkantine')->where('is_enabled', true))
+            ->where('key', $key)
+            ->first();
+
+        return $item !== null && $item->isVisibleTo($user);
+    }
+
     /** OGS-Sammelliste ansehen: Admin oder OGS-Betreuer. */
     public static function canViewOgsList(?User $user): bool
     {

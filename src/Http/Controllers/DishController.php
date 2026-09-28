@@ -3,6 +3,7 @@
 namespace Intranet\Modules\Schulkantine\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Intranet\Modules\Schulkantine\Support\Access;
 use Illuminate\Support\Facades\Storage;
 use Intranet\Modules\Schulkantine\Models\Additive;
 use Intranet\Modules\Schulkantine\Models\Allergen;
@@ -13,7 +14,7 @@ use Intranet\Modules\Schulkantine\Models\MealRating;
 
 /**
  * Verwaltung des Gerichte-Katalogs inkl. Allergene/Zusatzstoffe/Diäten.
- * Vorerst nur für Administratoren.
+ * Zugriff über die Rollen am Menüpunkt (Access::darfMenuepunkt).
  */
 class DishController
 {
@@ -259,6 +260,6 @@ class DishController
 
     private function authorizeAdmin(Request $request): void
     {
-        abort_unless($request->user()?->isAdmin(), 403, 'Nur Administratoren dürfen die Kantine verwalten.');
+        abort_unless(Access::darfMenuepunkt($request->user(), 'dishes'), 403, 'Kein Zugriff auf diese Kantinen-Seite. Freigabe über die Rollen am Menüpunkt (Verwaltung → Module).');
     }
 }

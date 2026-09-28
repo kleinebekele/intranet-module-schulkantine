@@ -4,6 +4,7 @@ namespace Intranet\Modules\Schulkantine\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Intranet\Modules\Schulkantine\Support\Access;
 use Illuminate\Support\Carbon;
 use Intranet\Modules\Schulkantine\Models\Allergen;
 use Intranet\Modules\Schulkantine\Models\CustomerGroup;
@@ -186,6 +187,6 @@ class EaterController
 
     private function authorizeAdmin(Request $request): void
     {
-        abort_unless($request->user()?->isAdmin(), 403, 'Nur Administratoren dürfen die Kantine verwalten.');
+        abort_unless(Access::darfMenuepunkt($request->user(), 'eaters'), 403, 'Kein Zugriff auf diese Kantinen-Seite. Freigabe über die Rollen am Menüpunkt (Verwaltung → Module).');
     }
 }

@@ -3,6 +3,7 @@
 namespace Intranet\Modules\Schulkantine\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Intranet\Modules\Schulkantine\Support\Access;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Intranet\Modules\Schulkantine\Models\ClosedDay;
@@ -14,8 +15,7 @@ use Intranet\Modules\Schulkantine\Support\HolidayImporter;
 /**
  * Verwaltung der Saisons (Schuljahre) und ihres Öffnungskalenders.
  *
- * Vorerst nur für Administratoren (siehe authorizeAdmin). Die feinere
- * Rollen-Steuerung (kantinenadmin) kommt mit der Rechte-Phase.
+ * Zugriff über die Rollen am Menüpunkt (authorizeAdmin → Access::darfMenuepunkt).
  */
 class SeasonController
 {
@@ -234,6 +234,6 @@ class SeasonController
 
     private function authorizeAdmin(Request $request): void
     {
-        abort_unless($request->user()?->isAdmin(), 403, 'Nur Administratoren dürfen die Kantine verwalten.');
+        abort_unless(Access::darfMenuepunkt($request->user(), 'seasons'), 403, 'Kein Zugriff auf diese Kantinen-Seite. Freigabe über die Rollen am Menüpunkt (Verwaltung → Module).');
     }
 }
