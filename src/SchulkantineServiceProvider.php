@@ -5,6 +5,7 @@ namespace Intranet\Modules\Schulkantine;
 use App\Models\User;
 use App\Modules\Support\ModuleManifest;
 use App\Modules\Support\ModuleServiceProvider;
+use App\Modules\Support\Zugriffsstufe;
 use Illuminate\Console\Scheduling\Schedule;
 use Intranet\Modules\Schulkantine\Models\Allergen;
 use Intranet\Modules\Schulkantine\Models\Diet;
@@ -85,6 +86,11 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
             ->item('dishes', 'Gerichte', 'module.schulkantine.dishes.index', icon: 'dish')
             ->item('menus', 'Speiseplan', 'module.schulkantine.menus.index', icon: 'menu-card')
             ->item('eaters', 'Teilnehmer', 'module.schulkantine.eaters.index', icon: 'user')
-            ->item('guide', 'Anleitung', 'module.schulkantine.guide.index', icon: 'book', adminsOnly: true);
+            ->item('guide', 'Anleitung', 'module.schulkantine.guide.index', icon: 'book', adminsOnly: true)
+            // Zugriffsstufen, wo die Regel aus Anfrageart/Routenname nicht passt
+            // (MODULES.md im Core, „Zugriffsstufen").
+            ->lesend('servings.lookup', 'servings.lookup-eater', 'servings.terminal.search') // suchen nur
+            ->stufe(Zugriffsstufe::Verwalten, 'seasons.import', 'eaters.chip.issue', 'chips.register') // legen an
+            ->stufe(Zugriffsstufe::Bearbeiten, 'dishes.photo.delete'); // Teil von „Gericht bearbeiten"
     }
 }
