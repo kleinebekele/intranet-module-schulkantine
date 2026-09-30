@@ -7,18 +7,51 @@ position: 25
 
 rollen: admin
 
-Teilnehmer sind schlicht die Benutzer des Intranets – jeder kann essen. Angelegt werden sie
-**nicht hier**, sondern über die Benutzerverwaltung beziehungsweise den Benutzer-Import. Auf
-dieser Seite pflegen Sie nur die Kantinen-Zusatzdaten.
+Teilnehmer sind die Benutzer des Intranets. Angelegt werden sie **nicht hier**, sondern über
+die Benutzerverwaltung beziehungsweise den nächtlichen Linear-Import. Auf dieser Seite pflegen
+Sie nur die Kantinen-Zusatzdaten.
+
+Suchen Sie jemanden über das Suchfeld, bleibt der Filter erhalten, wenn Sie die Person
+bearbeiten und danach zurückkehren.
 
 ## Was hier geht und was nicht
 
 rollen: admin
 
-Hier: Verträglichkeiten (Allergien und Diäten) und Schul-Chips.
+Hier: Verträglichkeiten (Allergien und Diäten), Schul-Chips und – nur für Testkonten – ein
+Testvertrag.
 
-Nicht hier: Name, E-Mail-Adresse, Rollen – und damit auch nicht die Kundengruppe. Die folgt
-den Rollen, siehe die Anleitung zu den Kundengruppen.
+Nicht hier: Name, E-Mail-Adresse, Rollen – und damit auch nicht die Kundengruppe und nicht
+der Essensvertrag. Beides kommt aus Linear.
+
+## Essensvertrag
+
+rollen: admin
+
+Bestellen darf nur, wer in Linear einen laufenden **Essensvertrag** hat. Die Spalte
+**Vertrag** zeigt ihn an:
+
+| Art | Gruppe |
+|---|---|
+| 27 | Klasse 1–4 (OGS) |
+| 28 | Schüler 5–13 |
+| 29 | Lehrer / Mitarbeiter |
+| 50 | Eltern |
+
+Blau heißt „aus Linear". Der Vertrag bestimmt auch den Preis bei Menüs mit „Preis aus Linear"
+und den OGS-Preis. Neue oder beendete Verträge wirken nach dem nächsten nächtlichen Import.
+
+Die Sperre für Personen ohne Vertrag greift erst, wenn der Linear-Import einmal scharf (nicht
+im Probelauf) gelaufen ist – vorher darf jeder bestellen.
+
+## Testvertrag
+
+rollen: admin
+
+Zum Ausprobieren lässt sich unter **Bearbeiten → Essensvertrag** ein **Testvertrag**
+(27/28/29/50) setzen. Er wirkt wie ein echter auf Bestellrecht und Preis und erscheint in der
+Liste **gelb** mit dem Zusatz „(Test)". Das geht nur bei Konten, die **nicht** aus Linear
+stammen – mit echten Personen wird nicht getestet.
 
 ## Verträglichkeiten von Amts wegen
 
@@ -50,8 +83,8 @@ Ein Schul-Chip wird einer Person zugeordnet und kann mit **Pfand** ausgegeben we
 Abrechnung zählt der Monat: Ausgabe belastet, Rückgabe schreibt gut.
 
 Nehmen Sie einen Chip deshalb über **Zurückgeben** aus dem Verkehr und nicht über Löschen –
-sonst fehlt die Gutschrift. Löschen ist für Fälle gedacht, in denen ein Chip versehentlich
-angelegt wurde.
+sonst fehlt die Gutschrift. Ist ein Chip **verloren**, gibt es kein Pfand zurück. Löschen ist
+für Fälle gedacht, in denen ein Chip versehentlich angelegt wurde.
 
 Eine Person kann mehrere Chips haben. Eigene Chips, die Eltern selbst registriert haben,
 stehen hier nur zur Ansicht und tragen kein Pfand.

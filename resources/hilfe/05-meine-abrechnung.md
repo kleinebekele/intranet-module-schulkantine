@@ -12,8 +12,9 @@ Oben wählen Sie den Monat; rechts steht die Gesamtsumme des Haushalts.
 
 Für jede Person werden die Posten des Monats aufgeführt:
 
-- **Menü-Vorbestellungen** – verbindlich bestellte Gerichte (Preis wie zum Bestellzeitpunkt).
-- **OGS-Essen** – teilgenommene Tage × Fixpreis der Saison.
+- **Menü-Vorbestellungen** – verbindlich bestellte Gerichte (Preis wie zum Bestellzeitpunkt;
+  bei Menüs je nach Essensvertrag der Person).
+- **OGS-Essen** – teilgenommene Tage × OGS-Preis der Saison.
 - **Spontane Abholungen** – am Tresen mitgenommene Gerichte.
 - **Chip-Pfand** – Pfand für einen ausgegebenen Schul-Chip (+) bzw. zurück (−).
 

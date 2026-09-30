@@ -14,9 +14,12 @@ Kennzeichnung. Der Speiseplan setzt später nur noch zusammen, was hier steht.
 
 rollen: admin
 
-Der Preis hängt **am Gericht**, nicht am Käufer – keine Gruppenpreise, keine ermäßigten
-Sätze. Ausnahme ist OGS: Dort zählt der Saison-Fixpreis aus der Saison, nicht der
-Gericht-Preis.
+Der Preis eines Einzelgerichts hängt **am Gericht**, nicht am Käufer. Zwei Ausnahmen:
+
+- **Menüs** mit „Preis aus Linear" kosten je Esser den Preis seines Essensvertrags (siehe
+  Saison → Menüs); die Gerichte darin tragen nur ihren Anteil.
+- **OGS** zahlt den OGS-Preis der Saison (standardmäßig der Linear-Preis für Klasse 1–4),
+  nicht den Gericht-Preis.
 
 Ändern Sie später einen Preis, bleiben alte Abrechnungen richtig: Beim Verbindlich-Werden
 wird der damalige Preis auf der Bestellung festgehalten.

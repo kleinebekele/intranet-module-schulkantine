@@ -29,8 +29,16 @@ bestellt wird:
 
 Die Gruppe wird nicht eigens eingetragen, sondern aus den **Rollen** des Essers abgeleitet.
 Wer die Rolle „Kantine: OGS" hat, ist in der OGS-Gruppe; wer „Kantine: Schüler" hat, ist
-Schüler; alle übrigen Benutzer fallen in „Sonstige". Eine Gruppe ändert man also, indem man
-die Rolle des Benutzers ändert.
+Schüler; alle übrigen Benutzer fallen in „Sonstige". Die beiden Kantinen-Rollen vergibt der
+nächtliche Import aus **Linear**, der Schulverwaltung, anhand der Klasse.
+
+## Essensvertrag
+
+Essen darf nur, wer in Linear einen laufenden **Essensvertrag** hat – für Kinder der Klassen
+1–4, für Schüler, für Lehrer und Mitarbeiter oder für Eltern. Ohne Vertrag zeigt die
+Bestellseite den Hinweis, im Sekretariat nachzufragen. Der Vertrag bestimmt auch den Preis:
+Menüs und OGS-Essen können je Vertragsgruppe unterschiedlich kosten, die Preise kommen
+ebenfalls aus Linear.
 
 ## Bestellung ist nicht gleich Ausgabe
 
@@ -46,8 +54,8 @@ Deshalb ist die Ausgabeliste keine Rechnung, und die Abrechnung kein Ausgabeprot
 
 ## Wer darf was
 
-Essen darf jeder angemeldete Benutzer – dafür braucht es keine besondere Rolle. Darüber
-hinaus gibt es drei Betriebs-Rollen:
+Essen darf jeder angemeldete Benutzer mit Essensvertrag – eine besondere Rolle braucht es
+dafür nicht. Darüber hinaus gibt es drei Betriebs-Rollen:
 
 | Rolle | sieht / darf |
 |---|---|
@@ -55,5 +63,6 @@ hinaus gibt es drei Betriebs-Rollen:
 | Kantine: Ausgabe (Kellner) | zusätzlich am Ausgabe-Terminal abhaken und Spontankäufe erfassen |
 | Kantine: OGS-Betreuer | die OGS-Sammelliste des Tages (Ausgabe → Details, als PDF druckbar) |
 
-Alles Verwaltende – Saison, Speiseplan, Gerichte, Teilnehmer, Auswertung – hängt am
-Administrator-Kennzeichen des Intranets.
+Wer welche Seite sieht, legen die Rollen am jeweiligen Menüpunkt fest (Verwaltung →
+Module), jeweils mit einer Stufe: lesen, bearbeiten oder verwalten. Administratoren dürfen
+alles.

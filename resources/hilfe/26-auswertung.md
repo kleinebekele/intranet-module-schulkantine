@@ -8,7 +8,7 @@ position: 26
 rollen: admin
 
 Die Monatsabrechnung je Person – als Liste, als CSV und als PDF. Das Modul rechnet nur aus,
-gebucht und kassiert wird außerhalb.
+gebucht und kassiert wird außerhalb. Eine Übergabe an Linear gibt es noch nicht.
 
 ## Woraus sich eine Zeile zusammensetzt
 
@@ -16,9 +16,10 @@ rollen: admin
 
 Vier Posten:
 
-- **Menü-Bestellungen** mit dem beim Verbindlich-Werden festgehaltenen Preis.
-- **OGS-Teilnahme** mal Saison-Fixpreis – abgeleitet aus der Dauerbestellung abzüglich der
-  Abbestellungen.
+- **Menü-Bestellungen** mit dem beim Bestellen festgehaltenen Preis – bei Menüs mit „Preis
+  aus Linear" also dem Preis des Essensvertrags dieser Person.
+- **OGS-Teilnahme** mal OGS-Preis (standardmäßig der Linear-Preis der Vertragsart 27) –
+  abgeleitet aus der Dauerbestellung abzüglich der Abbestellungen.
 - **Spontane Abholungen** mit ihrem Preis.
 - **Chip-Pfand**: im Monat der Ausgabe belastend, im Monat der Rückgabe gutschreibend.
 

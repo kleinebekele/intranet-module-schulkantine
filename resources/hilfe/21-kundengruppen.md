@@ -23,19 +23,28 @@ Jede Gruppe hängt fest an einer Rolle:
 | Sonstige | Benutzer (`user`) | Menü-Auswahl |
 
 Weil jeder Benutzer die Rolle `user` hat, fällt jeder irgendwo hinein – niemand steht ohne
-Gruppe da und kann deshalb nicht bestellen. Die Zuordnung geht nach Priorität von oben nach
+Gruppe da. (Bestellen darf trotzdem nur, wer einen Essensvertrag hat.) Die Zuordnung geht nach Priorität von oben nach
 unten: Wer OGS ist, ist OGS, auch wenn er zusätzlich `user` hat.
 
 ## Eine Person umgruppieren
 
 rollen: admin
 
-Nicht hier, sondern unter **Verwaltung → Benutzer**: Die Gruppe ist keine eigene Angabe,
-sondern folgt der Rolle. Ein Kind, das nach der vierten Klasse aus der OGS herauswächst,
-verliert die Rolle „Kantine: OGS" und ist damit automatisch Schüler.
+Nicht hier: Die Gruppe ist keine eigene Angabe, sondern folgt der Rolle – und die Rollen
+„Kantine: OGS" und „Kantine: Schüler" vergibt der **nächtliche Linear-Import** anhand der
+Klasse. Welche Klassen als OGS gelten, steht in der Einstellung „OGS-Klassen" am Task
+Linear/BenutzerImport (Standard 1–4). Ein Kind, das nach der vierten Klasse aus der OGS
+herauswächst, wird damit beim nächsten Import automatisch Schüler.
 
-Das ist der übliche Weg zum Schuljahreswechsel, und er läuft in der Regel über den
-Benutzer-Import mit.
+Von Hand angelegte Konten (ohne Linear-Herkunft) bekommen die Rolle unter **Verwaltung →
+Benutzer**; der Import fasst sie nicht an.
+
+## Gruppe und Essensvertrag sind zweierlei
+
+rollen: admin
+
+Die Gruppe bestimmt nur, **wie** bestellt wird. **Ob** jemand überhaupt bestellen darf und
+zu welchem Preis, entscheidet der Essensvertrag aus Linear (siehe Teilnehmer).
 
 ## Der Bestellmodus
 
