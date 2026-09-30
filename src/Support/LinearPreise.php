@@ -2,20 +2,20 @@
 
 namespace Intranet\Modules\Schulkantine\Support;
 
-use App\Ekkon\Ekkon;
 use App\Models\User;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 use Intranet\Modules\Schulkantine\Models\MenuDay;
+use Intranet\Modules\Schulkantine\Models\Setting;
 
 /**
- * Essenspreise je Vertragsgruppe aus Linear (`MgArtDat`: Art, Jahr, Monat, Betrag –
- * ein Preis gilt ab Jahr/Monat, es zählt die jüngste Zeile bis heute).
+ * Essenspreise je Vertragsgruppe aus Linear. Der nächtliche Linear-Import
+ * (Modul Verwaltung, `MgArtDat`) legt sie in `kantine_settings.linear_prices` ab;
+ * die Kantine liest Linear nicht selbst.
  *
  * Menüs mit „Preis aus Linear" kosten je Esser den Preis seines Vertrags
- * (Rolle `kantine_vertrag_<art>`, s. Essensvertrag). Wer keinem Vertrag mit Preis
- * zuzuordnen ist, zahlt den teuersten Preis. Ist Linear nicht erreichbar, gilt
- * der im Menü eingetragene Preis.
+ * (Rolle `kantine_vertrag_<art>`, s. Essensvertrag), bei mehreren den günstigsten.
+ * Wer keinem Vertrag mit Preis zuzuordnen ist, zahlt den teuersten Preis. Sind
+ * (noch) keine Preise importiert, gilt der im Menü eingetragene Preis.
  */
 class LinearPreise
 {
@@ -27,51 +27,36 @@ class LinearPreise
         50 => 'Eltern',
     ];
 
-    private const CACHE_KEY = 'kantine.linear_preise';
+    /** Vertragsart der OGS (Klasse 1–4). */
+    public const ART_OGS = 27;
+
+    /** @var array<int,float>|null|false  false = noch nicht geladen */
+    private static array|null|false $preise = false;
 
     /**
-     * Aktueller Preis je Vertragsart, null = Linear nicht lesbar.
+     * Zuletzt importierter Preis je Vertragsart, null = noch nichts importiert.
      *
      * @return array<int,float>|null
      */
     public static function aktuell(): ?array
     {
-        $preise = Cache::get(self::CACHE_KEY);
-        if (is_array($preise)) {
-            return $preise;
-        }
-        if (! Ekkon::mssqlKonfiguriert()) {
-            return null;
-        }
-
-        $tabelle = (string) config('schulkantine.linear_preise_tabelle', 'Linear2.dbo.MgArtDat');
-        $arten = implode(', ', array_keys(self::ARTEN));
-        try {
-            $zeilen = DB::connection(Ekkon::mssqlConnection())->select(
-                "SELECT d.Art, d.Betrag FROM {$tabelle} d
-                  WHERE d.Art IN ({$arten})
-                    AND d.Jahr * 100 + d.Monat = (
-                        SELECT MAX(x.Jahr * 100 + x.Monat) FROM {$tabelle} x
-                         WHERE x.Art = d.Art
-                           AND x.Jahr * 100 + x.Monat <= YEAR(GETDATE()) * 100 + MONTH(GETDATE()))"
-            );
-        } catch (\Throwable $e) {
-            report($e);
-
-            return null;
+        if (self::$preise === false) {
+            $roh = Setting::current()->linear_prices;
+            $preise = [];
+            foreach (is_array($roh) ? $roh : [] as $art => $betrag) {
+                $preise[(int) $art] = round((float) $betrag, 2);
+            }
+            ksort($preise);
+            self::$preise = $preise ?: null;
         }
 
-        $preise = [];
-        foreach ($zeilen as $z) {
-            $preise[(int) $z->Art] = round((float) $z->Betrag, 2);
-        }
-        if ($preise === []) {
-            return null;
-        }
-        ksort($preise);
-        Cache::put(self::CACHE_KEY, $preise, now()->addMinutes(10));
+        return self::$preise;
+    }
 
-        return $preise;
+    /** Wann zuletzt importiert. */
+    public static function stand(): ?Carbon
+    {
+        return Setting::current()->linear_prices_at;
     }
 
     /** Der teuerste Preis – gilt für alle, die keinem Vertrag zuzuordnen sind. */
@@ -80,6 +65,12 @@ class LinearPreise
         $preise = self::aktuell();
 
         return $preise ? max($preise) : null;
+    }
+
+    /** Preis einer Vertragsart, null wenn nicht importiert. */
+    public static function art(int $art): ?float
+    {
+        return self::aktuell()[$art] ?? null;
     }
 
     /** Preis für diesen Esser (günstigster seiner Verträge), sonst Fallback. */

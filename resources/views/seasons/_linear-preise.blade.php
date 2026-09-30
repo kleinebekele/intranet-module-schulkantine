@@ -14,7 +14,7 @@
                    class="rounded border-gray-300 text-sky-600 focus:ring-sky-500">
             Preis aus Linear (je Vertragsgruppe)
         </label>
-        <p class="mt-1 text-xs text-sky-700">Angehakt: Jeder Esser zahlt den Linear-Preis seines Vertrags. Der Preis oben gilt dann nur, wenn Linear nicht erreichbar ist.</p>
+        <p class="mt-1 text-xs text-sky-700">Angehakt: Jeder Esser zahlt den Linear-Preis seines Vertrags. Der Preis oben gilt dann nur, solange keine Linear-Preise importiert sind.</p>
     @endif
 
     @if ($preise)
@@ -24,8 +24,11 @@
                 <span class="whitespace-nowrap">{{ $name }} <b>{{ isset($preise[$art]) ? $eur($preise[$art]) : '–' }}</b>@if (! $loop->last) · @endif</span>
             @endforeach
             <span class="block">Nicht zuzuordnen (Fallback, teuerster Preis): <b>{{ $eur(max($preise)) }}</b></span>
+            @if ($lp::stand())
+                <span class="block text-sky-600">Stand: Linear-Import vom {{ $lp::stand()->format('d.m.Y H:i') }}</span>
+            @endif
         </div>
     @else
-        <div class="{{ ($mitSchalter ?? false) ? 'mt-2' : '' }} text-xs text-amber-700">⚠️ Linear-Preise sind gerade nicht abrufbar – es gilt der im Menü eingetragene Preis.</div>
+        <div class="{{ ($mitSchalter ?? false) ? 'mt-2' : '' }} text-xs text-amber-700">⚠️ Noch keine Linear-Preise importiert (nächtlicher Linear-Import) – bis dahin gilt der im Menü eingetragene Preis.</div>
     @endif
 </div>

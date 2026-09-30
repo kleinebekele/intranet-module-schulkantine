@@ -16,12 +16,16 @@ class Setting extends Model
         'order_deadline_time',
         'cancel_deadline_time',
         'release_lead_weeks',
+        'linear_prices',
+        'linear_prices_at',
     ];
 
     protected function casts(): array
     {
         return [
             'release_lead_weeks' => 'integer',
+            'linear_prices' => 'array',       // Vertragsart => Preis, vom Linear-Import (Modul Verwaltung)
+            'linear_prices_at' => 'datetime',
         ];
     }
 

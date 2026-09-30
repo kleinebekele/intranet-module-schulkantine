@@ -89,7 +89,7 @@ class BillingService
 
         // 3) OGS-Kosten (abgeleitet) – dieselbe Wahrheit wie überall (OgsAttendance):
         //    Standardtage aus dem Abo-Muster, einzelne An-/Abmeldungen schlagen es.
-        $ogsPrice = (float) ($season->ogs_price ?? 0);
+        $ogsPrice = (float) ($season->ogsPreis() ?? 0);
         if ($ogsPrice > 0 && $openCount > 0) {
             $subs = Subscription::where('season_id', $season->id)->get()->keyBy('user_id');
 
@@ -261,7 +261,7 @@ class BillingService
         // 2) OGS – teilgenommene Tage (Abo minus Abbestellungen bzw. bestellte Tage).
         // Jeder gebuchte Tag wird berechnet („gebucht ist gebucht"); zusätzlich zeigen
         // wir den Ausgabe-Stand je Tag: abgeholt / abgelehnt / nicht abgeholt (Default).
-        $ogsPrice = (float) ($season->ogs_price ?? 0);
+        $ogsPrice = (float) ($season->ogsPreis() ?? 0);
         $ogs = ['days' => 0, 'price' => $ogsPrice, 'total' => 0.0, 'dates' => [], 'cancelled' => [],
             'subscribed' => false, 'picked' => 0, 'declined' => 0, 'noshow' => 0];
         if ($ogsPrice > 0 && ! empty($openDays)) {

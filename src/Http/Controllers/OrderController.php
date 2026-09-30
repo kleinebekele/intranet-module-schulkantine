@@ -217,7 +217,7 @@ class OrderController
         // Öffnungstage des Monats × Saison-Fixpreis (Season::ogs_price).
         //  - Mit Abo:  alle Öffnungstage minus Abbestellungen (storniert).
         //  - Ohne Abo: nur explizit angehakte (bestellte) Tage.
-        $ogsPrice = (float) ($season->ogs_price ?? 0);
+        $ogsPrice = (float) ($season->ogsPreis() ?? 0);
         if ($ogsPrice > 0) {
             $ogsEaterIds = $eaterData->filter(fn ($e) => $e['mode'] === CustomerGroup::MODE_JA_NEIN)->pluck('user.id');
 

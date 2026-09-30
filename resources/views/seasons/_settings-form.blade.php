@@ -49,6 +49,24 @@
             Einheitlicher Preis für ein OGS-Essen in dieser Saison – gilt <strong>global</strong> für alle OGS-Kinder
             (die essen pauschal, ohne Gericht-Auswahl). Leer lassen, wenn noch nicht festgelegt.
         </p>
+        @php $ogsLinear = \Intranet\Modules\Schulkantine\Support\LinearPreise::art(\Intranet\Modules\Schulkantine\Support\LinearPreise::ART_OGS); @endphp
+        <input type="hidden" name="ogs_linear_price" value="0">
+        <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" name="ogs_linear_price" value="1"
+                   @checked(old('ogs_linear_price', $season->ogs_linear_price ?? true))
+                   class="rounded border-gray-300 text-sky-600 focus:ring-sky-500">
+            Preis aus Linear übernehmen (Vertrag Klasse 1–4)
+            @if ($ogsLinear !== null)
+                <span class="font-semibold text-sky-700">{{ number_format($ogsLinear, 2, ',', '.') }} €</span>
+            @endif
+        </label>
+        <p class="mt-1 text-xs text-gray-400">
+            @if ($ogsLinear !== null)
+                Angehakt gilt der Linear-Preis; der Fixpreis oben nur, wenn keine Linear-Preise vorliegen.
+            @else
+                Noch keine Linear-Preise importiert – bis dahin gilt der Fixpreis oben.
+            @endif
+        </p>
         <x-input-error :messages="$errors->get('ogs_price')" class="mt-2" />
     </div>
 

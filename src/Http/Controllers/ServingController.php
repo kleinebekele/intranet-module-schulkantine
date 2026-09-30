@@ -423,7 +423,7 @@ class ServingController
                 'user_id' => $eater->id,
                 'date' => $dateStr,
                 'order_id' => $order?->id,
-                'price_snapshot' => $season->ogs_price,
+                'price_snapshot' => $season->ogsPreis(),
                 'spontaneous' => false,
                 'served_by' => $servedBy,
             ]);
@@ -629,7 +629,7 @@ class ServingController
             'open' => $open,
             'menuByDish' => $data['menuByDish'],
             'ogs' => $data['ogs'],
-            'ogsPrice' => (float) ($season->ogs_price ?? 0),
+            'ogsPrice' => (float) ($season->ogsPreis() ?? 0),
             'closedReason' => $open ? null : $this->closedReason($season, $date),
         ] + $this->dayNav($season, $date, []));
     }
@@ -651,7 +651,7 @@ class ServingController
             'date' => $date,
             'menuByDish' => $data['menuByDish'],
             'ogs' => $data['ogs'],
-            'ogsPrice' => (float) ($season->ogs_price ?? 0),
+            'ogsPrice' => (float) ($season->ogsPreis() ?? 0),
             'generatedAt' => Carbon::now(),
         ])->setPaper('a4', 'portrait');
 
@@ -1502,7 +1502,7 @@ class ServingController
                 'user_id' => $eater->id,
                 'date' => $date->toDateString(),
                 'order_id' => $order?->id,
-                'price_snapshot' => $season->ogs_price,
+                'price_snapshot' => $season->ogsPreis(),
                 'spontaneous' => false,
                 'declined' => $declined,
                 'decline_reason' => $declined ? 'nicht genommen' : null,

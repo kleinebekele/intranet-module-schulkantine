@@ -19,6 +19,7 @@ class Season extends Model
         'end_date',
         'bundesland',
         'ogs_price',
+        'ogs_linear_price',
         'opening_weekdays',
         'is_active',
         'show_additives',
@@ -33,6 +34,7 @@ class Season extends Model
             'start_date' => 'date',
             'end_date' => 'date',
             'ogs_price' => 'decimal:2',
+            'ogs_linear_price' => 'boolean',
             'opening_weekdays' => 'array',
             'is_active' => 'boolean',
             'show_additives' => 'boolean',
@@ -40,6 +42,23 @@ class Season extends Model
             'show_diets' => 'boolean',
             'ratings_enabled' => 'boolean',
         ];
+    }
+
+    /**
+     * Preis eines OGS-Essens: standardmäßig der importierte Linear-Preis der
+     * Vertragsart Klasse 1–4; ohne Import bzw. mit abgeschaltetem Schalter der
+     * eingetragene Fixpreis (`ogs_price`).
+     */
+    public function ogsPreis(): ?float
+    {
+        if ($this->ogs_linear_price ?? true) {
+            $linear = \Intranet\Modules\Schulkantine\Support\LinearPreise::art(\Intranet\Modules\Schulkantine\Support\LinearPreise::ART_OGS);
+            if ($linear !== null) {
+                return $linear;
+            }
+        }
+
+        return $this->ogs_price !== null ? (float) $this->ogs_price : null;
     }
 
     /**

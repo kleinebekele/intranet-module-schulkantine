@@ -63,7 +63,7 @@
             simChips: @js($simChips),
             openDates: @js($openDates),   // alle Öffnungstage der Saison (Touch-Kalender)
             today: @js($today),
-            ogsPrice: @js((float) ($season->ogs_price ?? 0)),
+            ogsPrice: @js((float) ($season->ogsPreis() ?? 0)),
 
             // --- Zustand ---
             person: null,          // eingelesener Esser (null = Leerlauf)

@@ -213,6 +213,7 @@ class SeasonController
             'end_date' => $request->date('end_date'),
             'bundesland' => $request->input('bundesland') ?: null,
             'ogs_price' => $request->filled('ogs_price') ? (float) $request->input('ogs_price') : null,
+            'ogs_linear_price' => $request->boolean('ogs_linear_price', true),
             'opening_weekdays' => array_map('intval', $request->input('opening_weekdays', [])),
             'is_active' => $request->boolean('is_active'),
             'show_additives' => $request->boolean('show_additives'),
