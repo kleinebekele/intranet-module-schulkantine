@@ -143,10 +143,10 @@
                                         </div>
                                     @endif
                                 </div>
-                                {{-- Offener Betrag DIESER Person im angezeigten Monat --}}
-                                <div class="flex items-center gap-1.5">
-                                    <span class="text-[11px] uppercase tracking-wide text-gray-400">Kosten {{ $monthStart->isoFormat('MMM') }}</span>
-                                    <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-sm font-bold text-indigo-700">{{ $money($monthByUser[$eater->id] ?? 0) }}</span>
+                                {{-- Kosten DIESER Person in der angezeigten Woche (der Monat steht oben im Kopf) --}}
+                                <div class="flex items-center gap-1.5" title="Monat {{ $monthStart->isoFormat('MMMM') }}: {{ $money($monthByUser[$eater->id] ?? 0) }}">
+                                    <span class="text-[11px] uppercase tracking-wide text-gray-400">Kosten KW {{ $weekStart->isoWeek() }}</span>
+                                    <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-sm font-bold text-indigo-700">{{ $money($weekByUser[$eater->id] ?? 0) }}</span>
                                 </div>
                             </div>
 

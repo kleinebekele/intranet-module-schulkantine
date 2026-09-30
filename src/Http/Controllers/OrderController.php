@@ -245,6 +245,24 @@ class OrderController
         // Haushalts-Gesamtwert (oben rechts) = Summe aller Personen (inkl. OGS).
         $monthTotal = array_sum($monthByUser);
 
+        // Kosten der ANGEZEIGTEN Woche je Person (Esser-Kopf): Bestellungen der
+        // Woche plus OGS-Teilnahmetage der Woche × OGS-Preis.
+        $weekByUser = array_map('array_sum', $dayTotals);
+        if ($ogsPrice > 0) {
+            $openWeekDays = [];
+            foreach ($days as $day) {
+                if ($day['open']) {
+                    $openWeekDays[$day['date']->toDateString()] = true;
+                }
+            }
+            foreach ($eaterData->filter(fn ($e) => $e['mode'] === CustomerGroup::MODE_JA_NEIN) as $e) {
+                $uid = $e['user']->id;
+                $rows = $orders->where('user_id', $uid)->whereNull('category_id')->whereNull('menu_day_id');
+                $attended = count(OgsAttendance::attendedDates($subs->get($uid), $openWeekDays, $rows));
+                $weekByUser[$uid] = ($weekByUser[$uid] ?? 0) + $attended * $ogsPrice;
+            }
+        }
+
         return view('schulkantine::orders.index', [
             'season' => $season,
             'weekStart' => $weekStart,
@@ -262,6 +280,7 @@ class OrderController
             'dayTotals' => $dayTotals,
             'monthTotal' => $monthTotal,
             'monthByUser' => $monthByUser,
+            'weekByUser' => $weekByUser,
             'ogsPrice' => $ogsPrice,
             'openingWeekdays' => $openingWeekdays,
             'monthStart' => $monthStart,
