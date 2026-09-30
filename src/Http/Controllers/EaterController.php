@@ -39,6 +39,8 @@ class EaterController
             'users' => $users,
             'groups' => CustomerGroup::all()->keyBy('role_id'), // einmal laden → kein N+1
             'chips' => NfcChip::active()->whereIn('user_id', $users->pluck('id'))->get()->groupBy('user_id'),
+            // Testverträge (nur Konten ohne Linear-Herkunft) – einmal laden statt je Zeile.
+            'testVertraege' => \Intranet\Modules\Schulkantine\Models\TestVertrag::whereIn('user_id', $users->pluck('id'))->pluck('art', 'user_id'),
             'search' => $search,
             // Liegt gerade eine CSV bereit? Dann den Import-Button hervorheben.
             'wartendeImporte' => count(app(InfoImporter::class)->wartendeDateien()),
@@ -91,6 +93,8 @@ class EaterController
             'chips' => NfcChip::active()->where('user_id', $user->id)->orderBy('source')->get(),
             'isOgs' => CustomerGroup::forUser($user)?->ordering_mode === CustomerGroup::MODE_JA_NEIN,
             'testVertrag' => \Intranet\Modules\Schulkantine\Support\Essensvertrag::testVertrag($user),
+            // Filter der Übersicht – für den Rücksprung nach Speichern/Abbrechen.
+            'search' => trim((string) $request->query('search', '')),
         ]);
     }
 
@@ -120,8 +124,10 @@ class EaterController
             }
         }
 
+        $search = trim((string) $request->input('search', ''));
+
         return redirect()
-            ->route('module.schulkantine.eaters.index')
+            ->route('module.schulkantine.eaters.index', $search !== '' ? ['search' => $search] : [])
             ->with('status', 'Verträglichkeiten von „'.$user->name.'" wurden gespeichert.');
     }
 

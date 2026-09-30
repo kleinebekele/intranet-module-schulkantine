@@ -94,6 +94,7 @@
                                 <th class="px-3 py-2">E-Mail</th>
                                 <th class="px-3 py-2">Gruppe (aus Rolle)</th>
                                 <th class="px-3 py-2">Info</th>
+                                <th class="px-3 py-2">Vertrag</th>
                                 <th class="px-3 py-2">Verträglichkeiten</th>
                                 <th class="px-3 py-2 text-center">Chip</th>
                                 <th class="px-3 py-2 text-right">Aktion</th>
@@ -116,6 +117,24 @@
                                         @if ($user->kantineInfo)
                                             <span class="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">{{ $user->kantineInfo->info }}</span>
                                         @else
+                                            <span class="text-gray-300">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        @php
+                                            $arten = \Intranet\Modules\Schulkantine\Support\LinearPreise::ARTEN;
+                                            $linearVertraege = $user->roles->pluck('role_id')
+                                                ->filter(fn ($r) => str_starts_with($r, 'kantine_vertrag_'))
+                                                ->map(fn ($r) => (int) substr($r, 16));
+                                            $testArt = blank($user->externe_id) ? ($testVertraege[$user->id] ?? null) : null;
+                                        @endphp
+                                        @foreach ($linearVertraege as $art)
+                                            <span class="inline-flex whitespace-nowrap rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700" title="Vertrag aus Linear">{{ $art }} · {{ $arten[$art] ?? '' }}</span>
+                                        @endforeach
+                                        @if ($testArt !== null)
+                                            <span class="inline-flex whitespace-nowrap rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700" title="Simulierter Testvertrag">{{ $testArt }} · {{ $arten[$testArt] ?? '' }} (Test)</span>
+                                        @endif
+                                        @if ($linearVertraege->isEmpty() && $testArt === null)
                                             <span class="text-gray-300">—</span>
                                         @endif
                                     </td>
@@ -148,7 +167,7 @@
                                     </td>
                                     <td class="px-3 py-2 text-right">
                                         @darfRoute('module.schulkantine.eaters.edit')
-                                        <a href="{{ route('module.schulkantine.eaters.edit', $user) }}" title="Verträglichkeiten bearbeiten"
+                                        <a href="{{ route('module.schulkantine.eaters.edit', $search !== '' ? ['user' => $user, 'search' => $search] : $user) }}" title="Teilnehmer bearbeiten"
                                            class="inline-flex items-center rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
                                             <x-module-icon name="edit" class="text-base" />
                                         </a>

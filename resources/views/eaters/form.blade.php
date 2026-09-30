@@ -47,6 +47,7 @@
               class="space-y-6 rounded-xl border border-gray-200 bg-white p-6">
             @csrf
             @method('PUT')
+            <input type="hidden" name="search" value="{{ $search }}">
 
             {{-- Sonderkost: Allergene --}}
             <div>
@@ -103,7 +104,7 @@
                     <x-module-icon name="save" class="text-base" />
                     Speichern
                 </button>
-                <a href="{{ route('module.schulkantine.eaters.index') }}"
+                <a href="{{ route('module.schulkantine.eaters.index', $search !== '' ? ['search' => $search] : []) }}"
                    class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
                     <x-module-icon name="x" class="text-base" />
                     Abbrechen
