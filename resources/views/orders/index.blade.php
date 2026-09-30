@@ -96,7 +96,7 @@
                                     @if ($hasSonderkost)
                                         <span class="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600" title="Es sind Verträglichkeiten hinterlegt">⚠️ Verträglichkeiten</span>
                                     @endif
-                                    @if ($isOgs)
+                                    @if ($isOgs && $e['hasContract'])
                                         @php $wdKurz = [1 => 'Mo', 2 => 'Di', 3 => 'Mi', 4 => 'Do', 5 => 'Fr', 6 => 'Sa', 7 => 'So']; @endphp
                                         <div x-data="{ open: false }" class="inline-flex items-center gap-2">
                                             @if ($isSubscribed)
@@ -152,6 +152,10 @@
 
                             @if (! $e['group'])
                                 <div class="px-4 py-4 text-sm text-gray-400">Für diese Person ist keine Kundengruppe hinterlegt.</div>
+                            @elseif (! $e['hasContract'])
+                                <div class="m-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 sm:m-4">
+                                    📄 {{ \Intranet\Modules\Schulkantine\Support\Essensvertrag::hinweis($eater) }}
+                                </div>
                             @else
                                 {{-- Tage als umbrechendes Raster: jede Karte will mindestens 15.5rem, teilt sich
                                      die Breite gleichmäßig und rutscht in die nächste Zeile, wenn kein Platz mehr ist

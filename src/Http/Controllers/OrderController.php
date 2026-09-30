@@ -14,6 +14,7 @@ use Intranet\Modules\Schulkantine\Models\Order;
 use Intranet\Modules\Schulkantine\Models\Season;
 use Intranet\Modules\Schulkantine\Models\Subscription;
 use Intranet\Modules\Schulkantine\Support\DeadlineService;
+use Intranet\Modules\Schulkantine\Support\Essensvertrag;
 use Intranet\Modules\Schulkantine\Support\OgsAttendance;
 use Intranet\Modules\Schulkantine\Support\ReleaseService;
 
@@ -50,7 +51,7 @@ class OrderController
         // „isst standardmäßig an allen Öffnungstagen".
         foreach ($eaters as $eater) {
             $group = CustomerGroup::forUser($eater, $groups);
-            if ($group && $group->ordering_mode === CustomerGroup::MODE_JA_NEIN) {
+            if ($group && $group->ordering_mode === CustomerGroup::MODE_JA_NEIN && Essensvertrag::hat($eater)) {
                 Subscription::firstOrCreate(['season_id' => $season->id, 'user_id' => $eater->id]);
             }
         }
@@ -198,6 +199,7 @@ class OrderController
                 'user' => $eater,
                 'group' => $group,
                 'mode' => $group?->ordering_mode,
+                'hasContract' => Essensvertrag::hat($eater),
                 'allergenIds' => $eater->kantineAllergens->pluck('id')->all(),
                 'dietIds' => $eater->kantineDiets->pluck('id')->all(),
                 // Kategorien, die dieser Esser NICHT vorbestellen darf (Eltern-Freigabe).
@@ -290,6 +292,10 @@ class OrderController
 
         // Berechtigung: nur für sich selbst oder ein eigenes Kind bestellen.
         abort_unless($this->mayOrderFor($user, $eater), 403, 'Du darfst für diese Person nicht bestellen.');
+
+        if (! Essensvertrag::hat($eater)) {
+            return back()->withErrors(['bestellung' => Essensvertrag::hinweis($eater)]);
+        }
 
         $date = Carbon::parse($data['date'])->startOfDay();
         abort_unless($season->isOpenOn($date), 422, 'An diesem Tag hat die Kantine nicht geöffnet.');
@@ -441,6 +447,10 @@ class OrderController
         $eater = User::findOrFail($data['eater_id']);
 
         abort_unless($this->mayOrderFor($user, $eater), 403, 'Du darfst für diese Person kein Abo verwalten.');
+
+        if (! Essensvertrag::hat($eater)) {
+            return back()->withErrors(['bestellung' => Essensvertrag::hinweis($eater)]);
+        }
 
         $group = CustomerGroup::forUser($eater);
         abort_unless($group && $group->ordering_mode === CustomerGroup::MODE_JA_NEIN, 422, 'Nur OGS-Esser haben ein Abo.');
