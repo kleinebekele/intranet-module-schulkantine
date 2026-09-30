@@ -33,7 +33,7 @@
                     <div class="flex items-center gap-2">
                         <a href="{{ route('module.schulkantine.reports.linear', ['monat' => $monthValue]) }}"
                            class="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100">
-                            <x-module-icon name="search" class="text-base" /> Linear-Vorschau
+                            <x-module-icon name="search" class="text-base" /> Linear
                         </a>
                         <a href="{{ route('module.schulkantine.reports.csv', ['monat' => $monthValue]) }}"
                            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">

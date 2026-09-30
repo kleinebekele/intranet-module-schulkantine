@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="flex items-center gap-2">
             <x-module-icon name="chart" class="text-2xl text-indigo-600" />
-            <h1 class="text-xl font-semibold text-gray-800">Linear-Vorschau</h1>
+            <h1 class="text-xl font-semibold text-gray-800">Abrechnung an Linear</h1>
         </div>
     </x-slot>
 
@@ -10,12 +10,17 @@
 
     <div class="w-full space-y-5">
         <div class="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-            <strong>Nur Vorschau – es wird nichts an Linear gesendet.</strong>
-            So sähen die Zeilen für <code>MgEsGeld</code> aus, wenn {{ $monthLabel }} jetzt abgeschlossen würde
+            So sähen die Zeilen für <code>Linear2.dbo.MgEsGeld</code> aus, wenn {{ $monthLabel }} jetzt abgeschlossen würde
             (Aufbau wie beim alten Menü&amp;Serve: je Esser eine Zeile, Datum = Monatsletzter). Der Betrag umfasst
-            Menüs, OGS und spontane Abholungen; <strong>Chip-Pfand ist nicht enthalten</strong> und steht nur zur Info daneben.
-            Vertragsnehmer und Vertragsnummer stammen aus dem letzten nächtlichen Linear-Import.
+            Menüs, OGS, spontane Abholungen und <strong>Chip-Pfand</strong>. Vertragsnehmer und Vertragsnummer stammen
+            aus dem letzten nächtlichen Linear-Import.
+            <strong>Gesendet wird nur, was Sie je Zeile mit „An Linear senden" auslösen</strong> – jeder Esser höchstens
+            einmal je Monat. Soll/DatumSoll füllt Linear beim nächsten Sollstellungslauf.
         </div>
+
+        @if ($errors->has('linear'))
+            <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ $errors->first('linear') }}</div>
+        @endif
 
         @unless ($vertraegeStand)
             <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -67,8 +72,9 @@
                             <th class="px-3 py-2 text-right">Anzahl</th>
                             <th class="px-3 py-2 text-right">Betrag = Gesamt</th>
                             <th class="px-3 py-2">Beschreibung</th>
-                            <th class="px-3 py-2">Datum</th>
-                            <th class="px-3 py-2 text-right text-gray-300">Pfand (nicht enthalten)</th>
+                            <th class="px-3 py-2">Datum = DatumU</th>
+                            <th class="px-3 py-2 text-right">davon Pfand</th>
+                            <th class="px-3 py-2 text-right">Linear</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
@@ -80,13 +86,36 @@
                                 <td class="px-3 py-2">{{ $z['Art'] }}</td>
                                 <td class="px-3 py-2 font-mono">{{ $z['VertragNr'] }}</td>
                                 <td class="px-3 py-2 text-right">{{ $z['Anzahl'] }}</td>
-                                <td class="px-3 py-2 text-right font-semibold" title="Menüs {{ $euro($z['menu']) }} · OGS {{ $euro($z['ogs']) }} · spontan {{ $euro($z['spontan']) }}">{{ $euro($z['Betrag']) }}</td>
+                                <td class="px-3 py-2 text-right font-semibold" title="Menüs {{ $euro($z['menu']) }} · OGS {{ $euro($z['ogs']) }} · spontan {{ $euro($z['spontan']) }} · Pfand {{ $euro($z['pfand']) }}">{{ $euro($z['Betrag']) }}</td>
                                 <td class="px-3 py-2 text-gray-500">{{ $z['Beschreibung'] }}</td>
                                 <td class="px-3 py-2 text-gray-500">{{ $z['Datum']->format('d.m.Y') }}</td>
-                                <td class="px-3 py-2 text-right text-gray-400">{{ $z['pfand'] != 0 ? $euro($z['pfand']) : '' }}</td>
+                                <td class="px-3 py-2 text-right text-gray-500">{{ $z['pfand'] != 0 ? $euro($z['pfand']) : '' }}</td>
+                                <td class="px-3 py-2 text-right">
+                                    @if ($z['export'])
+                                        <span class="whitespace-nowrap text-xs font-medium text-green-700" title="{{ $z['export']->hinweis }}">
+                                            ✓ gesendet {{ \Illuminate\Support\Carbon::parse($z['export']->sent_at)->format('d.m.Y H:i') }}
+                                        </span>
+                                        @if (round((float) $z['export']->betrag, 2) !== round((float) $z['Betrag'], 2))
+                                            <div class="whitespace-nowrap text-xs font-medium text-amber-700">⚠️ gesendet {{ $euro($z['export']->betrag) }}, jetzt {{ $euro($z['Betrag']) }}</div>
+                                        @endif
+                                    @else
+                                        @php
+                                            $frage = "Diese Zeile jetzt an Linear (MgEsGeld) senden?\n\n"
+                                                ."AdrNr {$z['AdrNr']} · AbwAdrNr {$z['AbwAdrNr']} ({$z['user']?->name})\n"
+                                                ."Art {$z['Art']} · VertragNr {$z['VertragNr']} · Anzahl 1\n"
+                                                .'Betrag = Gesamt '.$euro($z['Betrag'])."\n"
+                                                .'Beschreibung '.$z['Beschreibung'].' · Datum = DatumU '.$z['Datum']->format('d.m.Y');
+                                        @endphp
+                                        <form method="POST" action="{{ route('module.schulkantine.reports.linear.send', ['user' => $z['user'], 'monat' => $monthValue]) }}"
+                                              onsubmit="return confirm(@js($frage))">
+                                            @csrf
+                                            <button type="submit" class="whitespace-nowrap rounded-md border border-sky-300 bg-white px-2 py-1 text-xs font-medium text-sky-800 hover:bg-sky-50">An Linear senden</button>
+                                        </form>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="10" class="px-3 py-8 text-center text-gray-500">Für {{ $monthLabel }} gäbe es keine Zeilen für Linear.</td></tr>
+                            <tr><td colspan="11" class="px-3 py-8 text-center text-gray-500">Für {{ $monthLabel }} gäbe es keine Zeilen für Linear.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

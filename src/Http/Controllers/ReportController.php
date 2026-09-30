@@ -104,6 +104,24 @@ class ReportController
         ]);
     }
 
+    /** EINE Zeile (Esser + Monat) an Linear senden – nur per Knopf, nie automatisch. */
+    public function linearSenden(Request $request, User $user)
+    {
+        $this->authorizeAdmin($request);
+        $season = Season::where('is_active', true)->firstOrFail();
+        [$year, $month] = $this->resolveMonth($request, $season);
+
+        try {
+            $meldung = (new \Intranet\Modules\Schulkantine\Support\LinearExport)->senden($season, $user, $year, $month, $request->user());
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->withErrors(['linear' => $e instanceof \RuntimeException ? $e->getMessage() : 'Senden an Linear fehlgeschlagen: '.$e->getMessage()]);
+        }
+
+        return back()->with('status', $meldung);
+    }
+
     // ------------------------------------------------------------- Exporte
 
     public function csv(Request $request): StreamedResponse

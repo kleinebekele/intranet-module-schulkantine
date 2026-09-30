@@ -136,6 +136,7 @@ Route::middleware(['web', 'auth'])
         Route::get('auswertung', [ReportController::class, 'index'])->name('reports.index');
         Route::get('auswertung/csv', [ReportController::class, 'csv'])->name('reports.csv');
         Route::get('auswertung/linear', [ReportController::class, 'linear'])->name('reports.linear');
+        Route::post('auswertung/linear/{user}/senden', [ReportController::class, 'linearSenden'])->name('reports.linear.send');
         Route::get('auswertung/person/{user}', [ReportController::class, 'show'])->name('reports.show');
         Route::get('auswertung/pdf', [ReportController::class, 'pdf'])->name('reports.pdf');
         // Kein manuelles „bezahlt": der Bezahlt-Status kommt ausschließlich aus dem

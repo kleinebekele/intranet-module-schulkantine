@@ -2,6 +2,7 @@
 
 namespace Intranet\Modules\Schulkantine\Support;
 
+use App\Ekkon\Ekkon;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -9,16 +10,18 @@ use Illuminate\Support\Facades\Schema;
 use Intranet\Modules\Schulkantine\Models\Season;
 
 /**
- * VORSCHAU der Monatsabrechnung für Linear – es wird nichts gesendet.
+ * Monatsabrechnung für Linear (`MgEsGeld`): Vorschau und Einzelversand.
  *
- * Aufbau wie beim alten Menü&Serve (`MgEsGeld`): je Esser und Monat eine Zeile mit
+ * Aufbau wie beim alten Menü&Serve: je Esser und Monat eine Zeile mit
  * Vertragsnehmer (AdrNr), Esser (AbwAdrNr), Vertragsart, Vertragsnummer, Anzahl 1,
- * Betrag = Gesamt = Monatssumme, Datum = letzter Tag des Monats. Der Betrag umfasst
- * Menüs, OGS und spontane Abholungen; Chip-Pfand ist NICHT enthalten (hat auch
- * Menü&Serve nie übertragen) und steht nur zur Information daneben.
+ * Betrag = Gesamt = Monatssumme, Datum = DatumU = letzter Tag des Monats. Die
+ * Spalten Soll/DatumSoll/ZeitSoll füllt Linear selbst beim Sollstellungslauf.
+ * Der Betrag umfasst Menüs, OGS, spontane Abholungen UND Chip-Pfand (Ausgabe +,
+ * Rückgabe −). Beschreibung „Kantine Intranet" – bewusst anders als Menü&Serve.
  *
- * Nicht übertragbar (und deshalb getrennt aufgeführt): Personen ohne Linear-Herkunft
- * (Testkonten) und Personen ohne laufenden Vertrag in den importierten Vertragsdaten.
+ * Gesendet wird ausschließlich per Knopf je Zeile ({@see senden()}), nie automatisch.
+ * Nicht übertragbar (getrennt aufgeführt): Testkonten ohne Linear-Herkunft, Esser
+ * ohne laufenden Vertrag, Beträge ≤ 0 (Gutschriften bitte von Hand in Linear).
  */
 class LinearExport
 {
@@ -41,13 +44,17 @@ class LinearExport
                 ->get()->groupBy('esser_adrnr')
             : collect();
         $preise = LinearPreise::aktuell() ?? [];
+        $gesendet = Schema::hasTable('kantine_linear_exports')
+            ? DB::table('kantine_linear_exports')->where('year', $year)->where('month', $month)->get()->keyBy('user_id')
+            : collect();
 
         $zeilen = [];
         $ausgeschlossen = [];
         foreach ($lines as $uid => $l) {
             $user = $users->get($uid);
-            $betrag = round($l['menu_total'] + $l['ogs_total'] + $l['spontan_total'], 2);
+            $essen = round($l['menu_total'] + $l['ogs_total'] + $l['spontan_total'], 2);
             $pfand = round($l['pfand_out'] - $l['pfand_back'], 2);
+            $betrag = round($essen + $pfand, 2);
             $basis = [
                 'user' => $user,
                 'betrag' => $betrag,
@@ -55,12 +62,17 @@ class LinearExport
                 'menu' => $l['menu_total'],
                 'ogs' => $l['ogs_total'],
                 'spontan' => $l['spontan_total'],
+                'export' => $gesendet->get($uid),
             ];
-            if ($betrag <= 0) {
-                continue; // wie Menü&Serve: nur Beträge über 0
+            if ($betrag == 0.0) {
+                continue;
             }
             if (! $user || blank($user->externe_id)) {
                 $ausgeschlossen[] = $basis + ['grund' => 'Konto ohne Linear-Herkunft (Testkonto)'];
+                continue;
+            }
+            if ($betrag < 0) {
+                $ausgeschlossen[] = $basis + ['grund' => 'Gutschrift (Pfand-Rückgabe) – bitte von Hand in Linear'];
                 continue;
             }
 
@@ -75,8 +87,9 @@ class LinearExport
 
             $zeilen[] = $basis + [
                 'AdrNr' => $vertrag->adrnr,
-                'AbwAdrNr' => (string) $user->externe_id,
                 'Art' => (int) $vertrag->art,
+                'DatumU' => $datum,
+                'AbwAdrNr' => (string) $user->externe_id,
                 'VertragNr' => $vertrag->vertrag_nr,
                 'Anzahl' => 1,
                 'Betrag' => $betrag,
@@ -95,5 +108,63 @@ class LinearExport
             'summe' => round(array_sum(array_column($zeilen, 'Betrag')), 2),
             'vertraegeStand' => $vertraegeStand,
         ];
+    }
+
+    /**
+     * EINE Zeile an Linear senden (INSERT in MgEsGeld). Rechnet den Monat frisch,
+     * sendet je Esser und Monat höchstens einmal und prüft vorher in Linear, ob dort
+     * schon eine Zeile dieses Essers mit derselben Beschreibung und demselben Datum steht.
+     *
+     * @return string Erfolgsmeldung
+     *
+     * @throws \RuntimeException mit verständlicher Meldung
+     */
+    public function senden(Season $season, User $esser, int $year, int $month, User $durch): string
+    {
+        if (DB::table('kantine_linear_exports')->where('user_id', $esser->id)->where('year', $year)->where('month', $month)->exists()) {
+            throw new \RuntimeException("{$esser->name} ist für {$month}/{$year} bereits an Linear gesendet.");
+        }
+        $zeile = collect($this->vorschau($season, $year, $month)['zeilen'])
+            ->first(fn ($z) => $z['user']?->id === $esser->id);
+        if (! $zeile) {
+            throw new \RuntimeException("Für {$esser->name} gibt es in {$month}/{$year} keine übertragbare Zeile.");
+        }
+        if (! Ekkon::mssqlKonfiguriert()) {
+            throw new \RuntimeException('Keine Verbindung zu Linear konfiguriert.');
+        }
+
+        $tabelle = (string) config('schulkantine.linear_esgeld_tabelle', 'Linear2.dbo.MgEsGeld');
+        $datum = $zeile['Datum']->format('Y-m-d');
+        $linear = DB::connection(Ekkon::mssqlConnection());
+
+        $schon = (int) ($linear->selectOne(
+            "SELECT COUNT(*) AS n FROM {$tabelle} WHERE AbwAdrNr = ? AND Beschreibung = ? AND CONVERT(date, Datum) = ?",
+            [(int) $zeile['AbwAdrNr'], self::BESCHREIBUNG, $datum],
+        )->n ?? 0);
+
+        $protokoll = [
+            'user_id' => $esser->id, 'year' => $year, 'month' => $month,
+            'adrnr' => $zeile['AdrNr'], 'abw_adrnr' => $zeile['AbwAdrNr'], 'art' => $zeile['Art'],
+            'vertrag_nr' => $zeile['VertragNr'], 'betrag' => $zeile['Betrag'], 'datum' => $datum,
+            'sent_at' => now(), 'sent_by' => $durch->id, 'created_at' => now(), 'updated_at' => now(),
+        ];
+
+        if ($schon > 0) {
+            DB::table('kantine_linear_exports')->insert($protokoll + ['hinweis' => 'stand bereits in Linear – nicht erneut geschrieben']);
+            throw new \RuntimeException("In Linear steht für {$esser->name} ({$datum}) schon eine Zeile „".self::BESCHREIBUNG."\" – nicht erneut geschrieben, als gesendet vermerkt.");
+        }
+
+        $linear->insert(
+            "INSERT INTO {$tabelle} (AdrNr, Art, DatumU, AbwAdrNr, VertragNr, Anzahl, Betrag, Gesamt, Beschreibung, Datum)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (int) $zeile['AdrNr'], $zeile['Art'], $datum, (int) $zeile['AbwAdrNr'],
+                (int) $zeile['VertragNr'], 1, $zeile['Betrag'], $zeile['Gesamt'],
+                self::BESCHREIBUNG, $datum,
+            ],
+        );
+        DB::table('kantine_linear_exports')->insert($protokoll);
+
+        return sprintf('%s: %s € für %02d/%d an Linear gesendet.', $esser->name, number_format($zeile['Betrag'], 2, ',', '.'), $month, $year);
     }
 }
