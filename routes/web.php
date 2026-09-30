@@ -135,6 +135,7 @@ Route::middleware(['web', 'auth'])
         // Auswertung & Abrechnung (Phase 5) – nur Admin (im Controller geprüft).
         Route::get('auswertung', [ReportController::class, 'index'])->name('reports.index');
         Route::get('auswertung/csv', [ReportController::class, 'csv'])->name('reports.csv');
+        Route::get('auswertung/linear', [ReportController::class, 'linear'])->name('reports.linear');
         Route::get('auswertung/person/{user}', [ReportController::class, 'show'])->name('reports.show');
         Route::get('auswertung/pdf', [ReportController::class, 'pdf'])->name('reports.pdf');
         // Kein manuelles „bezahlt": der Bezahlt-Status kommt ausschließlich aus dem

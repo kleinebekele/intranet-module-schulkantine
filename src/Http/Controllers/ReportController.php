@@ -87,6 +87,23 @@ class ReportController
     // (Tabelle kantine_settlements) kommt ausschließlich aus dem externen
     // Zahlungs-Import (folgt). Die Auswertung zeigt den Status nur noch an.
 
+    // ------------------------------------------------------- Linear-Vorschau
+
+    /** Was ginge für diesen Monat an Linear (MgEsGeld)? Nur Anzeige – es wird nichts gesendet. */
+    public function linear(Request $request)
+    {
+        $this->authorizeAdmin($request);
+        $season = Season::where('is_active', true)->firstOrFail();
+        [$year, $month] = $this->resolveMonth($request, $season);
+
+        return view('schulkantine::reports.linear', (new \Intranet\Modules\Schulkantine\Support\LinearExport)->vorschau($season, $year, $month) + [
+            'season' => $season,
+            'monthLabel' => $this->monthLabel($year, $month),
+            'monthValue' => sprintf('%04d-%02d', $year, $month),
+            'months' => $this->seasonMonths($season),
+        ]);
+    }
+
     // ------------------------------------------------------------- Exporte
 
     public function csv(Request $request): StreamedResponse
