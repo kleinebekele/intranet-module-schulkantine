@@ -347,9 +347,9 @@ class OrderController
      * (Kategorie + Gericht), alle mit derselben menu_day_id gruppiert. Der Festpreis
      * des Menüs wird auf die Gerichte verteilt (Summe = Menü-Preis).
      *
-     * Beim Bestellen werden vorherige Bestellungen des Essers an dem Tag verdrängt
-     * (à-la-carte wie andere Menüs) – ein Esser bekommt an einem Tag ein Menü ODER
-     * einzelne Gerichte, nicht beides doppelt.
+     * Ein Menü ist fest: ganz oder gar nicht. Einzeln gewählte Gerichte bleiben
+     * daneben bestehen und kommen zusätzlich dazu; verdrängt werden nur andere Menüs
+     * des Essers an dem Tag.
      */
     private function handleMenuDay(Season $season, User $eater, Carbon $date, DeadlineService $deadline, int $menuDayId, string $attend)
     {
@@ -388,12 +388,12 @@ class OrderController
             return back()->withErrors(['bestellung' => 'Die Bestellfrist für diesen Tag ist abgelaufen.']);
         }
 
-        // Verdrängung: alle aktiven Gericht-/Menü-Bestellungen des Essers an dem Tag
-        // (nicht OGS) räumen, dann das Menü frisch anlegen.
+        // Verdrängung: andere Menüs des Essers an dem Tag räumen (Einzelgerichte
+        // bleiben), dann das Menü frisch anlegen.
         Order::where('season_id', $season->id)->where('user_id', $eater->id)
             ->whereDate('date', $date->toDateString())
             ->where('status', Order::STATUS_ORDERED)
-            ->where(fn ($q) => $q->whereNotNull('category_id')->orWhereNotNull('menu_day_id'))
+            ->whereNotNull('menu_day_id')
             ->delete();
 
         $prices = $this->distributeMenuPrice(LinearPreise::menuPreis($menuDay, $eater),$slots->map(fn ($s) => (float) ($s->dish->price ?? 0))->all());
@@ -503,10 +503,13 @@ class OrderController
         abort_if(empty($data['category_id']), 422, 'Es fehlt die Kategorie.');
         $categoryId = (int) $data['category_id'];
 
+        // Nur Einzelbestellungen – die Slot-Zeilen eines Menüs gehören zum Menü und
+        // werden hier weder überschrieben noch abbestellt.
         $existing = Order::where('user_id', $eater->id)
             ->where('season_id', $season->id)
             ->whereDate('date', $date->toDateString())
             ->where('category_id', $categoryId)
+            ->whereNull('menu_day_id')
             ->where('status', Order::STATUS_ORDERED)
             ->first();
 
@@ -606,30 +609,16 @@ class OrderController
             ->whereDate('date', $date->toDateString())
             ->where('status', Order::STATUS_ORDERED)
             ->whereNotNull('category_id') // NULL = OGS ja/nein, betrifft uns nicht
+            ->whereNull('menu_day_id')    // Menüs sind fest, ein Einzelgericht kommt dazu
             ->when($keep, fn ($q) => $q->where('id', '!=', $keep->id))
-            ->with(['dish', 'menuDay'])
+            ->with('dish')
             ->get();
 
         $displaced = [];
-        $droppedMenus = [];
         foreach ($others as $o) {
-            $theirs = array_values(array_filter([$o->category_id]));
-
-            if (array_intersect($theirs, $occupied) !== []) {
-                // Gehört die Zeile zu einem Menü, fällt das GANZE Menü (kein
-                // verwaister Slot); sonst nur diese Gericht-Bestellung.
-                if ($o->menu_day_id) {
-                    if (! in_array($o->menu_day_id, $droppedMenus, true)) {
-                        $droppedMenus[] = $o->menu_day_id;
-                        $displaced[] = $o->menuDay?->name ?? 'Menü';
-                        Order::where('user_id', $eater->id)->where('season_id', $season->id)
-                            ->whereDate('date', $date->toDateString())
-                            ->where('menu_day_id', $o->menu_day_id)->delete();
-                    }
-                } else {
-                    $displaced[] = $o->dish?->name ?? 'frühere Bestellung';
-                    $o->delete();
-                }
+            if (in_array($o->category_id, $occupied)) {
+                $displaced[] = $o->dish?->name ?? 'frühere Bestellung';
+                $o->delete();
             }
         }
 
