@@ -474,7 +474,7 @@
                         <template x-if="dish.photo">
                             <img :src="dish.photo" alt="" class="h-20 w-20 shrink-0 rounded-xl object-cover">
                         </template>
-                        <template x-if="!dish.photo">
+                        <template x-if="!dish.photo && !dish.isMenu">
                             <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-300">
                                 <x-module-icon name="restaurant" class="text-3xl" />
                             </div>
