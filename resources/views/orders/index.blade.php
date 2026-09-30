@@ -468,16 +468,18 @@
                     class="absolute right-3 top-3 z-20 rounded-full bg-white/90 p-1.5 text-gray-500 shadow ring-1 ring-black/5 hover:bg-white hover:text-gray-700">
                 <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
             </button>
-            <template x-if="dish.photo">
-                <img :src="dish.photo" alt="" class="h-44 w-full rounded-t-2xl object-cover">
-            </template>
             <div class="p-5">
                 <div class="flex items-start justify-between gap-3">
-                    <div>
+                    <div class="flex min-w-0 items-start gap-3">
+                        <template x-if="dish.photo">
+                            <img :src="dish.photo" alt="" class="h-20 w-20 shrink-0 rounded-xl object-cover">
+                        </template>
+                        <div class="min-w-0">
                         <h2 class="text-lg font-semibold text-gray-800" x-text="dish.name"></h2>
                         <span x-show="dish.category" class="mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium"
                               :style="dish.categoryColor ? ('background-color:'+dish.categoryColor+'22; color:'+dish.categoryColor) : 'background-color:#eef2ff; color:#4f46e5'"
                               x-text="dish.category"></span>
+                        </div>
                     </div>
                     <span class="mr-8 whitespace-nowrap text-lg font-bold text-indigo-700" x-text="dish.price"></span>
                 </div>
@@ -491,16 +493,18 @@
                         <div class="mt-2 space-y-3">
                             <template x-for="c in dish.menuItems" :key="c.name">
                                 <div class="overflow-hidden rounded-xl border border-gray-100">
-                                    <template x-if="c.photo">
-                                        <img :src="c.photo" alt="" class="h-28 w-full object-cover">
-                                    </template>
                                     <div class="p-3">
                                         <div class="flex items-start justify-between gap-2">
-                                            <div>
+                                            <div class="flex min-w-0 items-start gap-3">
+                                                <template x-if="c.photo">
+                                                    <img :src="c.photo" alt="" class="h-16 w-16 shrink-0 rounded-lg object-cover">
+                                                </template>
+                                                <div class="min-w-0">
                                                 <div class="text-sm font-semibold text-gray-800" x-text="c.name"></div>
                                                 <span x-show="c.category" class="mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium"
                                                       :style="c.categoryColor ? ('background-color:'+c.categoryColor+'22; color:'+c.categoryColor) : 'background-color:#eef2ff; color:#4f46e5'"
                                                       x-text="c.category"></span>
+                                                </div>
                                             </div>
                                             <span class="whitespace-nowrap text-sm font-bold text-indigo-700" x-text="c.price"></span>
                                         </div>
