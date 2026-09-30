@@ -474,6 +474,11 @@
                         <template x-if="dish.photo">
                             <img :src="dish.photo" alt="" class="h-20 w-20 shrink-0 rounded-xl object-cover">
                         </template>
+                        <template x-if="!dish.photo">
+                            <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-300">
+                                <x-module-icon name="restaurant" class="text-3xl" />
+                            </div>
+                        </template>
                         <div class="min-w-0">
                         <h2 class="text-lg font-semibold text-gray-800" x-text="dish.name"></h2>
                         <span x-show="dish.category" class="mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium"
@@ -498,6 +503,11 @@
                                             <div class="flex min-w-0 items-start gap-3">
                                                 <template x-if="c.photo">
                                                     <img :src="c.photo" alt="" class="h-16 w-16 shrink-0 rounded-lg object-cover">
+                                                </template>
+                                                <template x-if="!c.photo">
+                                                    <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-300">
+                                                        <x-module-icon name="restaurant" class="text-2xl" />
+                                                    </div>
                                                 </template>
                                                 <div class="min-w-0">
                                                 <div class="text-sm font-semibold text-gray-800" x-text="c.name"></div>
