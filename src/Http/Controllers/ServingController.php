@@ -557,7 +557,7 @@ class ServingController
                 ->where('spontaneous', true)
                 ->whereBetween('date', [$weekStart->toDateString(), $weekStart->copy()->addDays(6)->toDateString()])
                 ->sum('price_snapshot');
-            if ($spent + (float) $dish->price > $budget + 0.001) {
+            if ($spent + $dish->preisFuer($eater) > $budget + 0.001) {
                 return $fail($eater->name.': Wochenbudget für Spontankäufe erreicht (Limit '
                     .number_format($budget, 2, ',', '.').' €, diese Woche schon '
                     .number_format($spent, 2, ',', '.').' € genutzt).');
@@ -571,7 +571,7 @@ class ServingController
             'order_id' => null,
             'dish_id' => $dish->id,
             'category_id' => $dish->category_id,
-            'price_snapshot' => $dish->price,
+            'price_snapshot' => $dish->preisFuer($eater),
             'spontaneous' => true,
             'served_by' => $user->id,
         ]);
@@ -580,7 +580,7 @@ class ServingController
             return response()->json([
                 'ok' => true,
                 'text' => 'Spontan erfasst: '.$dish->name.' für '.$eater->name.'.',
-                'item' => ['id' => $serving->id, 'name' => $dish->name, 'price' => (float) $dish->price],
+                'item' => ['id' => $serving->id, 'name' => $dish->name, 'price' => $dish->preisFuer($eater)],
             ]);
         }
 
@@ -1295,7 +1295,7 @@ class ServingController
         // Wochenbudget prüfen (Walk-in + Nachschlag zusammen).
         $extraSum = 0.0;
         foreach ($walkinDishes as $wd) {
-            $extraSum += (float) $wd['dish']->price * $wd['qty'];
+            $extraSum += $wd['dish']->preisFuer($eater) * $wd['qty'];
         }
         foreach ($nachschlag as $n) {
             $extraSum += (float) $n['amount'] * (int) $n['qty'];
@@ -1355,7 +1355,7 @@ class ServingController
                     Serving::create([
                         'season_id' => $season->id, 'user_id' => $eater->id, 'date' => $date->toDateString(),
                         'order_id' => null, 'dish_id' => $wd['dish']->id, 'category_id' => $wd['dish']->category_id,
-                        'price_snapshot' => $wd['dish']->price, 'spontaneous' => true, 'served_by' => $user->id,
+                        'price_snapshot' => $wd['dish']->preisFuer($eater), 'spontaneous' => true, 'served_by' => $user->id,
                     ]);
                 }
             }

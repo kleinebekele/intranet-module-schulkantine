@@ -2,9 +2,11 @@
 
 namespace Intranet\Modules\Schulkantine\Models;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Intranet\Modules\Schulkantine\Support\Essensvertrag;
 
 /**
  * Ein Gericht aus dem Katalog. Fixpreis, genau eine Kategorie, dazu Allergene,
@@ -20,8 +22,31 @@ class Dish extends Model
         'description',
         'photo_path',
         'price',
+        'contract_prices',
         'is_active',
     ];
+
+    /**
+     * Preis für diesen Esser: der günstigste Preis seiner Vertragsarten, für die am
+     * Gericht einer eingetragen ist – sonst der Hauptpreis.
+     */
+    public function preisFuer(?User $esser): float
+    {
+        $preise = $this->contract_prices ?: [];
+        if ($esser && $preise) {
+            $eigene = [];
+            foreach (Essensvertrag::arten($esser) as $art) {
+                if (isset($preise[$art])) {
+                    $eigene[] = (float) $preise[$art];
+                }
+            }
+            if ($eigene) {
+                return min($eigene);
+            }
+        }
+
+        return (float) $this->price;
+    }
 
     /** Öffentliche URL des Fotos (oder null, wenn keins hinterlegt ist). */
     public function photoUrl(): ?string
@@ -47,6 +72,7 @@ class Dish extends Model
     {
         return [
             'price' => 'decimal:2',
+            'contract_prices' => 'array',
             'is_active' => 'boolean',
         ];
     }

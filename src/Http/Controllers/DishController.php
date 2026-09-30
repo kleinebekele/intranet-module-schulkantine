@@ -11,6 +11,7 @@ use Intranet\Modules\Schulkantine\Models\Category;
 use Intranet\Modules\Schulkantine\Models\Diet;
 use Intranet\Modules\Schulkantine\Models\Dish;
 use Intranet\Modules\Schulkantine\Models\MealRating;
+use Intranet\Modules\Schulkantine\Support\LinearPreise;
 
 /**
  * Verwaltung des Gerichte-Katalogs inkl. Allergene/Zusatzstoffe/Diäten.
@@ -188,6 +189,8 @@ class DishController
             'category_id' => ['nullable', 'exists:kantine_categories,id'],
             'description' => ['nullable', 'string'],
             'price' => ['required', 'numeric', 'min:0'],
+            'contract_prices' => ['array'],
+            'contract_prices.*' => ['nullable', 'numeric', 'min:0'],
             'photo' => ['nullable', 'image', 'max:4096'],
             'remove_photo' => ['nullable', 'boolean'],
             'allergens' => ['array'],
@@ -203,8 +206,27 @@ class DishController
             'category_id' => $request->input('category_id') ?: null,
             'description' => $request->input('description') ?: null,
             'price' => $request->input('price'),
+            'contract_prices' => $this->contractPrices($request),
             'is_active' => $request->boolean('is_active'),
         ];
+    }
+
+    /**
+     * Preise je Vertragsart; leere Felder fallen weg (dort gilt der Hauptpreis).
+     *
+     * @return array<int, float>|null
+     */
+    private function contractPrices(Request $request): ?array
+    {
+        $preise = [];
+        foreach (LinearPreise::ARTEN as $art => $_) {
+            $wert = $request->input('contract_prices.'.$art);
+            if ($wert !== null && $wert !== '') {
+                $preise[$art] = round((float) $wert, 2);
+            }
+        }
+
+        return $preise ?: null;
     }
 
     /**

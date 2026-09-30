@@ -50,6 +50,22 @@
                 </div>
             </div>
 
+            {{-- Preis je Vertragsart: leer = Hauptpreis. Bei mehreren Verträgen gilt der günstigste. --}}
+            <div>
+                <x-input-label value="Preis je Vertragsart (€, optional – leer = Hauptpreis)" />
+                <div class="mt-1 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    @foreach (\Intranet\Modules\Schulkantine\Support\LinearPreise::ARTEN as $art => $artName)
+                        <div>
+                            <label for="contract_price_{{ $art }}" class="block text-xs text-gray-500">{{ $artName }}</label>
+                            <x-text-input id="contract_price_{{ $art }}" name="contract_prices[{{ $art }}]" type="number" step="0.01" min="0"
+                                          class="mt-0.5 block w-full" placeholder="Hauptpreis"
+                                          :value="old('contract_prices.'.$art, $dish->contract_prices[$art] ?? null)" />
+                            <x-input-error :messages="$errors->get('contract_prices.'.$art)" class="mt-1" />
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
             <div>
                 <x-input-label for="description" value="Beschreibung (optional)" />
                 <textarea id="description" name="description" rows="3"

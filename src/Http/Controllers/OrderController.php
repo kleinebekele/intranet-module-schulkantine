@@ -571,7 +571,7 @@ class OrderController
         $attributes = [
             'menu_id' => $menu->id,
             'dish_id' => $menu->dish_id,
-            'price_snapshot' => $menu->dish->price,
+            'price_snapshot' => $menu->dish->preisFuer($eater),
             'status' => Order::STATUS_ORDERED,
         ];
 

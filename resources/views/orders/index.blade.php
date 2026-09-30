@@ -352,7 +352,7 @@
                                                                             'name' => $m->dish->name,
                                                                             'category' => $m->dish->category?->name,
                                                                             'categoryColor' => $m->dish->category?->color,
-                                                                            'price' => $money($m->dish->price),
+                                                                            'price' => $money($m->dish->preisFuer($eater)),
                                                                             'description' => $m->dish->description,
                                                                             'photo' => $m->dish->photoUrl(),
                                                                             'allergens' => ($season->show_allergens ?? true) ? $m->dish->allergens->map(fn ($a) => trim($a->code.' '.$a->name))->values() : [],
@@ -406,7 +406,7 @@
                                                                                             @if ($isSel)
                                                                                                 <span class="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] font-bold text-white">✓</span>
                                                                                             @endif
-                                                                                            {{ $money($m->dish->price) }}
+                                                                                            {{ $money($m->dish->preisFuer($eater)) }}
                                                                                         </span>
                                                                                     </div>
                                                                                     @php
