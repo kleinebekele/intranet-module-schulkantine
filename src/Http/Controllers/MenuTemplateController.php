@@ -27,6 +27,7 @@ class MenuTemplateController
         $template = $season->menuTemplates()->create([
             'name' => $data['name'],
             'price' => $data['price'],
+            'linear_price' => $data['linear_price'],
             'weekdays' => $data['weekdays'],
             'is_active' => $data['is_active'],
             'sort_order' => (int) $season->menuTemplates()->max('sort_order') + 1,
@@ -60,6 +61,7 @@ class MenuTemplateController
         $menuTemplate->update([
             'name' => $data['name'],
             'price' => $data['price'],
+            'linear_price' => $data['linear_price'],
             'weekdays' => $data['weekdays'],
             'is_active' => $data['is_active'],
         ]);
@@ -104,7 +106,7 @@ class MenuTemplateController
 
     // ---------------------------------------------------------------- Helfer
 
-    /** @return array{name:string, price:float, weekdays:array<int>, is_active:bool, slots:array<int,array{category_id:int,quantity:int}>} */
+    /** @return array{name:string, price:float, linear_price:bool, weekdays:array<int>, is_active:bool, slots:array<int,array{category_id:int,quantity:int}>} */
     private function validated(Request $request): array
     {
         $request->validate([
@@ -138,6 +140,7 @@ class MenuTemplateController
         return [
             'name' => $request->string('name')->toString(),
             'price' => (float) $request->input('price'),
+            'linear_price' => $request->boolean('linear_price'),
             'weekdays' => collect($request->input('weekdays', []))->map(fn ($d) => (int) $d)->unique()->sort()->values()->all(),
             'is_active' => $request->boolean('is_active', true),
             'slots' => $slots,

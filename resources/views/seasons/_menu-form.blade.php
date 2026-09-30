@@ -36,6 +36,11 @@
             </div>
         </div>
 
+        @include('schulkantine::seasons._linear-preise', [
+            'mitSchalter' => true,
+            'an' => (bool) old('linear_price', $isEdit ? $template->linear_price : false),
+        ])
+
         <div>
             <x-input-label value="Angeboten an Wochentagen" />
             <div class="mt-2 flex flex-wrap gap-3">

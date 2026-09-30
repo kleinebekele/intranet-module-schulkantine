@@ -214,13 +214,20 @@
                                 <div class="min-w-0">
                                     <div class="flex items-center gap-2">
                                         <span class="font-semibold text-gray-800">{{ $t->name }}</span>
-                                        <span class="text-sm font-bold text-indigo-700">{{ number_format((float) $t->price, 2, ',', '.') }} €</span>
+                                        @if ($t->linear_price)
+                                            <span class="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">Preis aus Linear</span>
+                                        @else
+                                            <span class="text-sm font-bold text-indigo-700">{{ number_format((float) $t->price, 2, ',', '.') }} €</span>
+                                        @endif
                                         @unless ($t->is_active)
                                             <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">inaktiv</span>
                                         @endunless
                                     </div>
                                     <div class="mt-0.5 text-xs text-gray-500">{{ $slots ?: 'keine Slots' }}</div>
                                     <div class="text-xs text-gray-400">Angeboten: {{ $tage }}</div>
+                                    @if ($t->linear_price)
+                                        <div class="mt-1">@include('schulkantine::seasons._linear-preise', ['an' => true])</div>
+                                    @endif
                                 </div>
                                 <div class="flex shrink-0 items-center gap-1">
                                     @darfRoute('module.schulkantine.menu-templates.edit')

@@ -15,6 +15,7 @@ use Intranet\Modules\Schulkantine\Models\Season;
 use Intranet\Modules\Schulkantine\Models\Subscription;
 use Intranet\Modules\Schulkantine\Support\DeadlineService;
 use Intranet\Modules\Schulkantine\Support\Essensvertrag;
+use Intranet\Modules\Schulkantine\Support\LinearPreise;
 use Intranet\Modules\Schulkantine\Support\OgsAttendance;
 use Intranet\Modules\Schulkantine\Support\ReleaseService;
 
@@ -376,7 +377,7 @@ class OrderController
             ->where(fn ($q) => $q->whereNotNull('category_id')->orWhereNotNull('menu_day_id'))
             ->delete();
 
-        $prices = $this->distributeMenuPrice((float) $menuDay->price, $slots->map(fn ($s) => (float) ($s->dish->price ?? 0))->all());
+        $prices = $this->distributeMenuPrice(LinearPreise::menuPreis($menuDay, $eater),$slots->map(fn ($s) => (float) ($s->dish->price ?? 0))->all());
 
         foreach ($slots->values() as $i => $slot) {
             Order::create([

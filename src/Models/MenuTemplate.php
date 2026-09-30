@@ -21,6 +21,7 @@ class MenuTemplate extends Model
         'season_id',
         'name',
         'price',
+        'linear_price',
         'weekdays',
         'is_active',
         'sort_order',
@@ -30,6 +31,7 @@ class MenuTemplate extends Model
     {
         return [
             'price' => 'decimal:2',
+            'linear_price' => 'boolean',
             'weekdays' => 'array',
             'is_active' => 'boolean',
             'sort_order' => 'integer',

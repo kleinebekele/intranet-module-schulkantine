@@ -249,12 +249,14 @@
                                                                     && $md->slots->flatMap(fn ($s) => $s->dish?->allergens ?? collect())->pluck('id')->intersect($e['allergenIds'])->isNotEmpty())
                                                                 || (($season->show_diets ?? true)
                                                                     && $md->slots->flatMap(fn ($s) => $s->dish?->unsuitableDiets ?? collect())->pluck('id')->intersect($e['dietIds'])->isNotEmpty());
+                                                            // Preis für DIESEN Esser (Linear-Preis je Vertrag, falls am Menü eingestellt).
+                                                            $mdPreis = \Intranet\Modules\Schulkantine\Support\LinearPreise::menuPreis($md, $eater);
                                                             // Detail-Daten fürs Info-Modal: Menü + beide (alle) Gerichte mit ihren Angaben.
                                                             $menuData = [
                                                                 'name' => $md->name,
                                                                 'category' => 'Menü',
                                                                 'categoryColor' => '#059669',
-                                                                'price' => $money($md->price),
+                                                                'price' => $money($mdPreis),
                                                                 'description' => null,
                                                                 'photo' => null,
                                                                 'isMenu' => true,
@@ -292,7 +294,7 @@
                                                                         @if ($isMenuOrdered)
                                                                             <span class="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">✓</span>
                                                                         @endif
-                                                                        {{ $money($md->price) }}
+                                                                        {{ $money($mdPreis) }}
                                                                     </span>
                                                                 </div>
                                                                 <div class="mt-0.5 text-[11px] text-gray-500">{{ $md->slots->map(fn ($s) => $s->dish?->name)->filter()->join(' + ') }}</div>
