@@ -81,12 +81,9 @@ class LinearPreise
             return null;
         }
         $eigene = [];
-        foreach ($esser->roles as $rolle) {
-            if (str_starts_with($rolle->role_id, Essensvertrag::PRAEFIX)) {
-                $art = (int) substr($rolle->role_id, strlen(Essensvertrag::PRAEFIX));
-                if (isset($preise[$art])) {
-                    $eigene[] = $preise[$art];
-                }
+        foreach (Essensvertrag::arten($esser) as $art) {
+            if (isset($preise[$art])) {
+                $eigene[] = $preise[$art];
             }
         }
 

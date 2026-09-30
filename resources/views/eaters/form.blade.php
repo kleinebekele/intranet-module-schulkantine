@@ -76,6 +76,27 @@
                 </div>
             </div>
 
+            {{-- Essensvertrag: aus Linear bzw. simuliert (Übergang zum Testen) --}}
+            <div class="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3">
+                <x-input-label value="Essensvertrag" />
+                @php $linearArten = $user->roles->pluck('role_id')->filter(fn ($r) => str_starts_with($r, 'kantine_vertrag_'))->map(fn ($r) => (int) substr($r, 16)); @endphp
+                @if (filled($user->externe_id))
+                    <p class="mt-1 text-sm text-gray-700">
+                        Aus Linear:
+                        {{ $linearArten->map(fn ($a) => \Intranet\Modules\Schulkantine\Support\LinearPreise::ARTEN[$a] ?? $a)->join(', ') ?: 'kein laufender Vertrag' }}
+                    </p>
+                    <p class="mt-1 text-xs text-gray-400">Konto aus Linear – ein Testvertrag ist hier nicht möglich.</p>
+                @else
+                    <select name="test_vertrag" class="mt-1 block w-72 rounded-md border-gray-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                        <option value="">– kein Testvertrag –</option>
+                        @foreach (\Intranet\Modules\Schulkantine\Support\LinearPreise::ARTEN as $art => $name)
+                            <option value="{{ $art }}" @selected((int) old('test_vertrag', $testVertrag) === $art)>{{ $art }} – {{ $name }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-sky-700">Nur zum Testen: simuliert einen Linear-Vertrag (Bestellrecht und Preis). Nur für Konten, die nicht aus Linear stammen.</p>
+                @endif
+            </div>
+
             <div class="flex items-center gap-3 pt-2">
                 <button type="submit"
                         class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">

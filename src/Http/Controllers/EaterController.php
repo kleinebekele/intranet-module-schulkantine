@@ -90,6 +90,7 @@ class EaterController
             'selDiets' => $user->kantineDiets->pluck('id')->all(),
             'chips' => NfcChip::active()->where('user_id', $user->id)->orderBy('source')->get(),
             'isOgs' => CustomerGroup::forUser($user)?->ordering_mode === CustomerGroup::MODE_JA_NEIN,
+            'testVertrag' => \Intranet\Modules\Schulkantine\Support\Essensvertrag::testVertrag($user),
         ]);
     }
 
@@ -102,10 +103,22 @@ class EaterController
             'allergens.*' => ['integer', 'exists:kantine_allergens,id'],
             'diets' => ['array'],
             'diets.*' => ['integer', 'exists:kantine_diets,id'],
+            'test_vertrag' => ['nullable', 'integer', 'in:'.implode(',', array_keys(\Intranet\Modules\Schulkantine\Support\LinearPreise::ARTEN))],
         ]);
 
         $user->kantineAllergens()->sync($request->input('allergens', []));
         $user->kantineDiets()->sync($request->input('diets', []));
+
+        // Testvertrag – nur für Konten, die nicht aus Linear stammen.
+        if (blank($user->externe_id) && $request->has('test_vertrag')) {
+            if ($request->filled('test_vertrag')) {
+                \Intranet\Modules\Schulkantine\Models\TestVertrag::updateOrCreate(
+                    ['user_id' => $user->id], ['art' => (int) $request->input('test_vertrag')],
+                );
+            } else {
+                \Intranet\Modules\Schulkantine\Models\TestVertrag::where('user_id', $user->id)->delete();
+            }
+        }
 
         return redirect()
             ->route('module.schulkantine.eaters.index')

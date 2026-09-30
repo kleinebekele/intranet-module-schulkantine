@@ -4,6 +4,8 @@ namespace Intranet\Modules\Schulkantine\Support;
 
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Support\Facades\Schema;
+use Intranet\Modules\Schulkantine\Models\TestVertrag;
 
 /**
  * Essen darf nur, wer in Linear einen laufenden Essensvertrag hat.
@@ -34,7 +36,38 @@ class Essensvertrag
             return true;
         }
 
-        return $esser->roles->contains(fn (Role $r) => str_starts_with($r->role_id, self::PRAEFIX));
+        return self::arten($esser) !== [];
+    }
+
+    /**
+     * Vertragsarten des Essers: aus Linear (Rollen) plus ggf. Testvertrag.
+     *
+     * @return list<int>
+     */
+    public static function arten(User $esser): array
+    {
+        $arten = [];
+        foreach ($esser->roles as $rolle) {
+            if (str_starts_with($rolle->role_id, self::PRAEFIX)) {
+                $arten[] = (int) substr($rolle->role_id, strlen(self::PRAEFIX));
+            }
+        }
+        if (($test = self::testVertrag($esser)) !== null) {
+            $arten[] = $test;
+        }
+
+        return array_values(array_unique($arten));
+    }
+
+    /** Simulierter Vertrag (nur Konten ohne Linear-Herkunft), sonst null. */
+    public static function testVertrag(User $esser): ?int
+    {
+        if (filled($esser->externe_id) || ! Schema::hasTable('kantine_test_contracts')) {
+            return null;
+        }
+        $art = TestVertrag::where('user_id', $esser->id)->value('art');
+
+        return $art !== null ? (int) $art : null;
     }
 
     public static function hinweis(User $esser): string
