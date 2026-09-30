@@ -17,8 +17,8 @@ class Essensvertrag
 {
     public const PRAEFIX = 'kantine_vertrag_';
 
-    public const HINWEIS = 'Für %s liegt kein Essensvertrag vor. Bitte den Lastschrifteinzug ausdrucken, '
-        .'unterschreiben und im Sekretariat abgeben – danach kann bestellt werden.';
+    public const HINWEIS = 'Für %s liegt kein Essensvertrag vor. Bitte im Sekretariat nachfragen – '
+        .'danach kann bestellt werden.';
 
     private static ?bool $aktiv = null;
 
