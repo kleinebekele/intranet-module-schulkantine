@@ -488,7 +488,7 @@
                         <div class="min-w-0">
                         <h2 class="text-lg font-semibold text-gray-800" x-text="dish.name"></h2>
                         <span x-show="dish.category" class="mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium"
-                              :style="dish.categoryColor ? ('background-color:'+dish.categoryColor+'22; color:'+dish.categoryColor) : 'background-color:#eef2ff; color:#4f46e5'"
+                              :style="dish.categoryColor ? ('background-color:'+dish.categoryColor+'22; color:'+dish.categoryColor) : 'background-color:var(--color-indigo-50, #eef2ff); color:var(--color-indigo-600, #4f46e5)'"
                               x-text="dish.category"></span>
                         </div>
                     </div>
@@ -518,7 +518,7 @@
                                                 <div class="min-w-0">
                                                 <div class="text-sm font-semibold text-gray-800" x-text="c.name"></div>
                                                 <span x-show="c.category" class="mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium"
-                                                      :style="c.categoryColor ? ('background-color:'+c.categoryColor+'22; color:'+c.categoryColor) : 'background-color:#eef2ff; color:#4f46e5'"
+                                                      :style="c.categoryColor ? ('background-color:'+c.categoryColor+'22; color:'+c.categoryColor) : 'background-color:var(--color-indigo-50, #eef2ff); color:var(--color-indigo-600, #4f46e5)'"
                                                       x-text="c.category"></span>
                                                 </div>
                                             </div>

@@ -44,4 +44,22 @@
         padding: 8px 12px; background: #fafafa; page-break-inside: avoid; }
     .kantine-doc .scenario h4 { margin: 0 0 4px; font-size: 13px; color: #3730a3; }
     .kantine-doc .scenario .exp { color: #15803d; }
+
+    /* Dunkles Farbschema der Online-Ansicht (Profil → Darstellung). Im PDF gibt es kein .dark.
+       Die Farben kommen aus den Variablen des Cores, die dort bereits umgelegt sind. */
+    .dark .kantine-doc { color: var(--color-gray-800); }
+    .dark .kantine-doc h2 { color: var(--color-indigo-800); border-bottom-color: var(--color-indigo-100); }
+    .dark .kantine-doc h3,
+    .dark .kantine-doc strong { color: var(--color-gray-900); }
+    .dark .kantine-doc .lead { color: var(--color-gray-600); }
+    .dark .kantine-doc th { background: var(--color-gray-100); border-color: var(--color-gray-200); color: var(--color-gray-600); }
+    .dark .kantine-doc td { border-color: var(--color-gray-200); }
+    .dark .kantine-doc code { background: var(--color-slate-100); border-color: var(--color-slate-200); color: var(--color-slate-900); }
+    .dark .kantine-doc pre.beispiel { background: var(--color-slate-50); border-color: var(--color-slate-200); color: var(--color-slate-900); }
+    .dark .kantine-doc .cmd { background: var(--color-orange-50); border-color: var(--color-orange-300); border-left-color: #ea580c; }
+    .dark .kantine-doc .cmd pre { color: var(--color-orange-900); }
+    .dark .kantine-doc .note { background: var(--color-blue-50); border-color: var(--color-blue-200); border-left-color: #2563eb; }
+    .dark .kantine-doc .scenario { background: var(--color-gray-50); border-color: var(--color-gray-200); }
+    .dark .kantine-doc .scenario h4 { color: var(--color-indigo-800); }
+    .dark .kantine-doc .scenario .exp { color: var(--color-green-700); }
 </style>
