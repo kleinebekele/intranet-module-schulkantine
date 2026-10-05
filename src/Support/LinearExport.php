@@ -111,6 +111,84 @@ class LinearExport
     }
 
     /**
+     * Zahlungsstand der gesendeten Zeilen aus Linear (`MgSolln`) anhängen und den
+     * Bezahlt-Status der Auswertung (`kantine_settlements`) danach ausrichten.
+     *
+     * Je Vertragsnehmer, Esser, Art, Vertrag und Monat legt Linear beim
+     * Sollstellungslauf genau eine Forderung an: keine Zeile = noch nicht in Rechnung
+     * gestellt, Offen > 0 = offen (auch eine geplatzte Lastschrift), Offen = 0 = bezahlt.
+     * `MgLastRuck` wird bei der Schule nicht geführt. Linear nicht lesbar → Zustand null.
+     *
+     * @param  array{zeilen: list<array>}  $vorschau
+     * @return array  $vorschau mit 'linear' je Zeile und 'linearLesbar'
+     */
+    public function mitZahlungsstand(array $vorschau, Season $season, int $year, int $month): array
+    {
+        $gesendet = array_filter($vorschau['zeilen'], fn ($z) => $z['export'] !== null);
+        $vorschau['linearLesbar'] = true;
+        if ($gesendet === []) {
+            return $vorschau;
+        }
+
+        try {
+            if (! Ekkon::mssqlKonfiguriert()) {
+                throw new \RuntimeException('keine Linear-Verbindung');
+            }
+            $tabelle = (string) config('schulkantine.linear_solln_tabelle', 'Linear2.dbo.MgSolln');
+            $arten = implode(', ', array_keys(LinearPreise::ARTEN));
+            // Nur Zahlen/Texte lesen (ODBC-Datetime-Falle) – Jahr/Monat als Filter.
+            $soll = collect(DB::connection(Ekkon::mssqlConnection())->select(
+                "SELECT AdrNr, AbwAdrNr, Art, VertragNr, Betrag, Bezahlt, Offen FROM {$tabelle}
+                  WHERE Jahr = ? AND Monat = ? AND Art IN ({$arten})",
+                [$year, $month],
+            ))->groupBy(fn ($s) => ((int) $s->AdrNr).'|'.((int) $s->AbwAdrNr).'|'.((int) $s->Art).'|'.trim((string) $s->VertragNr));
+        } catch (\Throwable $e) {
+            report($e);
+            $vorschau['linearLesbar'] = false;
+
+            return $vorschau;
+        }
+
+        foreach ($vorschau['zeilen'] as $i => $z) {
+            $export = $z['export'];
+            if ($export === null) {
+                continue;
+            }
+            $treffer = $soll->get(((int) $export->adrnr).'|'.((int) $export->abw_adrnr).'|'.((int) $export->art).'|'.trim((string) $export->vertrag_nr));
+            if (! $treffer) {
+                $status = ['zustand' => 'nicht', 'betrag' => null, 'offen' => null];
+            } else {
+                $betrag = round($treffer->sum(fn ($s) => (float) $s->Betrag), 2);
+                $offen = round($treffer->sum(fn ($s) => (float) $s->Offen), 2);
+                $status = ['zustand' => $offen > 0 ? 'offen' : 'bezahlt', 'betrag' => $betrag, 'offen' => $offen];
+            }
+            $vorschau['zeilen'][$i]['linear'] = $status;
+            $this->bezahltAusrichten($season, $z['user']->id, $year, $month, $status);
+        }
+
+        return $vorschau;
+    }
+
+    /** Bezahlt-Häkchen der Auswertung = „in Linear bezahlt" (nur für gesendete Zeilen). */
+    private function bezahltAusrichten(Season $season, int $userId, int $year, int $month, array $status): void
+    {
+        $schluessel = ['user_id' => $userId, 'year' => $year, 'month' => $month];
+        if ($status['zustand'] === 'bezahlt') {
+            $vorhanden = DB::table('kantine_settlements')->where($schluessel)->first();
+            if (! $vorhanden) {
+                DB::table('kantine_settlements')->insert($schluessel + [
+                    'season_id' => $season->id, 'amount' => $status['betrag'], 'paid_at' => now(),
+                    'marked_by' => null, 'created_at' => now(), 'updated_at' => now(),
+                ]);
+            } elseif (round((float) $vorhanden->amount, 2) !== $status['betrag']) {
+                DB::table('kantine_settlements')->where('id', $vorhanden->id)->update(['amount' => $status['betrag'], 'updated_at' => now()]);
+            }
+        } else {
+            DB::table('kantine_settlements')->where($schluessel)->delete();
+        }
+    }
+
+    /**
      * EINE Zeile an Linear senden (INSERT in MgEsGeld). Rechnet den Monat frisch,
      * sendet je Esser und Monat höchstens einmal und prüft vorher in Linear, ob dort
      * schon eine Zeile dieses Essers mit derselben Beschreibung und demselben Datum steht.

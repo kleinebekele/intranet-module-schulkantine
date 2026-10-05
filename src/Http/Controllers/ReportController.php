@@ -96,7 +96,9 @@ class ReportController
         $season = Season::where('is_active', true)->firstOrFail();
         [$year, $month] = $this->resolveMonth($request, $season);
 
-        return view('schulkantine::reports.linear', (new \Intranet\Modules\Schulkantine\Support\LinearExport)->vorschau($season, $year, $month) + [
+        $export = new \Intranet\Modules\Schulkantine\Support\LinearExport;
+
+        return view('schulkantine::reports.linear', $export->mitZahlungsstand($export->vorschau($season, $year, $month), $season, $year, $month) + [
             'season' => $season,
             'monthLabel' => $this->monthLabel($year, $month),
             'monthValue' => sprintf('%04d-%02d', $year, $month),

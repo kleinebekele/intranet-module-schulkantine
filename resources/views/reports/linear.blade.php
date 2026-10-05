@@ -15,8 +15,16 @@
             Menüs, OGS, spontane Abholungen und <strong>Chip-Pfand</strong>. Vertragsnehmer und Vertragsnummer stammen
             aus dem letzten nächtlichen Linear-Import.
             <strong>Gesendet wird nur, was Sie je Zeile mit „An Linear senden" auslösen</strong> – jeder Esser höchstens
-            einmal je Monat. Soll/DatumSoll füllt Linear beim nächsten Sollstellungslauf.
+            einmal je Monat. Soll/DatumSoll füllt Linear beim nächsten Sollstellungslauf. Bei gesendeten Zeilen steht
+            der Zahlungsstand aus Linear (<code>MgSolln</code>): noch nicht in Rechnung gestellt, offen oder bezahlt –
+            „bezahlt" setzt auch das Häkchen in der Auswertung.
         </div>
+
+        @unless ($linearLesbar ?? true)
+            <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                ⚠️ Linear ist gerade nicht lesbar – der Zahlungsstand der gesendeten Zeilen fehlt, der Bezahlt-Status bleibt unverändert.
+            </div>
+        @endunless
 
         @if ($errors->has('linear'))
             <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ $errors->first('linear') }}</div>
@@ -95,6 +103,16 @@
                                         <span class="whitespace-nowrap text-xs font-medium text-green-700" title="{{ $z['export']->hinweis }}">
                                             ✓ gesendet {{ \Illuminate\Support\Carbon::parse($z['export']->sent_at)->format('d.m.Y H:i') }}
                                         </span>
+                                        @php $ls = $z['linear'] ?? null; @endphp
+                                        @if ($ls === null)
+                                            <div class="whitespace-nowrap text-xs text-gray-400">Zahlungsstand unbekannt</div>
+                                        @elseif ($ls['zustand'] === 'nicht')
+                                            <div class="whitespace-nowrap text-xs text-gray-500">noch nicht in Rechnung gestellt</div>
+                                        @elseif ($ls['zustand'] === 'offen')
+                                            <div class="whitespace-nowrap text-xs font-medium text-amber-700" title="Forderung in Linear: {{ $euro($ls['betrag']) }}">offen {{ $euro($ls['offen']) }}</div>
+                                        @else
+                                            <div class="whitespace-nowrap text-xs font-semibold text-green-700" title="Forderung in Linear: {{ $euro($ls['betrag']) }}">bezahlt</div>
+                                        @endif
                                         @if (round((float) $z['export']->betrag, 2) !== round((float) $z['Betrag'], 2))
                                             <div class="whitespace-nowrap text-xs font-medium text-amber-700">⚠️ gesendet {{ $euro($z['export']->betrag) }}, jetzt {{ $euro($z['Betrag']) }}</div>
                                         @endif
