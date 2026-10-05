@@ -63,7 +63,53 @@ class MyBillingController
             'monthLabel' => $this->monthLabel($year, $month),
             'monthValue' => sprintf('%04d-%02d', $year, $month),
             'months' => $this->seasonMonths($season),
-        ]);
+        ] + $this->linearHistorie($viewer));
+    }
+
+    /**
+     * In Linear abgerechnete Essens-Monate des Haushalts (ab 2026, auch aus
+     * Menü&Serve) – nachts vom Linear-Import abgelegt. Je Person, neueste zuerst.
+     *
+     * @return array{linearHistorie: array, linearStand: ?\Illuminate\Support\Carbon}
+     */
+    private function linearHistorie(User $viewer): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('kantine_linear_charges')) {
+            return ['linearHistorie' => [], 'linearStand' => null];
+        }
+        $haushalt = $this->household($viewer)->filter(fn ($u) => filled($u->externe_id))->keyBy(fn ($u) => (string) $u->externe_id);
+        $eigeneNr = filled($viewer->externe_id) ? (string) $viewer->externe_id : null;
+        if ($haushalt->isEmpty() && $eigeneNr === null) {
+            return ['linearHistorie' => [], 'linearStand' => null];
+        }
+
+        // Esser aus dem Haushalt ODER Forderungen, bei denen ich Vertragsnehmer bin.
+        $zeilen = \Illuminate\Support\Facades\DB::table('kantine_linear_charges')
+            ->where(function ($q) use ($haushalt, $eigeneNr) {
+                $q->whereIn('esser_adrnr', $haushalt->keys()->all());
+                if ($eigeneNr !== null) {
+                    $q->orWhere('adrnr', $eigeneNr);
+                }
+            })
+            ->orderByDesc('jahr')->orderByDesc('monat')
+            ->get();
+
+        $historie = [];
+        foreach ($zeilen->groupBy('esser_adrnr') as $esserNr => $monate) {
+            $historie[] = [
+                'name' => $haushalt->get($esserNr)?->name ?? 'Esser '.$esserNr,
+                'monate' => $monate->map(fn ($m) => [
+                    'label' => $this->monthLabel((int) $m->jahr, (int) $m->monat),
+                    'betrag' => (float) $m->betrag,
+                    'offen' => (float) $m->offen,
+                ])->all(),
+            ];
+        }
+
+        return [
+            'linearHistorie' => $historie,
+            'linearStand' => \Intranet\Modules\Schulkantine\Models\Setting::current()->linear_charges_at,
+        ];
     }
 
     /** Einzelposten einer Person des eigenen Haushalts im gewählten Monat. */

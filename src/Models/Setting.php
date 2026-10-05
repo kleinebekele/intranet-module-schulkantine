@@ -26,6 +26,7 @@ class Setting extends Model
             'release_lead_weeks' => 'integer',
             'linear_prices' => 'array',       // Vertragsart => Preis, vom Linear-Import (Modul Verwaltung)
             'linear_prices_at' => 'datetime',
+            'linear_charges_at' => 'datetime',     // Stand der Forderungen aus Linear (Meine Abrechnung)
         ];
     }
 

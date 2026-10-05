@@ -86,6 +86,41 @@
                 </div>
             @endif
 
+            @if (! empty($linearHistorie))
+                <div class="mt-8">
+                    <h2 class="text-base font-semibold text-gray-800">Abgerechnet über die Schulverwaltung</h2>
+                    <p class="mt-1 text-xs text-gray-500">
+                        Alle Essens-Monate seit 2026, die in Rechnung gestellt wurden – auch aus dem früheren Kantinenprogramm
+                        (dafür gibt es keine Einzelposten).
+                        @if ($linearStand) Stand: {{ $linearStand->format('d.m.Y') }}. @endif
+                    </p>
+                    <div class="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        @foreach ($linearHistorie as $person)
+                            <div class="rounded-xl border border-gray-200 bg-white p-4">
+                                <div class="font-semibold text-gray-800">{{ $person['name'] }}</div>
+                                <table class="mt-2 w-full text-sm">
+                                    <tbody class="divide-y divide-gray-100">
+                                        @foreach ($person['monate'] as $m)
+                                            <tr>
+                                                <td class="py-1.5 text-gray-600">{{ $m['label'] }}</td>
+                                                <td class="py-1.5 text-right tabular-nums text-gray-800">{{ $euro($m['betrag']) }}</td>
+                                                <td class="py-1.5 pl-3 text-right">
+                                                    @if ($m['offen'] > 0)
+                                                        <span class="whitespace-nowrap text-xs font-medium text-amber-700">offen {{ $euro($m['offen']) }}</span>
+                                                    @else
+                                                        <span class="text-xs font-semibold text-green-700">bezahlt</span>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             <p class="mt-6 text-xs text-gray-400">
                 Grundlage: verbindliche Vorbestellungen (rechtzeitig storniert = nicht berechnet, No-Shows zahlen trotzdem),
                 spontane Abholungen und Chip-Pfand. Die eigentliche Zahlung läuft extern.
