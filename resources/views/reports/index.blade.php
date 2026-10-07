@@ -164,15 +164,24 @@
                                         }
                                     }
                                     $wert = fn ($v, $leer = '–') => $v != 0 ? $euro($v) : $leer;
+                                    // Einzelperson: nichts aufzuklappen – die Zeile IST die Person.
+                                    $einzeln = count($hh['members']) === 1 ? $hh['members'][0] : null;
                                 @endphp
-                                <tbody x-data="{ auf: false }" class="border-b border-gray-100">
-                                    {{-- Haushaltszeile: Summen groß, Klick klappt die Personen auf --}}
-                                    <tr class="cursor-pointer hover:bg-gray-50" @click="auf = ! auf">
+                                <tbody @unless ($einzeln) x-data="{ auf: false }" @endunless class="border-b border-gray-100">
+                                    {{-- Haushaltszeile: Summen groß, bei mehreren Personen klappt ein Klick sie auf --}}
+                                    <tr @if ($einzeln) class="hover:bg-gray-50" @else class="cursor-pointer hover:bg-gray-50" @click="auf = ! auf" @endif>
                                         <td class="px-4 py-2.5">
                                             <div class="flex items-center gap-2">
-                                                <span class="inline-block w-3 text-gray-400 transition-transform" :class="auf && 'rotate-90'">▸</span>
-                                                <span class="whitespace-nowrap font-semibold text-gray-900">{{ $hh['name'] }}</span>
-                                                <span class="whitespace-nowrap text-xs text-gray-400">{{ count($hh['members']) }} {{ count($hh['members']) === 1 ? 'Person' : 'Personen' }}</span>
+                                                @if ($einzeln)
+                                                    <span class="inline-block w-3"></span>
+                                                    <a href="{{ route('module.schulkantine.reports.show', [$einzeln['user'], 'monat' => $monthValue]) }}"
+                                                       class="whitespace-nowrap font-semibold text-indigo-600 hover:text-indigo-800 hover:underline">{{ $einzeln['user']->name }}</a>
+                                                    <span class="whitespace-nowrap text-xs text-gray-400">{{ $einzeln['group'] }}</span>
+                                                @else
+                                                    <span class="inline-block w-3 text-gray-400 transition-transform" :class="auf && 'rotate-90'">▸</span>
+                                                    <span class="whitespace-nowrap font-semibold text-gray-900">{{ $hh['name'] }}</span>
+                                                    <span class="whitespace-nowrap text-xs text-gray-400">{{ count($hh['members']) }} Personen</span>
+                                                @endif
                                             </div>
                                         </td>
                                         <td class="whitespace-nowrap px-3 py-2.5 text-right tabular-nums {{ $sum('menu_total') > 0 ? 'text-gray-800' : 'text-gray-300' }}">{{ $wert($sum('menu_total')) }}</td>
@@ -190,18 +199,23 @@
                                         </td>
                                         @if ($linear)
                                             <td class="px-4 py-2.5 text-xs">
-                                                @foreach ($hhLinear as $text => $info)
-                                                    <div class="whitespace-nowrap font-medium {{ $info[1] }}">{{ count($hh['members']) > 1 ? $info[0].'× ' : '' }}{{ $text }}</div>
-                                                @endforeach
-                                                @if ($hhLinear === [])
-                                                    <span class="text-gray-300">–</span>
+                                                @if ($einzeln)
+                                                    @php $lz = $linear['je'][$einzeln['user']->id] ?? null; @endphp
+                                                    @include('schulkantine::reports.partials.linear-person', ['lz' => $lz, 'z' => $linearZustand($lz)])
+                                                @else
+                                                    @foreach ($hhLinear as $text => $info)
+                                                        <div class="whitespace-nowrap font-medium {{ $info[1] }}">{{ $info[0] }}× {{ $text }}</div>
+                                                    @endforeach
+                                                    @if ($hhLinear === [])
+                                                        <span class="text-gray-300">–</span>
+                                                    @endif
                                                 @endif
                                             </td>
                                         @endif
                                     </tr>
 
                                     {{-- Personen: klein, erst nach dem Aufklappen --}}
-                                    @foreach ($hh['members'] as $m)
+                                    @foreach ($einzeln ? [] : $hh['members'] as $m)
                                         @php $l = $m['line']; @endphp
                                         <tr x-show="auf" x-cloak class="bg-gray-50/60 text-xs text-gray-600">
                                             <td class="whitespace-nowrap py-1.5 pl-10 pr-4">
@@ -230,26 +244,9 @@
                                                 @endif
                                             </td>
                                             @if ($linear)
-                                                @php
-                                                    $lz = $linear['je'][$m['user']->id] ?? null;
-                                                    $z = $linearZustand($lz);
-                                                @endphp
+                                                @php $lz = $linear['je'][$m['user']->id] ?? null; @endphp
                                                 <td class="px-4 py-1.5">
-                                                    @if (! $z)
-                                                        <span class="text-gray-300">–</span>
-                                                    @else
-                                                        <div class="whitespace-nowrap {{ $z[1] }}" title="{{ $z[2] }}">
-                                                            {{ $z[0] }}@if (isset($lz['grund'])): {{ $lz['grund'] }}@endif
-                                                        </div>
-                                                        @if (! isset($lz['grund']) && $lz['export'])
-                                                            <div class="whitespace-nowrap text-gray-400" title="{{ $lz['export']->hinweis }}">
-                                                                am {{ \Illuminate\Support\Carbon::parse($lz['export']->sent_at)->format('d.m.Y H:i') }}
-                                                            </div>
-                                                            @if (round((float) $lz['export']->betrag, 2) !== round((float) $lz['Betrag'], 2))
-                                                                <div class="whitespace-nowrap font-medium text-amber-700">⚠️ gesendet {{ $euro($lz['export']->betrag) }}, jetzt {{ $euro($lz['Betrag']) }}</div>
-                                                            @endif
-                                                        @endif
-                                                    @endif
+                                                    @include('schulkantine::reports.partials.linear-person', ['lz' => $lz, 'z' => $linearZustand($lz)])
                                                 </td>
                                             @endif
                                         </tr>
