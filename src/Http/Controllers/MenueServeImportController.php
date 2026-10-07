@@ -5,6 +5,7 @@ namespace Intranet\Modules\Schulkantine\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Intranet\Modules\Schulkantine\Models\Category;
+use Intranet\Modules\Schulkantine\Models\Diet;
 use Intranet\Modules\Schulkantine\Models\Dish;
 use Intranet\Modules\Schulkantine\Support\Access;
 use Intranet\Modules\Schulkantine\Support\MenueServeGerichte;
@@ -50,9 +51,10 @@ class MenueServeImportController
         $gerichte = collect((new MenueServeGerichte)->lesen()['gerichte'])->keyBy('key');
         $vorhanden = Dish::pluck('name')->mapWithKeys(fn ($n) => [MenueServeGerichte::schluessel($n) => true]);
 
+        $diaeten = Diet::pluck('id', 'name');
         $angelegt = 0;
         $ohneKategorie = 0;
-        DB::transaction(function () use ($request, $gerichte, $vorhanden, &$angelegt, &$ohneKategorie) {
+        DB::transaction(function () use ($request, $gerichte, $vorhanden, $diaeten, &$angelegt, &$ohneKategorie) {
             foreach ((array) $request->input('auswahl') as $key) {
                 $g = $gerichte->get($key);
                 if (! $g || isset($vorhanden[$key])) {
@@ -70,7 +72,7 @@ class MenueServeImportController
                     ->map(fn ($p) => round((float) str_replace(',', '.', (string) $p), 2))
                     ->all();
 
-                Dish::create([
+                $dish = Dish::create([
                     'category_id' => (int) $kategorie,
                     'name' => mb_substr($g['titel'], 0, 255),
                     'description' => $g['notiz'] !== '' ? $g['notiz'] : null,
@@ -79,6 +81,9 @@ class MenueServeImportController
                     'contract_prices' => $preise ?: null,
                     'is_active' => true,
                 ]);
+                // Fleischart → „nicht geeignet für" (vegetarisch, halal …).
+                $nichtFuer = MenueServeGerichte::NICHT_FUER[$g['art']] ?? [];
+                $dish->unsuitableDiets()->sync($diaeten->only($nichtFuer)->values()->all());
                 $vorhanden[$key] = true;
                 $angelegt++;
             }

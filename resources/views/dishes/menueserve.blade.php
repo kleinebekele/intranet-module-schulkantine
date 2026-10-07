@@ -8,6 +8,8 @@
 
     @php
         $artName = \Intranet\Modules\Schulkantine\Support\LinearPreise::ARTEN;
+        $artText = \Intranet\Modules\Schulkantine\Support\MenueServeGerichte::ARTEN;
+        $nichtFuer = \Intranet\Modules\Schulkantine\Support\MenueServeGerichte::NICHT_FUER;
         $neu = collect($gerichte)->where('vorhanden', false);
         // Vorauswahl: neu und in den letzten zwei Jahren noch auf dem Speiseplan (ohne Datum: alle neuen).
         $grenze = now()->subYears(2)->format('Y-m-d');
@@ -18,7 +20,7 @@
         <div class="flex flex-wrap items-center justify-between gap-3">
             <p class="text-sm text-gray-500">
                 Menü&amp;Serve hat keine Gerichte-Liste – übernommen werden die verschiedenen Titel aus dem alten Speiseplan
-                (Snacks ausgenommen). Gleichnamige Gerichte, die es hier schon gibt, bleiben unberührt.
+                (Snacks ausgenommen). Die Fleischart setzt „nicht geeignet für" (z. B. vegetarisch, halal). Gleichnamige Gerichte, die es hier schon gibt, bleiben unberührt.
             </p>
             <a href="{{ route('module.schulkantine.dishes.index') }}" class="text-sm text-gray-500 hover:text-gray-700">← zurück zu den Gerichten</a>
         </div>
@@ -104,6 +106,7 @@
                                     <th class="w-8 px-4 py-2"></th>
                                     <th class="px-3 py-2 font-medium">Titel</th>
                                     <th class="px-3 py-2 font-medium">Menülinie</th>
+                                    <th class="px-3 py-2 font-medium" title="Fleischart aus Menü&amp;Serve → „nicht geeignet für“">Art</th>
                                     <th class="px-3 py-2 text-right font-medium">Mal</th>
                                     <th class="px-3 py-2 font-medium">Zuletzt</th>
                                     <th class="px-3 py-2 font-medium">Notiz → Beschreibung</th>
@@ -122,6 +125,15 @@
                                             @if ($g['vorhanden'])<span class="ml-1 text-xs font-normal">· schon vorhanden</span>@endif
                                         </td>
                                         <td class="whitespace-nowrap px-3 py-1.5 text-gray-500">{{ $linien[$g['linie']]['titel'] ?? '–' }}</td>
+                                        <td class="whitespace-nowrap px-3 py-1.5" title="nicht geeignet für: {{ implode(', ', $nichtFuer[$g['art']] ?? []) ?: '–' }}">
+                                            @if ($g['art'] === 7)
+                                                <span class="text-green-700">Vegetarisch</span>
+                                            @elseif ($g['art'])
+                                                <span class="text-gray-700">{{ $artText[$g['art']] }}</span>
+                                            @else
+                                                <span class="text-gray-300">–</span>
+                                            @endif
+                                        </td>
                                         <td class="px-3 py-1.5 text-right tabular-nums text-gray-500">{{ $g['anzahl'] }}</td>
                                         <td class="whitespace-nowrap px-3 py-1.5 text-gray-500">{{ $g['zuletzt'] ? \Illuminate\Support\Carbon::parse($g['zuletzt'])->format('d.m.Y') : '–' }}</td>
                                         <td class="px-3 py-1.5 text-xs text-gray-500">{{ \Illuminate\Support\Str::limit($g['notiz'], 120) }}</td>
