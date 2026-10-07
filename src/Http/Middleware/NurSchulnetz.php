@@ -20,10 +20,9 @@ class NurSchulnetz
         $modulAktiv = Module::where('key', 'schulkantine')->where('is_enabled', true)->exists();
         abort_unless($modulAktiv, 404);
 
-        if ($request->user()?->isAdmin() || Bestellterminal::erlaubt($request->ip())) {
-            return $next($request);
-        }
+        // Von außen nur ein schlichtes 403 – keine Erklärung, kein Hinweis auf das Terminal.
+        abort_unless($request->user()?->isAdmin() || Bestellterminal::erlaubt($request->ip()), 403);
 
-        return response()->view('schulkantine::bestellterminal.gesperrt', ['ip' => $request->ip()], 403);
+        return $next($request);
     }
 }
