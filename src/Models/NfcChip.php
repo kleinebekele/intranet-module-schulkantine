@@ -99,4 +99,29 @@ class NfcChip extends Model
     {
         return self::activeForUid($raw)?->user;
     }
+
+    /**
+     * Wie userForUid(), versteht zusätzlich Tastaturleser, die statt Hex die
+     * DEZIMALZAHL der letzten 4 Byte tippen (HDWR: 10 Ziffern bis 4294967295).
+     * Gesucht wird dann der aktive 125-kHz-Chip (10 Hex), der auf diese 8 Hex
+     * endet – nur bei genau einem Treffer, sonst lieber „unbekannt".
+     */
+    public static function userForLeser(?string $raw): ?User
+    {
+        if ($user = self::userForUid($raw)) {
+            return $user;
+        }
+
+        $s = trim((string) $raw);
+        if (! preg_match('/^\d{10}$/', $s) || (int) $s > 0xFFFFFFFF) {
+            return null;
+        }
+
+        $treffer = self::active()
+            ->where('uid', 'like', '%'.sprintf('%08x', (int) $s))
+            ->whereRaw('LENGTH(uid) = 10')
+            ->limit(2)->get();
+
+        return $treffer->count() === 1 ? $treffer->first()->user : null;
+    }
 }

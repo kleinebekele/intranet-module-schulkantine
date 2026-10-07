@@ -36,12 +36,20 @@ class OrderController
 
     public function index(Request $request)
     {
-        $user = $request->user();
+        return view('schulkantine::orders.index', $this->wochenDaten($request, $request->user()));
+    }
 
+    /**
+     * Alle Daten der Wochenansicht für einen Besteller (er selbst + seine Kinder).
+     * Gemeinsame Grundlage für „Essen bestellen" und das Bestell-Terminal, wo der
+     * Besteller per Chip feststeht statt über das Intranet-Konto.
+     */
+    public function wochenDaten(Request $request, User $user): array
+    {
         $season = Season::where('is_active', true)->first();
 
         if (! $season) {
-            return view('schulkantine::orders.index', ['season' => null]);
+            return ['season' => null];
         }
 
         // Für wen darf bestellt werden: der Nutzer selbst + seine Kinder.
@@ -263,7 +271,7 @@ class OrderController
             }
         }
 
-        return view('schulkantine::orders.index', [
+        return [
             'season' => $season,
             'weekStart' => $weekStart,
             'weekEnd' => $weekEnd,
@@ -288,13 +296,17 @@ class OrderController
             'nextWeek' => $weekStart->copy()->addWeek()->toDateString(),
             'canPrev' => $weekStart->copy()->subWeek()->endOfWeek(Carbon::SUNDAY)->gte($season->start_date),
             'canNext' => $weekStart->copy()->addWeek()->lte($season->end_date),
-        ]);
+        ];
     }
 
     public function store(Request $request)
     {
-        $user = $request->user();
+        return $this->speichern($request, $request->user());
+    }
 
+    /** Bestellen/abbestellen im Namen von $user (Intranet-Konto oder Chip am Bestell-Terminal). */
+    public function speichern(Request $request, User $user)
+    {
         $data = $request->validate([
             'eater_id' => ['required', 'integer'],
             'date' => ['required', 'date'],
@@ -454,8 +466,12 @@ class OrderController
      */
     public function subscription(Request $request)
     {
-        $user = $request->user();
+        return $this->aboSpeichern($request, $request->user());
+    }
 
+    /** OGS-Abo im Namen von $user (Intranet-Konto oder Chip am Bestell-Terminal). */
+    public function aboSpeichern(Request $request, User $user)
+    {
         $data = $request->validate([
             'eater_id' => ['required', 'integer'],
             'active' => ['required', 'in:0,1'],

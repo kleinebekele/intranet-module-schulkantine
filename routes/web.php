@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Intranet\Modules\Schulkantine\Http\Controllers\BestellTerminalController;
 use Intranet\Modules\Schulkantine\Http\Controllers\CategoryController;
 use Intranet\Modules\Schulkantine\Http\Controllers\ChipController;
 use Intranet\Modules\Schulkantine\Http\Controllers\CustomerGroupController;
@@ -103,6 +104,14 @@ Route::middleware(['web', 'auth'])
         Route::get('bestellen', [OrderController::class, 'index'])->name('orders.index');
         Route::post('bestellen', [OrderController::class, 'store'])->name('orders.store');
         Route::post('bestellen/abo', [OrderController::class, 'subscription'])->name('orders.subscription');
+
+        // Bestell-Terminal (Kiosk auf den Schul-Terminals): Gerät mit eigenem Konto,
+        // Besteller melden sich nur per Chip an. Vollbild, eigenes Layout.
+        Route::get('bestell-terminal', [BestellTerminalController::class, 'index'])->name('bestellterminal.index');
+        Route::post('bestell-terminal/anmelden', [BestellTerminalController::class, 'anmelden'])->name('bestellterminal.anmelden');
+        Route::post('bestell-terminal/abmelden', [BestellTerminalController::class, 'abmelden'])->name('bestellterminal.abmelden');
+        Route::post('bestell-terminal/bestellen', [BestellTerminalController::class, 'bestellen'])->name('bestellterminal.bestellen');
+        Route::post('bestell-terminal/abo', [BestellTerminalController::class, 'abo'])->name('bestellterminal.abo');
 
         // Meine Abrechnung (Selbstbedienung: ich + meine Kinder) – jeder Nutzer.
         // Eigenes Präfix (abrechnung.*), damit die Sichtbarkeit unabhängig von der
