@@ -44,13 +44,21 @@
                         <div class="text-lg font-bold text-indigo-700" id="month-total">{{ $money($monthTotal) }}</div>
                     </div>
                 @endif
-                <form method="POST" action="{{ route('module.schulkantine.bestellterminal.abmelden') }}" x-ref="abmelden">
+                <form method="POST" action="{{ route('kantine.bestellterminal.abmelden') }}" x-ref="abmelden">
                     @csrf
                     <button type="submit" class="rounded-xl bg-indigo-600 px-6 py-3 text-lg font-semibold text-white shadow hover:bg-indigo-700">
                         Fertig
                         <span x-show="rest <= warnAb" x-cloak class="ml-1 text-sm font-normal text-indigo-200" x-text="'(' + rest + ' s)'"></span>
                     </button>
                 </form>
+            </div>
+        @else
+            <div class="flex items-center gap-3 rounded-xl bg-indigo-600 px-5 py-3 text-white shadow" :class="busy ? 'animate-pulse' : ''">
+                <svg class="h-8 w-8 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/></svg>
+                <div>
+                    <div class="text-lg font-semibold leading-tight">Chip auflegen</div>
+                    <div class="text-xs text-indigo-200">zum Bestellen</div>
+                </div>
             </div>
         @endif
     </header>
@@ -64,40 +72,43 @@
         <main class="flex-1 p-3 sm:p-6">
             @include('schulkantine::orders._woche', [
                 'routen' => [
-                    'woche' => 'module.schulkantine.bestellterminal.index',
-                    'bestellen' => 'module.schulkantine.bestellterminal.bestellen',
-                    'abo' => 'module.schulkantine.bestellterminal.abo',
+                    'woche' => 'kantine.bestellterminal.index',
+                    'bestellen' => 'kantine.bestellterminal.bestellen',
+                    'abo' => 'kantine.bestellterminal.abo',
                 ],
                 'ichId' => $besteller->id,
+                'terminal' => true,
                 'statusZeigen' => true,
             ])
         </main>
     @else
-        {{-- Ohne Anmeldung: nur „Chip auflegen". --}}
-        <main class="flex flex-1 items-center justify-center p-6">
-            <div class="w-full max-w-xl text-center">
-                <div class="mx-auto flex h-40 w-40 items-center justify-center rounded-full bg-indigo-50 text-indigo-500"
-                     :class="busy ? 'animate-pulse' : ''">
-                    <svg class="h-20 w-20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/></svg>
+        {{-- Ohne Anmeldung: Speiseplan der Woche zum Ansehen; bestellen erst nach Chip. --}}
+        <div x-show="meldung" x-cloak class="bg-red-100 px-4 py-3 text-center text-lg font-medium text-red-700" x-text="meldung"></div>
+
+        <main class="flex-1 p-3 sm:p-6">
+            @include('schulkantine::orders._woche', [
+                'routen' => [
+                    'woche' => 'kantine.bestellterminal.index',
+                    'bestellen' => 'kantine.bestellterminal.bestellen',
+                    'abo' => 'kantine.bestellterminal.abo',
+                ],
+                'ichId' => 0,
+                'terminal' => true,
+                'gast' => true,
+            ])
+
+            @if ($simChips->isNotEmpty())
+                {{-- Nur lokal (APP_ENV=local): Chip-Auswahl zum Testen ohne Leser. --}}
+                <div class="mt-6 max-w-md rounded-xl border border-dashed border-gray-300 bg-white p-4">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Test (nur lokal): Chip simulieren</div>
+                    <select class="mt-2 w-full rounded-lg border-gray-300 text-sm" @change="if ($event.target.value) anmelden($event.target.value)">
+                        <option value="">– Chip wählen –</option>
+                        @foreach ($simChips as $c)
+                            <option value="{{ $c['uid'] }}">{{ $c['name'] }} ({{ $c['uid'] }})</option>
+                        @endforeach
+                    </select>
                 </div>
-                <h1 class="mt-8 text-4xl font-bold text-gray-800">Chip auflegen</h1>
-                <p class="mt-3 text-lg text-gray-500">Halte deinen Kantinen-Chip an den Leser, um dein Essen zu bestellen.</p>
-
-                <div x-show="meldung" x-cloak class="mt-8 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-lg font-medium text-red-700" x-text="meldung"></div>
-
-                @if ($simChips->isNotEmpty())
-                    {{-- Nur lokal (APP_ENV=local): Chip-Auswahl zum Testen ohne Leser. --}}
-                    <div class="mt-10 rounded-xl border border-dashed border-gray-300 bg-white p-4 text-left">
-                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">Test (nur lokal): Chip simulieren</div>
-                        <select class="mt-2 w-full rounded-lg border-gray-300 text-sm" @change="if ($event.target.value) anmelden($event.target.value)">
-                            <option value="">– Chip wählen –</option>
-                            @foreach ($simChips as $c)
-                                <option value="{{ $c['uid'] }}">{{ $c['name'] }} ({{ $c['uid'] }})</option>
-                            @endforeach
-                        </select>
-                    </div>
-                @endif
-            </div>
+            @endif
         </main>
     @endif
 
@@ -111,7 +122,7 @@
     document.addEventListener('alpine:init', () => {
         Alpine.data('bestellTerminal', () => ({
             angemeldet: @js((bool) $besteller),
-            urlAnmelden: @js(route('module.schulkantine.bestellterminal.anmelden')),
+            urlAnmelden: @js(route('kantine.bestellterminal.anmelden')),
             csrf: document.querySelector('meta[name=csrf-token]').content,
             busy: false,
             meldung: '',
@@ -130,12 +141,17 @@
                 // Bereits freigegebener COM-Leser: ohne Klick wieder verbinden.
                 if (this.hasSerial()) this.serialConnect(false);
 
+                ['pointerdown', 'keydown', 'scroll', 'wheel'].forEach(ev =>
+                    window.addEventListener(ev, () => { this.rest = this.leerlauf; }, { passive: true }));
                 if (this.angemeldet) {
-                    ['pointerdown', 'keydown', 'scroll', 'wheel'].forEach(ev =>
-                        window.addEventListener(ev, () => { this.rest = this.leerlauf; }, { passive: true }));
                     setInterval(() => {
                         this.rest--;
                         if (this.rest <= 0) this.$refs.abmelden.submit();
+                    }, 1000);
+                } else if (location.search) {
+                    // Ohne Chip in eine andere Woche geblättert: nach Untätigkeit zurück zur aktuellen.
+                    setInterval(() => {
+                        if (--this.rest <= 0) location.href = location.pathname;
                     }, 1000);
                 }
             },

@@ -3,13 +3,20 @@
      OrderController::wochenDaten():
        $routen  ['woche' => …, 'bestellen' => …, 'abo' => …] (Routennamen)
        $ichId   Esser, der als „ich" markiert wird (der Besteller selbst)
-       $statusZeigen  optional: Erfolgsmeldung selbst anzeigen (Seiten ohne App-Layout) --}}
+       $statusZeigen  optional: Erfolgsmeldung selbst anzeigen (Seiten ohne App-Layout)
+       $gast    optional: nur ansehen (Terminal ohne Chip) – Platzhalter-Esser, Karten
+                öffnen die Details statt zu bestellen
+$terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüfung) --}}
 @php
+    $gast = $gast ?? false;
     $money = fn ($v) => number_format((float) $v, 2, ',', '.').' €';
 @endphp
 
 <div class="max-w-full" id="orders-content">
-    @include('schulkantine::partials.nur-lesen', ['route' => $routen['bestellen'], 'text' => 'bestellen und abbestellen ist nicht möglich.'])
+    {{-- Das Terminal hat kein Konto und keine Zugriffsstufe – dort gilt die Chip-Anmeldung. --}}
+    @unless ($terminal ?? false)
+        @include('schulkantine::partials.nur-lesen', ['route' => $routen['bestellen'], 'text' => 'bestellen und abbestellen ist nicht möglich.'])
+    @endunless
     {{-- Erfolgsmeldungen zeigt das App-Layout bereits global; hier nur Fehler.
          Das Terminal hat kein App-Layout und zeigt sie deshalb hier ($statusZeigen). --}}
     @if (($statusZeigen ?? false) && session('status'))
@@ -82,11 +89,16 @@
                         {{-- Kopf des Essers --}}
                         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 bg-gray-50/60 px-4 py-3">
                             <div class="flex flex-wrap items-center gap-2">
+                                @if ($gast)
+                                    <span class="font-semibold text-gray-800">Speiseplan</span>
+                                    <span class="text-xs text-gray-400">Zum Bestellen Chip an den Leser halten</span>
+                                @else
                                 <span class="font-semibold text-gray-800">{{ $eater->name }}</span>
                                 @if ($eater->id === $ichId)
                                     <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">ich</span>
                                 @endif
                                 <span class="text-xs text-gray-400">{{ $e['group']?->name ?? 'keine Gruppe' }}</span>
+                                @endif
                                 @if ($hasSonderkost)
                                     <span class="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600" title="Es sind Verträglichkeiten hinterlegt">⚠️ Verträglichkeiten</span>
                                 @endif
@@ -138,7 +150,7 @@
                                 @endif
                             </div>
                             {{-- Kosten DIESER Person in der angezeigten Woche (der Monat steht oben im Kopf) --}}
-                            <div class="flex items-center gap-1.5" title="Monat {{ $monthStart->isoFormat('MMMM') }}: {{ $money($monthByUser[$eater->id] ?? 0) }}">
+                            <div class="{{ $gast ? 'hidden' : '' }} flex items-center gap-1.5" title="Monat {{ $monthStart->isoFormat('MMMM') }}: {{ $money($monthByUser[$eater->id] ?? 0) }}">
                                 <span class="text-[11px] uppercase tracking-wide text-gray-400">Kosten KW {{ $weekStart->isoWeek() }}</span>
                                 <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-sm font-bold text-indigo-700">{{ $money($weekByUser[$eater->id] ?? 0) }}</span>
                             </div>
@@ -278,10 +290,11 @@
                                                         <input type="hidden" name="date" value="{{ $dateStr }}">
                                                         <input type="hidden" name="menu_day_id" value="{{ $md->id }}">
                                                         <input type="hidden" name="attend" value="{{ $menuAttend }}">
-                                                        <button type="submit" @disabled(! $menuClickable)
+                                                        <button type="{{ $gast ? 'button' : 'submit' }}" @disabled(! $gast && ! $menuClickable)
+                                                                @if ($gast) x-data @click="$dispatch('open-dish', @js($menuData))" @endif
                                                                 class="w-full rounded-lg border p-2 text-left transition
                                                                        {{ $isMenuOrdered ? 'border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-300' : ($menuWarn ? 'border-red-300' : 'border-emerald-200') }}
-                                                                       {{ $menuClickable ? 'cursor-pointer hover:border-emerald-400' : 'cursor-not-allowed opacity-60' }}">
+                                                                       {{ $gast || $menuClickable ? 'cursor-pointer hover:border-emerald-400' : 'cursor-not-allowed opacity-60' }}">
                                                             <div class="flex items-center justify-between gap-2">
                                                                 <span class="text-sm font-semibold text-emerald-800">🍽 {{ $md->name }}<span x-data @click.stop.prevent="$dispatch('open-dish', @js($menuData))" role="button" tabindex="0" title="Details anzeigen" aria-label="Details anzeigen" class="ml-1 inline-flex translate-y-px cursor-pointer align-middle text-emerald-600 hover:text-emerald-800"><svg class="inline h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg></span></span>
                                                                 <span class="flex items-center gap-1 text-xs font-bold {{ $isMenuOrdered ? 'text-emerald-700' : 'text-gray-700' }}">
@@ -378,10 +391,11 @@
                                                                     <input type="hidden" name="date" value="{{ $dateStr }}">
                                                                     <input type="hidden" name="category_id" value="{{ $catId }}">
                                                                     <input type="hidden" name="dish_id" value="{{ $postDish }}">
-                                                                    <button type="submit" @disabled(! $clickable) style="{{ $selStyle }}"
+                                                                    <button type="{{ $gast ? 'button' : 'submit' }}" @disabled(! $gast && ! $clickable) style="{{ $selStyle }}"
+                                                                            @if ($gast) x-data @click="$dispatch('open-dish', @js($dishData))" @endif
                                                                             class="group relative w-full overflow-hidden rounded-lg border text-left transition
                                                                                    {{ $isSel ? ($catColor ? '' : 'border-green-500 ring-2 ring-green-300') : ($warn ? 'border-red-300' : 'border-gray-200') }}
-                                                                                   {{ $clickable ? 'hover:border-indigo-400 cursor-pointer' : 'opacity-60 cursor-not-allowed' }}">
+                                                                                   {{ $gast || $clickable ? 'hover:border-indigo-400 cursor-pointer' : 'opacity-60 cursor-not-allowed' }}">
                                                                         @if ($isSel)
                                                                             {{-- „bestellt" an der linken Kante – bleibt sichtbar, auch wenn
                                                                                  der Rahmen jetzt die Kategoriefarbe trägt. --}}
@@ -446,10 +460,16 @@
                 @endforeach
             </div>
 
+            @if ($gast)
+            <p class="mt-4 text-xs text-gray-400">
+                Auf ein Gericht tippen = Details mit Allergenen und Zusatzstoffen. Zum Bestellen den Chip an den Leser halten.
+            </p>
+            @else
             <p class="mt-4 text-xs text-gray-400">
                 Auf eine Gericht-Karte tippen = auswählen (erneut tippen = abwählen). Grün umrandete Tage sind bereits bestellt.
                 Bestellschluss ist der vorige Öffnungstag; Abbestellen ist am Tag selbst bis zur eingestellten Uhrzeit möglich.
             </p>
+            @endif
         @endif
     @endif
 </div>
@@ -615,7 +635,7 @@
                                 x-text="dish.isSel ? 'Abbestellen' : 'Bestellen'"></button>
                     </template>
                     <template x-if="! dish.clickable">
-                        <span class="self-center text-xs text-amber-600">Bestellfrist abgelaufen</span>
+                        <span class="self-center text-xs text-amber-600">{{ $gast ? 'Zum Bestellen Chip an den Leser halten' : 'Bestellfrist abgelaufen' }}</span>
                     </template>
                 </form>
             </div>

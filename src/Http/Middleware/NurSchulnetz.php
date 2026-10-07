@@ -1,0 +1,29 @@
+<?php
+
+namespace Intranet\Modules\Schulkantine\Http\Middleware;
+
+use App\Models\Module;
+use Closure;
+use Illuminate\Http\Request;
+use Intranet\Modules\Schulkantine\Support\Bestellterminal;
+use Symfony\Component\HttpFoundation\Response;
+
+/**
+ * Das Bestell-Terminal läuft ohne Intranet-Anmeldung – darum nur aus den
+ * freigegebenen Netzen der Schule (Einstellung unter „Bestell-Terminal").
+ * Angemeldete Admins dürfen immer (Einrichten/Testen von außen).
+ */
+class NurSchulnetz
+{
+    public function handle(Request $request, Closure $next): Response
+    {
+        $modulAktiv = Module::where('key', 'schulkantine')->where('is_enabled', true)->exists();
+        abort_unless($modulAktiv, 404);
+
+        if ($request->user()?->isAdmin() || Bestellterminal::erlaubt($request->ip())) {
+            return $next($request);
+        }
+
+        return response()->view('schulkantine::bestellterminal.gesperrt', ['ip' => $request->ip()], 403);
+    }
+}

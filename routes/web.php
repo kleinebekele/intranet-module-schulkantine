@@ -18,6 +18,7 @@ use Intranet\Modules\Schulkantine\Http\Controllers\ReportController;
 use Intranet\Modules\Schulkantine\Http\Controllers\SeasonController;
 use Intranet\Modules\Schulkantine\Http\Controllers\ServingController;
 use Intranet\Modules\Schulkantine\Http\Controllers\SonderkostController;
+use Intranet\Modules\Schulkantine\Http\Middleware\NurSchulnetz;
 
 /*
  | Routen des Schulkantine-Moduls.
@@ -105,13 +106,10 @@ Route::middleware(['web', 'auth'])
         Route::post('bestellen', [OrderController::class, 'store'])->name('orders.store');
         Route::post('bestellen/abo', [OrderController::class, 'subscription'])->name('orders.subscription');
 
-        // Bestell-Terminal (Kiosk auf den Schul-Terminals): Gerät mit eigenem Konto,
-        // Besteller melden sich nur per Chip an. Vollbild, eigenes Layout.
-        Route::get('bestell-terminal', [BestellTerminalController::class, 'index'])->name('bestellterminal.index');
-        Route::post('bestell-terminal/anmelden', [BestellTerminalController::class, 'anmelden'])->name('bestellterminal.anmelden');
-        Route::post('bestell-terminal/abmelden', [BestellTerminalController::class, 'abmelden'])->name('bestellterminal.abmelden');
-        Route::post('bestell-terminal/bestellen', [BestellTerminalController::class, 'bestellen'])->name('bestellterminal.bestellen');
-        Route::post('bestell-terminal/abo', [BestellTerminalController::class, 'abo'])->name('bestellterminal.abo');
+        // Bestell-Terminal einrichten (freigegebene Netze, Link zum Terminal).
+        // Das Terminal selbst steht unten, außerhalb der Anmeldung.
+        Route::get('bestell-terminal', [BestellTerminalController::class, 'einstellungen'])->name('bestellterminal.index');
+        Route::put('bestell-terminal', [BestellTerminalController::class, 'einstellungenSpeichern'])->name('bestellterminal.update');
 
         // Meine Abrechnung (Selbstbedienung: ich + meine Kinder) – jeder Nutzer.
         // Eigenes Präfix (abrechnung.*), damit die Sichtbarkeit unabhängig von der
@@ -187,4 +185,21 @@ Route::middleware(['web', 'auth'])
         Route::post('teilnehmer/{user}/chip', [EaterController::class, 'issueChip'])->name('eaters.chip.issue');
         Route::post('teilnehmer/chip/{chip}/zurueck', [EaterController::class, 'returnChip'])->name('eaters.chip.return');
         Route::delete('teilnehmer/chip/{chip}', [EaterController::class, 'removeChip'])->name('eaters.chip.remove');
+    });
+
+/*
+ | Bestell-Terminal (Kiosk auf den Schul-Terminals): OHNE Intranet-Anmeldung,
+ | dafür nur aus den freigegebenen Netzen der Schule (NurSchulnetz). Bestellen
+ | erst nach Chip-Anmeldung. Bewusst nicht unter module.* benannt – die
+ | Rollen-Prüfung der Modulverwaltung gilt hier nicht, es gibt kein Konto.
+*/
+Route::middleware(['web', NurSchulnetz::class])
+    ->prefix('kantine-terminal')
+    ->name('kantine.bestellterminal.')
+    ->group(function () {
+        Route::get('/', [BestellTerminalController::class, 'index'])->name('index');
+        Route::post('anmelden', [BestellTerminalController::class, 'anmelden'])->middleware('throttle:30,1')->name('anmelden');
+        Route::post('abmelden', [BestellTerminalController::class, 'abmelden'])->name('abmelden');
+        Route::post('bestellen', [BestellTerminalController::class, 'bestellen'])->name('bestellen');
+        Route::post('abo', [BestellTerminalController::class, 'abo'])->name('abo');
     });

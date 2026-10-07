@@ -5,21 +5,22 @@ kategorie: Schulkantine – Betrieb
 position: 13
 ---
 
-rollen: kantine_bestellterminal, admin
+rollen: admin
 
-Das Bestell-Terminal ist die Vollbild-Ansicht für die Terminals in der Schule. Dort bestellt
-man sein Essen ohne Benutzername und Passwort: Chip auflegen, bestellen, „Fertig".
+Das Bestell-Terminal ist die Vollbild-Ansicht für die Terminals in der Schule. Es braucht
+keine Intranet-Anmeldung: Jeder sieht dort den Speiseplan der Woche, bestellen kann man nach
+Chip-Anmeldung – Chip auflegen, bestellen, „Fertig".
 
 ## Gerät einrichten
 
 rollen: admin
 
-Das Terminal braucht ein eigenes Intranet-Konto mit der Rolle **Kantine: Bestell-Terminal
-(Gerätekonto)**. Mit diesem Konto am Gerät anmelden und die Seite „Bestell-Terminal" öffnen –
-am besten als Startseite im Vollbild (Kiosk-Modus von Chrome oder Edge).
+Unter **Schulkantine → Bestell-Terminal** stehen die Adresse des Terminals und die
+**freigegebenen Netze**. Nur von dort ist das Terminal erreichbar; ohne Eintrag ist es
+nirgends erreichbar. Die Seite zeigt auch, mit welcher Adresse der Server Sie gerade sieht –
+am besten einmal an einem Schul-Terminal nachsehen und von außerhalb gegenprüfen.
 
-Das Gerätekonto bestellt selbst nichts. Bestellt wird immer für den Inhaber des aufgelegten
-Chips und dessen Kinder – genau wie unter „Essen bestellen".
+Am Terminal die Adresse als Startseite öffnen, am besten im Kiosk-Modus von Chrome oder Edge.
 
 Erkannt werden die USB-Leser, die die Kennung wie eine Tastatur eintippen, und der alte
 Chipleser am COM-Anschluss. Den COM-Leser einmal je Gerät über „COM-Leser verbinden"
@@ -27,11 +28,11 @@ unten rechts freigeben, danach verbindet er sich selbst.
 
 ## Bestellen am Terminal
 
-rollen: kantine_bestellterminal, admin
+rollen: admin
 
-Chip an den Leser halten – die Woche erscheint mit allen Tagen, Gerichten und Menüs, wie
-unter „Essen bestellen". Antippen bestellt, nochmal antippen bestellt ab. Es gelten dieselben
-Fristen.
+Ohne Chip zeigt das Terminal den Speiseplan der Woche; ein Tipp auf ein Gericht zeigt die
+Details mit Allergenen und Zusatzstoffen. Mit Chip erscheint dieselbe Ansicht wie unter
+„Essen bestellen" – für den Chip-Inhaber und seine Kinder, mit denselben Fristen.
 
 Mit **Fertig** abmelden. Wer eine Minute nichts tippt, wird automatisch abgemeldet; die
 letzten Sekunden zählt ein Hinweis herunter. Legt jemand anderes seinen Chip auf, wechselt das
