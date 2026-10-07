@@ -135,8 +135,9 @@ Route::middleware(['web', 'auth'])
         // Auswertung & Abrechnung (Phase 5) – nur Admin (im Controller geprüft).
         Route::get('auswertung', [ReportController::class, 'index'])->name('reports.index');
         Route::get('auswertung/csv', [ReportController::class, 'csv'])->name('reports.csv');
-        Route::get('auswertung/linear', [ReportController::class, 'linear'])->name('reports.linear');
-        Route::post('auswertung/linear/{user}/senden', [ReportController::class, 'linearSenden'])->name('reports.linear.send');
+        // Linear steht direkt in der Auswertung; die alte Unterseite leitet dorthin.
+        Route::get('auswertung/linear', fn (\Illuminate\Http\Request $r) => redirect()->route('module.schulkantine.reports.index', $r->only('monat')))->name('reports.linear');
+        Route::post('auswertung/linear/senden', [ReportController::class, 'linearSenden'])->name('reports.linear.send');
         Route::get('auswertung/person/{user}', [ReportController::class, 'show'])->name('reports.show');
         Route::get('auswertung/pdf', [ReportController::class, 'pdf'])->name('reports.pdf');
         // Kein manuelles „bezahlt": der Bezahlt-Status kommt ausschließlich aus dem

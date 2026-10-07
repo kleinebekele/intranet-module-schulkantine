@@ -21,6 +21,20 @@ use Intranet\Modules\Schulkantine\Models\UserInfo;
  */
 class SchulkantineServiceProvider extends ModuleServiceProvider
 {
+    public function register(): void
+    {
+        parent::register();
+
+        // Tasks unter src/Tasks (z. B. Linear/KantineAbrechnung) – ruhen, wenn das Modul aus ist.
+        $this->app->singletonIf(\App\Ekkon\Support\TaskRegistry::class);
+        $this->app->make(\App\Ekkon\Support\TaskRegistry::class)->addSource(
+            $this->moduleBasePath().'/src/Tasks',
+            __NAMESPACE__.'\\Tasks',
+            'do1emu/module-schulkantine',
+            'schulkantine',
+        );
+    }
+
     public function boot(): void
     {
         parent::boot();

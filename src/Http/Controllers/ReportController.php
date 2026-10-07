@@ -10,6 +10,7 @@ use Intranet\Modules\Schulkantine\Models\Order;
 use Intranet\Modules\Schulkantine\Models\Season;
 use Intranet\Modules\Schulkantine\Models\Settlement;
 use Intranet\Modules\Schulkantine\Support\BillingService;
+use Intranet\Modules\Schulkantine\Support\LinearExport;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -47,7 +48,42 @@ class ReportController
             'monthLabel' => $this->monthLabel($year, $month),
             'monthValue' => sprintf('%04d-%02d', $year, $month),
             'months' => $this->seasonMonths($season),
+            'linear' => $isAdmin ? $this->linearStand($season, $year, $month) : null,
         ]);
+    }
+
+    /**
+     * Linear-Stand des Monats für die Auswertung: je Esser die Zeile (bereit/gesendet
+     * samt Zahlungsstand aus Linear) oder der Grund, warum sie nicht übertragbar ist.
+     */
+    private function linearStand(Season $season, int $year, int $month): array
+    {
+        $export = new LinearExport;
+        $vorschau = $export->mitZahlungsstand($export->vorschau($season, $year, $month), $season, $year, $month);
+
+        $je = [];
+        foreach ($vorschau['zeilen'] as $z) {
+            $je[$z['user']->id] = $z;
+        }
+        foreach ($vorschau['ausgeschlossen'] as $a) {
+            if ($a['user']) {
+                $je[$a['user']->id] = $a;
+            }
+        }
+        $offen = array_filter($vorschau['zeilen'], fn ($z) => $z['export'] === null);
+        $gesendet = array_filter($vorschau['zeilen'], fn ($z) => $z['export'] !== null);
+
+        return [
+            'je' => $je,
+            'bereit' => count($offen),
+            'bereitSumme' => round(array_sum(array_column($offen, 'Betrag')), 2),
+            'gesendet' => count($gesendet),
+            'gesendetSumme' => round(array_sum(array_map(fn ($z) => (float) $z['export']->betrag, $gesendet)), 2),
+            'ausgeschlossen' => count($vorschau['ausgeschlossen']),
+            'sendezeitpunkt' => $export->sendezeitpunkt($season, $year, $month),
+            'lesbar' => $vorschau['linearLesbar'] ?? true,
+            'vertraegeStand' => $vorschau['vertraegeStand'],
+        ];
     }
 
     /** Detailseite einer Person: alle Einzelposten im gewählten Monat. */
@@ -87,38 +123,39 @@ class ReportController
     // (Tabelle kantine_settlements) kommt ausschließlich aus dem externen
     // Zahlungs-Import (folgt). Die Auswertung zeigt den Status nur noch an.
 
-    // ------------------------------------------------------- Linear-Vorschau
+    // ---------------------------------------------------------------- Linear
 
-    /** Was ginge für diesen Monat an Linear (MgEsGeld)? Nur Anzeige – es wird nichts gesendet. */
-    public function linear(Request $request)
+    /**
+     * Den ganzen Monat an Linear senden – Notfallknopf für den Task
+     * Linear/KantineAbrechnung, erst ab dessen Sendezeitpunkt.
+     */
+    public function linearSenden(Request $request)
     {
         $this->authorizeAdmin($request);
         $season = Season::where('is_active', true)->firstOrFail();
         [$year, $month] = $this->resolveMonth($request, $season);
+        $export = new LinearExport;
 
-        $export = new \Intranet\Modules\Schulkantine\Support\LinearExport;
-
-        return view('schulkantine::reports.linear', $export->mitZahlungsstand($export->vorschau($season, $year, $month), $season, $year, $month) + [
-            'season' => $season,
-            'monthLabel' => $this->monthLabel($year, $month),
-            'monthValue' => sprintf('%04d-%02d', $year, $month),
-            'months' => $this->seasonMonths($season),
-        ]);
-    }
-
-    /** EINE Zeile (Esser + Monat) an Linear senden – nur per Knopf, nie automatisch. */
-    public function linearSenden(Request $request, User $user)
-    {
-        $this->authorizeAdmin($request);
-        $season = Season::where('is_active', true)->firstOrFail();
-        [$year, $month] = $this->resolveMonth($request, $season);
+        $zeitpunkt = $export->sendezeitpunkt($season, $year, $month);
+        if (! $zeitpunkt || Carbon::now()->lt($zeitpunkt)) {
+            return back()->withErrors(['linear' => 'Der Monat ist noch nicht abgeschlossen – gesendet wird frühestens '
+                .($zeitpunkt ? 'am '.$zeitpunkt->format('d.m.Y \u\m H:i') : 'nach dem letzten Kantinentag').'.']);
+        }
 
         try {
-            $meldung = (new \Intranet\Modules\Schulkantine\Support\LinearExport)->senden($season, $user, $year, $month, $request->user());
-        } catch (\Throwable $e) {
-            report($e);
+            $e = $export->sendenAlle($season, $year, $month, $request->user()->id);
+        } catch (\Throwable $ex) {
+            report($ex);
 
-            return back()->withErrors(['linear' => $e instanceof \RuntimeException ? $e->getMessage() : 'Senden an Linear fehlgeschlagen: '.$e->getMessage()]);
+            return back()->withErrors(['linear' => $ex instanceof \RuntimeException ? $ex->getMessage() : 'Senden an Linear fehlgeschlagen: '.$ex->getMessage()]);
+        }
+
+        $meldung = sprintf('%d Zeilen mit %s € an Linear gesendet.', $e['gesendet'], number_format($e['summe'], 2, ',', '.'));
+        if ($e['vermerkt'] > 0) {
+            $meldung .= " {$e['vermerkt']} standen bereits in Linear und wurden nur vermerkt.";
+        }
+        if ($e['fehler'] !== []) {
+            return back()->with('status', $meldung)->withErrors(['linear' => 'Nicht gesendet: '.implode(' · ', $e['fehler'])]);
         }
 
         return back()->with('status', $meldung);

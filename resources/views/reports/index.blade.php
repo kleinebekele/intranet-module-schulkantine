@@ -6,7 +6,7 @@
         </div>
     </x-slot>
 
-    <div class="max-w-5xl space-y-5">
+    <div class="w-full space-y-5">
         @if (! $season)
             <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 Es ist keine Saison als „aktiv" markiert. Lege zuerst eine aktive Saison an.
@@ -31,10 +31,6 @@
 
                 @if ($isAdmin)
                     <div class="flex items-center gap-2">
-                        <a href="{{ route('module.schulkantine.reports.linear', ['monat' => $monthValue]) }}"
-                           class="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100">
-                            <x-module-icon name="search" class="text-base" /> Linear
-                        </a>
                         <a href="{{ route('module.schulkantine.reports.csv', ['monat' => $monthValue]) }}"
                            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
                             <x-module-icon name="download" class="text-base" /> CSV
@@ -67,94 +63,208 @@
                 </div>
             </div>
 
+            {{-- Linear: Stand des Monats, Versand immer gesammelt --}}
+            @if ($linear)
+                @php
+                    $zp = $linear['sendezeitpunkt'];
+                    $faellig = $zp && now()->gte($zp);
+                @endphp
+                @if ($errors->has('linear'))
+                    <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ $errors->first('linear') }}</div>
+                @endif
+                <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                    <div class="space-y-0.5">
+                        <div class="font-semibold">Linear</div>
+                        <div>
+                            {{ $linear['gesendet'] }} gesendet ({{ $euro($linear['gesendetSumme']) }})
+                            · {{ $linear['bereit'] }} bereit ({{ $euro($linear['bereitSumme']) }})
+                            · {{ $linear['ausgeschlossen'] }} nicht übertragbar
+                        </div>
+                        <div class="text-xs text-sky-700">
+                            @if (! $zp)
+                                In {{ $monthLabel }} gibt es keinen Kantinentag – nichts zu senden.
+                            @elseif (! $faellig)
+                                Wird automatisch am {{ $zp->format('d.m.Y') }} um {{ $zp->format('H:i') }} Uhr gesendet (letzter Kantinentag, nach Abbestellschluss).
+                            @else
+                                Sendezeitpunkt {{ $zp->format('d.m.Y H:i') }} erreicht – der Task Linear/KantineAbrechnung sendet alles Bereite zusammen.
+                            @endif
+                        </div>
+                        @unless ($linear['lesbar'])
+                            <div class="text-xs font-medium text-amber-700">⚠️ Linear ist gerade nicht lesbar – Abrechnungsstand der gesendeten Zeilen fehlt.</div>
+                        @endunless
+                        @unless ($linear['vertraegeStand'])
+                            <div class="text-xs font-medium text-amber-700">⚠️ Noch keine Vertragsdaten aus Linear importiert.</div>
+                        @endunless
+                    </div>
+                    @if ($faellig && $linear['bereit'] > 0)
+                        <form method="POST" action="{{ route('module.schulkantine.reports.linear.send', ['monat' => $monthValue]) }}"
+                              onsubmit="return confirm(@js('Jetzt alle '.$linear['bereit'].' bereiten Zeilen ('.$euro($linear['bereitSumme']).') für '.$monthLabel.' an Linear senden?'))">
+                            @csrf
+                            <button type="submit" class="whitespace-nowrap rounded-lg border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100">Jetzt alle an Linear senden</button>
+                        </form>
+                    @endif
+                </div>
+            @endif
+
             @if (empty($households))
                 <div class="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-500">
                     Für {{ $monthLabel }} liegen keine abrechenbaren Posten vor.
                 </div>
             @else
+                @php
+                    // Linear-Zustand einer Person als [Text, Farbe] – Personen- und Haushaltszeile nutzen dasselbe.
+                    $linearZustand = function ($lz) use ($euro) {
+                        if (! $lz) {
+                            return null;
+                        }
+                        if (isset($lz['grund'])) {
+                            return ['nicht übertragbar', 'text-amber-700', $lz['grund']];
+                        }
+                        if (! $lz['export']) {
+                            return ['bereit', 'text-sky-700', 'AdrNr '.$lz['AdrNr'].' · Art '.$lz['Art'].' · Vertrag '.$lz['VertragNr']];
+                        }
+                        $ls = $lz['linear'] ?? null;
+
+                        return match ($ls['zustand'] ?? null) {
+                            null => ['übermittelt', 'text-gray-500', 'Stand in Linear unbekannt'],
+                            'fehlt' => ['⚠️ fehlt in Linear', 'text-red-700', 'Übermittelt, aber in Linear weder in MgEsGeld noch abgerechnet zu finden'],
+                            'nicht' => ['übermittelt', 'text-gray-600', 'noch nicht abgerechnet'],
+                            'offen' => ['abgerechnet · offen', 'text-amber-700', 'Forderung '.$euro($ls['betrag']).', offen '.$euro($ls['offen'])],
+                            default => ['abgerechnet · bezahlt', 'text-green-700', 'Forderung '.$euro($ls['betrag'])],
+                        };
+                    };
+                @endphp
                 <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
                     <div class="overflow-x-auto">
-                        <table class="min-w-full text-sm">
+                        <table class="w-full text-sm">
                             <thead>
                                 <tr class="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400">
-                                    <th class="px-4 py-2 font-medium">Person</th>
+                                    <th class="px-4 py-2 font-medium">Haushalt / Person</th>
                                     <th class="px-3 py-2 text-right font-medium">Menü</th>
                                     <th class="px-3 py-2 text-right font-medium">OGS</th>
                                     <th class="px-3 py-2 text-right font-medium">Spontan</th>
                                     <th class="px-3 py-2 text-right font-medium">Pfand</th>
+                                    <th class="px-3 py-2 text-right font-medium" title="Bestellt, aber nicht abgeholt (wird trotzdem berechnet)">No-Show</th>
                                     <th class="px-3 py-2 text-right font-medium">Summe</th>
                                     <th class="px-4 py-2 text-center font-medium">Bezahlt</th>
+                                    @if ($linear)<th class="px-4 py-2 font-medium">Linear</th>@endif
                                 </tr>
                             </thead>
                             @foreach ($households as $hh)
-                                <tbody class="divide-y divide-gray-50 border-b-4 border-gray-100">
-                                    <tr class="bg-gray-50/70">
-                                        <td class="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500" colspan="5">
-                                            Haushalt {{ $hh['name'] }}
+                                @php
+                                    $sum = fn ($k) => array_sum(array_map(fn ($m) => $m['line'][$k], $hh['members']));
+                                    $hhLinear = [];
+                                    if ($linear) {
+                                        foreach ($hh['members'] as $m) {
+                                            $z = $linearZustand($linear['je'][$m['user']->id] ?? null);
+                                            if ($z) {
+                                                $hhLinear[$z[0]] ??= [0, $z[1]];
+                                                $hhLinear[$z[0]][0]++;
+                                            }
+                                        }
+                                    }
+                                    $wert = fn ($v, $leer = '–') => $v != 0 ? $euro($v) : $leer;
+                                @endphp
+                                <tbody x-data="{ auf: false }" class="border-b border-gray-100">
+                                    {{-- Haushaltszeile: Summen groß, Klick klappt die Personen auf --}}
+                                    <tr class="cursor-pointer hover:bg-gray-50" @click="auf = ! auf">
+                                        <td class="px-4 py-2.5">
+                                            <div class="flex items-center gap-2">
+                                                <span class="inline-block w-3 text-gray-400 transition-transform" :class="auf && 'rotate-90'">▸</span>
+                                                <span class="whitespace-nowrap font-semibold text-gray-900">{{ $hh['name'] }}</span>
+                                                <span class="whitespace-nowrap text-xs text-gray-400">{{ count($hh['members']) }} {{ count($hh['members']) === 1 ? 'Person' : 'Personen' }}</span>
+                                            </div>
                                         </td>
-                                        <td class="px-3 py-1.5 text-right text-xs font-semibold text-gray-600">{{ $euro($hh['subtotal']) }}</td>
-                                        <td class="px-4 py-1.5 text-center text-xs text-gray-400">
+                                        <td class="whitespace-nowrap px-3 py-2.5 text-right tabular-nums {{ $sum('menu_total') > 0 ? 'text-gray-800' : 'text-gray-300' }}">{{ $wert($sum('menu_total')) }}</td>
+                                        <td class="whitespace-nowrap px-3 py-2.5 text-right tabular-nums {{ $sum('ogs_total') > 0 ? 'text-gray-800' : 'text-gray-300' }}">{{ $wert($sum('ogs_total')) }}</td>
+                                        <td class="whitespace-nowrap px-3 py-2.5 text-right tabular-nums {{ $sum('spontan_total') > 0 ? 'text-gray-800' : 'text-gray-300' }}">{{ $wert($sum('spontan_total')) }}</td>
+                                        <td class="whitespace-nowrap px-3 py-2.5 text-right tabular-nums {{ $sum('pfand_net') != 0 ? 'text-gray-800' : 'text-gray-300' }}">{{ $wert($sum('pfand_net')) }}</td>
+                                        <td class="whitespace-nowrap px-3 py-2.5 text-right tabular-nums {{ $sum('no_show_count') > 0 ? 'font-medium text-rose-600' : 'text-gray-300' }}">{{ $sum('no_show_count') ?: '–' }}</td>
+                                        <td class="whitespace-nowrap px-3 py-2.5 text-right text-base font-bold tabular-nums text-gray-900">{{ $euro($hh['subtotal']) }}</td>
+                                        <td class="px-4 py-2.5 text-center">
                                             @if ($hh['open'] > 0)
-                                                offen {{ $euro($hh['open']) }}
+                                                <span class="text-xs font-medium text-amber-600">offen {{ $euro($hh['open']) }}</span>
                                             @else
-                                                <span class="text-green-600">vollständig</span>
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">✓ Bezahlt</span>
                                             @endif
                                         </td>
-                                    </tr>
-                                    @foreach ($hh['members'] as $m)
-                                        @php $l = $m['line']; @endphp
-                                        <tr class="{{ $m['paid'] ? 'bg-green-50/40' : '' }}">
-                                            <td class="px-4 py-2">
-                                                <a href="{{ route('module.schulkantine.reports.show', [$m['user'], 'monat' => $monthValue]) }}"
-                                                   class="font-medium text-indigo-600 hover:text-indigo-800 hover:underline">{{ $m['user']->name }}</a>
-                                                <div class="flex items-center gap-2 text-xs text-gray-400">
-                                                    <span>{{ $m['group'] }}</span>
-                                                    @if ($l['no_show_count'] > 0)
-                                                        <span class="rounded-full bg-rose-50 px-1.5 py-0.5 font-medium text-rose-600"
-                                                              title="Bestellt, aber nicht abgeholt (wird trotzdem berechnet)">
-                                                            {{ $l['no_show_count'] }}× No-Show
-                                                        </span>
-                                                    @endif
-                                                </div>
-                                            </td>
-                                            <td class="px-3 py-2 text-right tabular-nums {{ $l['menu_total'] > 0 ? 'text-gray-700' : 'text-gray-300' }}">
-                                                {{ $l['menu_total'] > 0 ? $euro($l['menu_total']) : '–' }}
-                                                @if ($l['menu_count'] > 0)<span class="text-xs text-gray-400"> ({{ $l['menu_count'] }})</span>@endif
-                                            </td>
-                                            <td class="px-3 py-2 text-right tabular-nums {{ $l['ogs_total'] > 0 ? 'text-gray-700' : 'text-gray-300' }}">
-                                                {{ $l['ogs_total'] > 0 ? $euro($l['ogs_total']) : '–' }}
-                                                @if ($l['ogs_days'] > 0)<span class="text-xs text-gray-400"> ({{ $l['ogs_days'] }} T.)</span>@endif
-                                            </td>
-                                            <td class="px-3 py-2 text-right tabular-nums {{ $l['spontan_total'] > 0 ? 'text-gray-700' : 'text-gray-300' }}">
-                                                {{ $l['spontan_total'] > 0 ? $euro($l['spontan_total']) : '–' }}
-                                                @if ($l['spontan_count'] > 0)<span class="text-xs text-gray-400"> ({{ $l['spontan_count'] }})</span>@endif
-                                            </td>
-                                            <td class="px-3 py-2 text-right tabular-nums {{ $l['pfand_net'] != 0 ? 'text-gray-700' : 'text-gray-300' }}">
-                                                {{ $l['pfand_net'] != 0 ? $euro($l['pfand_net']) : '–' }}
-                                            </td>
-                                            <td class="px-3 py-2 text-right font-semibold tabular-nums text-gray-900">{{ $euro($l['total']) }}</td>
-                                            {{-- Nur-Anzeige: Bezahlt-Status kommt aus dem externen
-                                                 Zahlungs-Import (folgt), nicht manuell setzbar. --}}
-                                            <td class="px-4 py-2 text-center">
-                                                @if ($m['paid'])
-                                                    <span class="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700"
-                                                          @if ($m['settlement']?->paid_at) title="Bezahlt am {{ $m['settlement']->paid_at->format('d.m.Y') }}" @endif>✓ Bezahlt</span>
-                                                @else
-                                                    <span class="text-xs font-medium text-amber-600">offen</span>
+                                        @if ($linear)
+                                            <td class="px-4 py-2.5 text-xs">
+                                                @foreach ($hhLinear as $text => $info)
+                                                    <div class="whitespace-nowrap font-medium {{ $info[1] }}">{{ count($hh['members']) > 1 ? $info[0].'× ' : '' }}{{ $text }}</div>
+                                                @endforeach
+                                                @if ($hhLinear === [])
+                                                    <span class="text-gray-300">–</span>
                                                 @endif
                                             </td>
+                                        @endif
+                                    </tr>
+
+                                    {{-- Personen: klein, erst nach dem Aufklappen --}}
+                                    @foreach ($hh['members'] as $m)
+                                        @php $l = $m['line']; @endphp
+                                        <tr x-show="auf" x-cloak class="bg-gray-50/60 text-xs text-gray-600">
+                                            <td class="whitespace-nowrap py-1.5 pl-10 pr-4">
+                                                <a href="{{ route('module.schulkantine.reports.show', [$m['user'], 'monat' => $monthValue]) }}"
+                                                   class="font-medium text-indigo-600 hover:text-indigo-800 hover:underline">{{ $m['user']->name }}</a>
+                                                <span class="ml-1 text-gray-400">{{ $m['group'] }}</span>
+                                            </td>
+                                            <td class="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
+                                                {{ $wert($l['menu_total']) }}@if ($l['menu_count'] > 0)<span class="text-gray-400"> ({{ $l['menu_count'] }})</span>@endif
+                                            </td>
+                                            <td class="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
+                                                {{ $wert($l['ogs_total']) }}@if ($l['ogs_days'] > 0)<span class="text-gray-400"> ({{ $l['ogs_days'] }} T.)</span>@endif
+                                            </td>
+                                            <td class="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
+                                                {{ $wert($l['spontan_total']) }}@if ($l['spontan_count'] > 0)<span class="text-gray-400"> ({{ $l['spontan_count'] }})</span>@endif
+                                            </td>
+                                            <td class="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">{{ $wert($l['pfand_net']) }}</td>
+                                            <td class="whitespace-nowrap px-3 py-1.5 text-right tabular-nums {{ $l['no_show_count'] > 0 ? 'text-rose-600' : '' }}">{{ $l['no_show_count'] ?: '–' }}</td>
+                                            <td class="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">{{ $euro($l['total']) }}</td>
+                                            {{-- Nur-Anzeige: Bezahlt-Status kommt aus Linear, nicht manuell setzbar. --}}
+                                            <td class="px-4 py-1.5 text-center">
+                                                @if ($m['paid'])
+                                                    <span class="text-green-700" @if ($m['settlement']?->paid_at) title="Bezahlt am {{ $m['settlement']->paid_at->format('d.m.Y') }}" @endif>✓ bezahlt</span>
+                                                @else
+                                                    <span class="text-amber-600">offen</span>
+                                                @endif
+                                            </td>
+                                            @if ($linear)
+                                                @php
+                                                    $lz = $linear['je'][$m['user']->id] ?? null;
+                                                    $z = $linearZustand($lz);
+                                                @endphp
+                                                <td class="px-4 py-1.5">
+                                                    @if (! $z)
+                                                        <span class="text-gray-300">–</span>
+                                                    @else
+                                                        <div class="whitespace-nowrap {{ $z[1] }}" title="{{ $z[2] }}">
+                                                            {{ $z[0] }}@if (isset($lz['grund'])): {{ $lz['grund'] }}@endif
+                                                        </div>
+                                                        @if (! isset($lz['grund']) && $lz['export'])
+                                                            <div class="whitespace-nowrap text-gray-400" title="{{ $lz['export']->hinweis }}">
+                                                                am {{ \Illuminate\Support\Carbon::parse($lz['export']->sent_at)->format('d.m.Y H:i') }}
+                                                            </div>
+                                                            @if (round((float) $lz['export']->betrag, 2) !== round((float) $lz['Betrag'], 2))
+                                                                <div class="whitespace-nowrap font-medium text-amber-700">⚠️ gesendet {{ $euro($lz['export']->betrag) }}, jetzt {{ $euro($lz['Betrag']) }}</div>
+                                                            @endif
+                                                        @endif
+                                                    @endif
+                                                </td>
+                                            @endif
                                         </tr>
                                     @endforeach
                                 </tbody>
                             @endforeach
                             <tfoot>
                                 <tr class="border-t-2 border-gray-200 bg-gray-50">
-                                    <td class="px-4 py-2.5 font-semibold text-gray-700">Gesamt {{ $monthLabel }}</td>
-                                    <td colspan="4"></td>
-                                    <td class="px-3 py-2.5 text-right text-base font-bold text-gray-900 tabular-nums">{{ $euro($grandTotal) }}</td>
-                                    <td class="px-4 py-2.5 text-center text-xs text-amber-600">
+                                    <td class="px-4 py-3 font-semibold text-gray-700">Gesamt {{ $monthLabel }}</td>
+                                    <td colspan="5"></td>
+                                    <td class="px-3 py-3 text-right text-lg font-bold tabular-nums text-gray-900">{{ $euro($grandTotal) }}</td>
+                                    <td class="px-4 py-3 text-center text-xs text-amber-600">
                                         @if ($openTotal > 0) offen {{ $euro($openTotal) }} @else <span class="text-green-600">alles bezahlt</span> @endif
                                     </td>
+                                    @if ($linear)<td></td>@endif
                                 </tr>
                             </tfoot>
                         </table>
