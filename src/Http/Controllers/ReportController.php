@@ -11,7 +11,7 @@ use Intranet\Modules\Schulkantine\Models\Season;
 use Intranet\Modules\Schulkantine\Models\Settlement;
 use Intranet\Modules\Schulkantine\Support\BillingService;
 use Intranet\Modules\Schulkantine\Support\LinearExport;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Intranet\Modules\Schulkantine\Support\XlsxSchreiber;
 
 /**
  * Auswertung & Abrechnung (Phase 5). Nur für Administratoren.
@@ -72,15 +72,18 @@ class ReportController
         }
         $offen = array_filter($vorschau['zeilen'], fn ($z) => $z['export'] === null);
         $gesendet = array_filter($vorschau['zeilen'], fn ($z) => $z['export'] !== null);
+        $zeitpunkt = $export->sendezeitpunkt($season, $year, $month);
 
         return [
+            'abgeschlossen' => (! $zeitpunkt || Carbon::now()->gte($zeitpunkt)) && $offen === [],
+            'uebertragenAm' => collect($gesendet)->map(fn ($z) => $z['export']->sent_at)->max(),
             'je' => $je,
             'bereit' => count($offen),
             'bereitSumme' => round(array_sum(array_column($offen, 'Betrag')), 2),
             'gesendet' => count($gesendet),
             'gesendetSumme' => round(array_sum(array_map(fn ($z) => (float) $z['export']->betrag, $gesendet)), 2),
             'ausgeschlossen' => count($vorschau['ausgeschlossen']),
-            'sendezeitpunkt' => $export->sendezeitpunkt($season, $year, $month),
+            'sendezeitpunkt' => $zeitpunkt,
             'lesbar' => $vorschau['linearLesbar'] ?? true,
             'vertraegeStand' => $vorschau['vertraegeStand'],
         ];
@@ -126,8 +129,8 @@ class ReportController
     // ---------------------------------------------------------------- Linear
 
     /**
-     * Den ganzen Monat an Linear senden – Notfallknopf für den Task
-     * Linear/KantineAbrechnung, erst ab dessen Sendezeitpunkt.
+     * Monat abschließen = den ganzen Monat an Linear übertragen. Macht sonst der Task
+     * Linear/KantineAbrechnung; der Knopf erst ab dessen Sendezeitpunkt.
      */
     public function linearSenden(Request $request)
     {
@@ -150,7 +153,7 @@ class ReportController
             return back()->withErrors(['linear' => $ex instanceof \RuntimeException ? $ex->getMessage() : 'Senden an Linear fehlgeschlagen: '.$ex->getMessage()]);
         }
 
-        $meldung = sprintf('%d Zeilen mit %s € an Linear gesendet.', $e['gesendet'], number_format($e['summe'], 2, ',', '.'));
+        $meldung = sprintf('Monat abgeschlossen: %d Zeilen mit %s € an Linear übertragen.', $e['gesendet'], number_format($e['summe'], 2, ',', '.'));
         if ($e['vermerkt'] > 0) {
             $meldung .= " {$e['vermerkt']} standen bereits in Linear und wurden nur vermerkt.";
         }
@@ -163,44 +166,47 @@ class ReportController
 
     // ------------------------------------------------------------- Exporte
 
-    public function csv(Request $request): StreamedResponse
+    //
+    // Erst wenn der Monat abgeschlossen (an Linear übertragen) ist – vorher ändern
+    // sich die Zahlen noch und ein Export wäre eine Momentaufnahme.
+
+    public function csv(Request $request)
     {
         $this->authorizeAdmin($request);
         $season = Season::where('is_active', true)->firstOrFail();
         [$year, $month] = $this->resolveMonth($request, $season);
-        $report = $this->buildReport($season, $year, $month);
+        if ($sperre = $this->exportGesperrt($season, $year, $month)) {
+            return $sperre;
+        }
+        [$kopf, $zeilen] = $this->exportTabelle($this->buildReport($season, $year, $month));
 
         $filename = 'kantine-abrechnung-'.sprintf('%04d-%02d', $year, $month).'.csv';
 
-        return response()->streamDownload(function () use ($report) {
+        return response()->streamDownload(function () use ($kopf, $zeilen) {
             $out = fopen('php://output', 'w');
             // UTF-8-BOM, damit Excel Umlaute korrekt anzeigt.
             fwrite($out, "\xEF\xBB\xBF");
-
-            $head = ['Name', 'E-Mail', 'Haushalt', 'Gruppe',
-                'Menü (€)', 'Menü Anzahl', 'OGS (€)', 'OGS Tage',
-                'Spontan (€)', 'Spontan Anzahl', 'Pfand (€)', 'No-Shows',
-                'Summe (€)', 'Bezahlt'];
-            fputcsv($out, $head, ';');
-
-            foreach ($report['households'] as $hh) {
-                foreach ($hh['members'] as $m) {
-                    $l = $m['line'];
-                    fputcsv($out, [
-                        $m['user']->name,
-                        $m['user']->email,
-                        $hh['name'],
-                        $m['group'],
-                        $this->num($l['menu_total']), $l['menu_count'],
-                        $this->num($l['ogs_total']), $l['ogs_days'],
-                        $this->num($l['spontan_total']), $l['spontan_count'],
-                        $this->num($l['pfand_net']), $l['no_show_count'],
-                        $this->num($l['total']),
-                        $m['paid'] ? 'ja' : 'offen',
-                    ], ';');
-                }
+            fputcsv($out, $kopf, ';', '"', '');
+            foreach ($zeilen as $z) {
+                fputcsv($out, array_map(fn ($v) => is_float($v) ? $this->num($v) : $v, $z), ';', '"', '');
             }
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    public function xlsx(Request $request)
+    {
+        $this->authorizeAdmin($request);
+        $season = Season::where('is_active', true)->firstOrFail();
+        [$year, $month] = $this->resolveMonth($request, $season);
+        if ($sperre = $this->exportGesperrt($season, $year, $month)) {
+            return $sperre;
+        }
+        [$kopf, $zeilen] = $this->exportTabelle($this->buildReport($season, $year, $month));
+
+        return response(XlsxSchreiber::bauen($this->monthLabel($year, $month), $kopf, $zeilen), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="kantine-abrechnung-'.sprintf('%04d-%02d', $year, $month).'.xlsx"',
+        ]);
     }
 
     public function pdf(Request $request)
@@ -208,6 +214,9 @@ class ReportController
         $this->authorizeAdmin($request);
         $season = Season::where('is_active', true)->firstOrFail();
         [$year, $month] = $this->resolveMonth($request, $season);
+        if ($sperre = $this->exportGesperrt($season, $year, $month)) {
+            return $sperre;
+        }
         $report = $this->buildReport($season, $year, $month);
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulkantine::reports.pdf', $report + [
@@ -220,6 +229,47 @@ class ReportController
     }
 
     // ----------------------------------------------------------- Interna
+
+    /** Noch nicht abgeschlossen → zurück zur Auswertung statt Export. */
+    private function exportGesperrt(Season $season, int $year, int $month)
+    {
+        if ((new LinearExport)->abgeschlossen($season, $year, $month)) {
+            return null;
+        }
+
+        return redirect()->route('module.schulkantine.reports.index', ['monat' => sprintf('%04d-%02d', $year, $month)])
+            ->withErrors(['linear' => 'Exporte gibt es erst, wenn der Monat abgeschlossen (an Linear übertragen) ist.']);
+    }
+
+    /**
+     * Kopf + Zeilen für CSV und Excel – Beträge als float, Anzahlen als int.
+     *
+     * @return array{0: list<string>, 1: list<list<string|int|float>>}
+     */
+    private function exportTabelle(array $report): array
+    {
+        $kopf = ['Name', 'E-Mail', 'Haushalt', 'Gruppe',
+            'Menü (€)', 'Menü Anzahl', 'OGS (€)', 'OGS Tage',
+            'Spontan (€)', 'Spontan Anzahl', 'Pfand (€)', 'No-Shows',
+            'Summe (€)', 'Bezahlt'];
+        $zeilen = [];
+        foreach ($report['households'] as $hh) {
+            foreach ($hh['members'] as $m) {
+                $l = $m['line'];
+                $zeilen[] = [
+                    $m['user']->name, (string) $m['user']->email, $hh['name'], $m['group'],
+                    (float) $l['menu_total'], (int) $l['menu_count'],
+                    (float) $l['ogs_total'], (int) $l['ogs_days'],
+                    (float) $l['spontan_total'], (int) $l['spontan_count'],
+                    (float) $l['pfand_net'], (int) $l['no_show_count'],
+                    (float) $l['total'],
+                    $m['paid'] ? 'ja' : 'offen',
+                ];
+            }
+        }
+
+        return [$kopf, $zeilen];
+    }
 
     /**
      * Baut die nach Haushalt gruppierte Monatsauswertung (für Ansicht & Export).

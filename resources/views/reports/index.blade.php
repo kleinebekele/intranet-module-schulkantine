@@ -29,16 +29,40 @@
                     <span class="text-xs text-gray-400">Saison „{{ $season->name }}"</span>
                 </form>
 
-                @if ($isAdmin)
-                    <div class="flex items-center gap-2">
-                        <a href="{{ route('module.schulkantine.reports.csv', ['monat' => $monthValue]) }}"
-                           class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                            <x-module-icon name="download" class="text-base" /> CSV
-                        </a>
-                        <a href="{{ route('module.schulkantine.reports.pdf', ['monat' => $monthValue]) }}"
-                           class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                            <x-module-icon name="download" class="text-base" /> PDF
-                        </a>
+                {{-- Abgeschlossen (an Linear übertragen) → Exporte; sonst der Abschluss, sobald es etwas abzuschließen gibt --}}
+                @if ($linear)
+                    @php
+                        $zp = $linear['sendezeitpunkt'];
+                        $faellig = ! $zp || now()->gte($zp);
+                    @endphp
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if ($linear['abgeschlossen'])
+                            @if ($linear['uebertragenAm'])
+                                <span class="whitespace-nowrap text-sm font-medium text-green-700">✓ übertragen am {{ \Illuminate\Support\Carbon::parse($linear['uebertragenAm'])->format('d.m.Y H:i') }}</span>
+                            @else
+                                <span class="whitespace-nowrap text-sm font-medium text-green-700">✓ abgeschlossen</span>
+                            @endif
+                            <a href="{{ route('module.schulkantine.reports.xlsx', ['monat' => $monthValue]) }}"
+                               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                <x-module-icon name="download" class="text-base" /> Excel
+                            </a>
+                            <a href="{{ route('module.schulkantine.reports.csv', ['monat' => $monthValue]) }}"
+                               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                <x-module-icon name="download" class="text-base" /> CSV
+                            </a>
+                            <a href="{{ route('module.schulkantine.reports.pdf', ['monat' => $monthValue]) }}"
+                               class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                                <x-module-icon name="download" class="text-base" /> PDF
+                            </a>
+                        @elseif ($faellig && $linear['bereit'] > 0)
+                            <form method="POST" action="{{ route('module.schulkantine.reports.linear.send', ['monat' => $monthValue]) }}"
+                                  onsubmit="return confirm(@js($monthLabel.' abschließen und '.$linear['bereit'].' Zeilen ('.$euro($linear['bereitSumme']).') an Linear übertragen?'))">
+                                @csrf
+                                <button type="submit" class="whitespace-nowrap rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">Monat abschließen</button>
+                            </form>
+                        @else
+                            <span class="whitespace-nowrap text-sm text-gray-500">Monat läuft noch</span>
+                        @endif
                     </div>
                 @endif
             </div>
@@ -65,10 +89,6 @@
 
             {{-- Linear: Stand des Monats, Versand immer gesammelt --}}
             @if ($linear)
-                @php
-                    $zp = $linear['sendezeitpunkt'];
-                    $faellig = $zp && now()->gte($zp);
-                @endphp
                 @if ($errors->has('linear'))
                     <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ $errors->first('linear') }}</div>
                 @endif
@@ -84,9 +104,11 @@
                             @if (! $zp)
                                 In {{ $monthLabel }} gibt es keinen Kantinentag – nichts zu senden.
                             @elseif (! $faellig)
-                                Wird automatisch am {{ $zp->format('d.m.Y') }} um {{ $zp->format('H:i') }} Uhr gesendet (letzter Kantinentag, nach Abbestellschluss).
+                                Wird automatisch am {{ $zp->format('d.m.Y') }} um {{ $zp->format('H:i') }} Uhr abgeschlossen und übertragen (letzter Kantinentag, nach Abbestellschluss).
+                            @elseif ($linear['bereit'] > 0)
+                                Abschluss seit {{ $zp->format('d.m.Y H:i') }} fällig – der Task Linear/KantineAbrechnung überträgt alles Bereite zusammen.
                             @else
-                                Sendezeitpunkt {{ $zp->format('d.m.Y H:i') }} erreicht – der Task Linear/KantineAbrechnung sendet alles Bereite zusammen.
+                                Letzter Kantinentag war der {{ $zp->format('d.m.Y') }}.
                             @endif
                         </div>
                         @unless ($linear['lesbar'])
@@ -96,13 +118,6 @@
                             <div class="text-xs font-medium text-amber-700">⚠️ Noch keine Vertragsdaten aus Linear importiert.</div>
                         @endunless
                     </div>
-                    @if ($faellig && $linear['bereit'] > 0)
-                        <form method="POST" action="{{ route('module.schulkantine.reports.linear.send', ['monat' => $monthValue]) }}"
-                              onsubmit="return confirm(@js('Jetzt alle '.$linear['bereit'].' bereiten Zeilen ('.$euro($linear['bereitSumme']).') für '.$monthLabel.' an Linear senden?'))">
-                            @csrf
-                            <button type="submit" class="whitespace-nowrap rounded-lg border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100">Jetzt alle an Linear senden</button>
-                        </form>
-                    @endif
                 </div>
             @endif
 

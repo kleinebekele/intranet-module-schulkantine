@@ -57,6 +57,20 @@ class LinearExport
     }
 
     /**
+     * Ist der Monat abgeschlossen? Sendezeitpunkt vorbei (oder gar kein Kantinentag)
+     * und keine übertragbare Zeile mehr offen – erst dann gibt es die Exporte.
+     */
+    public function abgeschlossen(Season $season, int $year, int $month): bool
+    {
+        $zeitpunkt = $this->sendezeitpunkt($season, $year, $month);
+        if ($zeitpunkt && now()->lt($zeitpunkt)) {
+            return false;
+        }
+
+        return collect($this->vorschau($season, $year, $month)['zeilen'])->every(fn ($z) => $z['export'] !== null);
+    }
+
+    /**
      * @return array{zeilen: list<array>, ausgeschlossen: list<array>, datum: Carbon, summe: float, vertraegeStand: bool}
      */
     public function vorschau(Season $season, int $year, int $month): array
