@@ -24,8 +24,8 @@ Kein Chip zur Hand? Über die Suche finden Sie die Person auch über den Namen.
 rollen: kantine_kellner, admin
 
 Das Chip-Menü unten links (NFC-Scan auf Android, alten COM-Leser verbinden, Chip-Auswahl)
-ist standardmäßig ausgeblendet. Es wird je Gerät eingeschaltet: das Terminal einmal mit
-`?chip=an` am Ende der Adresse öffnen, mit `?chip=aus` wieder aus. Das Gerät merkt sich das.
+ist ausgeblendet. Es erscheint nur, wenn das Terminal mit `?chip=an` am Ende der Adresse
+geöffnet wird – für ein Gerät, das es immer braucht, gehört das in die Kiosk-Verknüpfung.
 
 Die Chip-Auswahl ist als Rückfalltür und zum Testen gedacht – im Alltag ist der echte Chip
 schneller. USB-Leser, die die Kennung wie eine Tastatur eintippen, brauchen das Menü nicht.

@@ -26,9 +26,10 @@ Erkannt werden die USB-Leser, die die Kennung wie eine Tastatur eintippen, und d
 Chipleser am COM-Anschluss.
 
 Der Hinweis „Chip auflegen" oben rechts und der Knopf „COM-Leser verbinden" unten rechts
-sind standardmäßig ausgeblendet. Je Gerät einschalten: die Adresse einmal mit `?chip=an`
-am Ende öffnen (mit `?chip=aus` wieder aus), das Gerät merkt sich das. Den COM-Leser einmal
-je Gerät darüber freigeben, danach verbindet er sich selbst – auch wenn der Knopf wieder aus ist.
+sind ausgeblendet. Sie erscheinen nur, wenn das Terminal mit `?chip=an` am Ende der Adresse
+geöffnet wird – für ein Gerät, das sie immer braucht, gehört das in die Kiosk-Verknüpfung.
+Den COM-Leser einmal je Gerät darüber freigeben, danach verbindet er sich selbst – auch ohne
+`?chip=an`.
 
 ## Bestellen am Terminal
 

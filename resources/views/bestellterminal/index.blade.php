@@ -122,7 +122,7 @@
 <script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('bestellTerminal', () => ({
-            chipUi: false,   // „Chip auflegen" + COM-Knopf: je Gerät per ?chip=an einschalten
+            chipUi: false,   // „Chip auflegen" + COM-Knopf: nur mit ?chip=an in der Adresse
             angemeldet: @js((bool) $besteller),
             urlAnmelden: @js(route('kantine.bestellterminal.anmelden')),
             csrf: document.querySelector('meta[name=csrf-token]').content,

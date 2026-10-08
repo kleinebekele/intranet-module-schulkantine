@@ -39,7 +39,7 @@
 <script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('terminal', () => ({
-            chipUi: false,   // Chip-Menü unten links: je Gerät per ?chip=an einschalten
+            chipUi: false,   // Chip-Menü unten links: nur mit ?chip=an in der Adresse
             // --- Serverdaten ---
             date: @js($date->toDateString()),
             csrf: document.querySelector('meta[name=csrf-token]').content,

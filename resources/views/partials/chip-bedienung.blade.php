@@ -1,17 +1,21 @@
 {{-- Chip-Bedienelemente der Terminals (Chip-Menü, „Chip auflegen", COM-Leser verbinden) sind
-     standardmäßig aus und werden JE GERÄT eingeschaltet: Adresse einmal mit ?chip=an bzw.
-     ?chip=aus öffnen, das Gerät merkt es sich (localStorage). Über die IP geht es nicht –
-     alle Schulrechner kommen mit derselben Adresse an. Die Leser selbst (Tastatur-Leser,
-     bereits freigegebener COM-Leser) arbeiten unabhängig davon immer. --}}
+     aus und nur an, wenn die Adresse mit ?chip=an geöffnet wurde (z. B. in der Kiosk-
+     Verknüpfung). Gemerkt wird das nur für dieses Browserfenster (sessionStorage), damit
+     Seitenwechsel und Neuladen es nicht verlieren – nach einem Neustart ohne ?chip=an ist es
+     wieder aus. Die Leser selbst (Tastatur-Leser, bereits freigegebener COM-Leser) arbeiten
+     unabhängig davon immer. --}}
 <script>
     window.kantineChipBedienung = function () {
         const p = new URLSearchParams(location.search);
         const wunsch = p.get('chip');
         if (wunsch !== null) {
-            try { localStorage.setItem('kantine.chipBedienung', wunsch === 'an' ? 'an' : 'aus'); } catch (e) {}
+            try {
+                if (wunsch === 'an') sessionStorage.setItem('kantine.chipBedienung', 'an');
+                else sessionStorage.removeItem('kantine.chipBedienung');
+            } catch (e) {}
             p.delete('chip');
             history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : '') + location.hash);
         }
-        try { return localStorage.getItem('kantine.chipBedienung') === 'an'; } catch (e) { return false; }
+        try { return sessionStorage.getItem('kantine.chipBedienung') === 'an'; } catch (e) { return wunsch === 'an'; }
     };
 </script>
