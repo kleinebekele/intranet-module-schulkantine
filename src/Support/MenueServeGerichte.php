@@ -24,6 +24,48 @@ class MenueServeGerichte
     /** Fleischart (ATTRIB01) → Klartext. */
     public const ARTEN = [1 => 'Rind', 2 => 'Schwein', 3 => 'Rind/Schwein', 4 => 'Lamm', 5 => 'Geflügel', 6 => 'Fisch', 7 => 'Vegetarisch'];
 
+    /** Fleischart (ATTRIB01) → unsere Fleischart am Gericht (Dish::FLEISCHARTEN). */
+    public const ART_ZU_FLEISCHART = [1 => 'rind', 2 => 'schwein', 3 => 'rind_schwein', 4 => 'lamm', 5 => 'gefluegel', 6 => 'fisch', 7 => 'vegetarisch'];
+
+    /**
+     * Fleischart je Gericht aus der ganzen Menü&Serve-Historie: über die gespeicherte
+     * Zuordnung (Hauptspeise), sonst über den eindeutigen Namens-Treffer der Hauptspeise
+     * bzw. des Titels. Je Gericht zählt die häufigste Angabe.
+     *
+     * @param  iterable<Dish>  $gerichte
+     * @return array<int, string> dish_id → Fleischart
+     */
+    public function fleischartJeGericht(iterable $gerichte): array
+    {
+        $zuordnung = DB::table('kantine_menueserve_zuordnungen')->whereNotNull('hauptspeise_id')->pluck('hauptspeise_id', 'ms_id');
+        $treffer = [];
+        $zaehler = [];
+        foreach ($this->menuesAb(Carbon::parse('2000-01-01')) as $m) {
+            if (! $m['art']) {
+                continue;
+            }
+            $id = $zuordnung[$m['ms_id']] ?? null;
+            if (! $id) {
+                $schluessel = $m['hauptspeise'].'|'.$m['titel'];
+                if (! array_key_exists($schluessel, $treffer)) {
+                    $treffer[$schluessel] = self::vorschlag($m['hauptspeise'], $gerichte) ?? self::vorschlag($m['titel'], $gerichte);
+                }
+                $id = $treffer[$schluessel];
+            }
+            if ($id) {
+                $zaehler[$id][$m['art']] = ($zaehler[$id][$m['art']] ?? 0) + 1;
+            }
+        }
+
+        $ergebnis = [];
+        foreach ($zaehler as $id => $arten) {
+            arsort($arten);
+            $ergebnis[$id] = self::ART_ZU_FLEISCHART[array_key_first($arten)];
+        }
+
+        return $ergebnis;
+    }
+
     /**
      * @return list<array{ms_id: string, datum: string, linie: string, titel: string, art: ?int, notiz: string, hauptspeise: ?string, nachspeise: ?string}>
      *

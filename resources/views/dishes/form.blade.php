@@ -90,6 +90,12 @@
                         </label>
                     @endforeach
                 </div>
+                <p class="mt-1.5 text-xs text-gray-400">
+                    Die Allergene haben Vorrang: Fisch, Krebstiere oder Weichtiere zeigen 🐟, Ei oder Milch machen aus „Vegan" „Vegetarisch".
+                </p>
+                @if ($dish->exists && $dish->fleischartWirksam() !== $dish->fleischart)
+                    <p class="mt-1 text-xs text-amber-700">Wegen der Allergene wird angezeigt: {{ $dish->symbol() }} {{ $dish->fleischartName() }}.</p>
+                @endif
                 <x-input-error :messages="$errors->get('fleischart')" class="mt-2" />
             </div>
 

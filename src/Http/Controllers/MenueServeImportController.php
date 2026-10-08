@@ -85,6 +85,12 @@ class MenueServeImportController
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+            // Fleischart des Menüs an die Hauptspeise, wenn dort noch keine eigene steht.
+            if ($m['art'] && ! empty($wahl['hauptspeise_id'])) {
+                Dish::whereKey($wahl['hauptspeise_id'])
+                    ->where(fn ($q) => $q->whereNull('fleischart')->orWhere('fleischart', 'fleisch'))
+                    ->update(['fleischart' => MenueServeGerichte::ART_ZU_FLEISCHART[$m['art']]]);
+            }
             $gespeichert++;
         }
 
@@ -107,6 +113,40 @@ class MenueServeImportController
         return $zurueck
             ->with('status', "Zuordnung gespeichert, {$ok} von ".count($ergebnis).' Menüs in den Speiseplan übernommen.')
             ->with('speiseplan_ergebnis', $ergebnis);
+    }
+
+    /**
+     * Fleischarten (Symbole) aus der Menü&Serve-Historie nachtragen – nur bei Gerichten
+     * ohne Angabe oder mit dem allgemeinen „Fleisch" (vom Nachtrag aus „nicht geeignet für").
+     */
+    public function symbole(Request $request)
+    {
+        $this->authorize($request);
+
+        $gerichte = Dish::with('allergens')->orderBy('name')->get();
+        try {
+            $arten = (new MenueServeGerichte)->fleischartJeGericht($gerichte);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->withErrors(['symbole' => 'Menü&Serve ist nicht lesbar: '.$e->getMessage()]);
+        }
+
+        $gesetzt = [];
+        $behalten = 0;
+        foreach ($gerichte->whereIn('id', array_keys($arten)) as $dish) {
+            if ($dish->fleischart !== null && $dish->fleischart !== 'fleisch') {
+                $behalten++;
+
+                continue;
+            }
+            $dish->update(['fleischart' => $arten[$dish->id]]);
+            $gesetzt[] = ['name' => $dish->name, 'symbol' => $dish->symbol()];
+        }
+
+        return back()
+            ->with('status', count($gesetzt).' Fleischarten aus Menü&Serve nachgetragen.')
+            ->with('symbole_ergebnis', ['gesetzt' => $gesetzt, 'behalten' => $behalten]);
     }
 
     private function ab(Request $request): Carbon

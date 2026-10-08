@@ -109,16 +109,42 @@ class Dish extends Model
         return $this->belongsToMany(Additive::class, 'kantine_dish_additive', 'dish_id', 'additive_id');
     }
 
+    /** Allergene (Codes), die das Gericht zu Fisch/Meeresfrüchten machen: Krebstiere, Fisch, Weichtiere. */
+    public const ALLERGENE_FISCH = ['B', 'D', 'N'];
+
+    /** Allergene (Codes), die „vegan" ausschließen: Eier, Milch. */
+    public const ALLERGENE_NICHT_VEGAN = ['C', 'G'];
+
+    /**
+     * Die Fleischart, wie sie angezeigt wird – die Allergene haben Vorrang vor der
+     * Angabe: Fisch/Krebstiere/Weichtiere → Fisch (statt keine Angabe, „Fleisch",
+     * vegan oder vegetarisch); Ei oder Milch machen aus „vegan" „vegetarisch".
+     */
+    public function fleischartWirksam(): ?string
+    {
+        $art = $this->fleischart;
+        $codes = $this->allergens->pluck('code')->map(fn ($c) => strtoupper((string) $c))->all();
+
+        if (array_intersect($codes, self::ALLERGENE_FISCH) && in_array($art, [null, 'fleisch', 'vegan', 'vegetarisch'], true)) {
+            return 'fisch';
+        }
+        if ($art === 'vegan' && array_intersect($codes, self::ALLERGENE_NICHT_VEGAN)) {
+            return 'vegetarisch';
+        }
+
+        return $art;
+    }
+
     /** Symbol der Fleischart (🐄, 🥦 …) oder null. */
     public function symbol(): ?string
     {
-        return self::FLEISCHARTEN[$this->fleischart][1] ?? null;
+        return self::FLEISCHARTEN[$this->fleischartWirksam()][1] ?? null;
     }
 
     /** Bezeichnung der Fleischart oder null. */
     public function fleischartName(): ?string
     {
-        return self::FLEISCHARTEN[$this->fleischart][0] ?? null;
+        return self::FLEISCHARTEN[$this->fleischartWirksam()][0] ?? null;
     }
 
     /**

@@ -15,8 +15,32 @@
                            class="mt-1 rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </div>
             </form>
-            <a href="{{ route('module.schulkantine.dishes.index') }}" class="text-sm text-gray-500 hover:text-gray-700">← zurück zu den Gerichten</a>
+            <div class="flex items-center gap-4">
+                @darfRoute('module.schulkantine.dishes.menueserve.symbole')
+                    <form method="POST" action="{{ route('module.schulkantine.dishes.menueserve.symbole') }}"
+                          onsubmit="return confirm('Fleischarten aus allen bisherigen Menü&Serve-Menüs nachtragen? Gerichte mit eigener Fleischart bleiben unverändert.')">
+                        @csrf
+                        <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                title="Fleischart (Symbol) aus der Menü&amp;Serve-Historie nachtragen – nur bei Gerichten ohne Angabe oder mit „Fleisch“">🐄🥦 Fleischarten nachholen</button>
+                    </form>
+                @enddarfRoute
+                <a href="{{ route('module.schulkantine.dishes.index') }}" class="text-sm text-gray-500 hover:text-gray-700">← zurück zu den Gerichten</a>
+            </div>
         </div>
+
+        @if (session('symbole_ergebnis'))
+            @php $se = session('symbole_ergebnis'); @endphp
+            <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm">
+                <div class="font-semibold text-gray-700">Fleischarten aus Menü&amp;Serve: {{ count($se['gesetzt']) }} nachgetragen, {{ $se['behalten'] }} mit eigener Angabe behalten.</div>
+                @if ($se['gesetzt'])
+                    <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-gray-600">
+                        @foreach ($se['gesetzt'] as $g)
+                            <span>{{ $g['symbol'] }} {{ $g['name'] }}</span>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        @endif
 
         <p class="text-sm text-gray-500">
             Je Menü&amp;Serve-Menü: welche Hauptspeise und welche Nachspeise aus unseren Gerichten ist es?
