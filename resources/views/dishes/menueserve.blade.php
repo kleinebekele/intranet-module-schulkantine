@@ -31,6 +31,21 @@
             <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ $errors->first() }}</div>
         @endif
 
+        @if (session('speiseplan_ergebnis'))
+            <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                <div class="border-b border-gray-100 px-4 py-2 text-sm font-semibold text-gray-700">Übernahme in den Speiseplan</div>
+                <ul class="divide-y divide-gray-100 text-sm">
+                    @foreach (session('speiseplan_ergebnis') as $e)
+                        <li class="flex flex-wrap gap-x-3 px-4 py-1.5">
+                            <span class="w-24 text-gray-500">{{ $e['datum'] }}</span>
+                            <span class="w-40 font-medium text-gray-900">{{ $e['titel'] }}</span>
+                            <span class="{{ $e['ok'] ? 'text-green-700' : 'text-amber-700' }}">{{ $e['ok'] ? '✓' : '⚠️' }} {{ $e['text'] }}</span>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
         @if ($menues)
             <form method="POST" action="{{ route('module.schulkantine.dishes.menueserve.save') }}" class="space-y-4">
                 @csrf
@@ -87,8 +102,11 @@
                     </div>
                 </div>
 
-                <div class="flex justify-end">
-                    <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Zuordnung speichern</button>
+                <div class="flex flex-wrap justify-end gap-2">
+                    <button type="submit" name="aktion" value="speichern" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Zuordnung speichern</button>
+                    <button type="submit" name="aktion" value="speiseplan"
+                            onclick="return confirm('Zuordnung speichern und alle Menüs in den Speiseplan eintragen? Die Plätze für Haupt- und Nachspeise werden dort überschrieben.')"
+                            class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Speichern und in den Speiseplan übernehmen</button>
                 </div>
             </form>
         @elseif (! $fehler)

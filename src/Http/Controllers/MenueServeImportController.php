@@ -6,8 +6,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Intranet\Modules\Schulkantine\Models\Dish;
+use Intranet\Modules\Schulkantine\Models\Season;
 use Intranet\Modules\Schulkantine\Support\Access;
 use Intranet\Modules\Schulkantine\Support\MenueServeGerichte;
+use Intranet\Modules\Schulkantine\Support\MenueServeSpeiseplan;
 
 /**
  * Menü&Serve-Menüs unseren Gerichten zuordnen: je Menü (Tag + Menülinie) eine
@@ -16,6 +18,9 @@ use Intranet\Modules\Schulkantine\Support\MenueServeGerichte;
  */
 class MenueServeImportController
 {
+    /** Erster Tag, an dem die Intranet-Kantine Menü&Serve ablöst. */
+    private const START = '2026-10-12';
+
     public function index(Request $request)
     {
         $this->authorize($request);
@@ -83,15 +88,37 @@ class MenueServeImportController
             $gespeichert++;
         }
 
-        return redirect()->route('module.schulkantine.dishes.menueserve', ['ab' => $ab->format('Y-m-d')])
-            ->with('status', "Zuordnung für {$gespeichert} Menüs gespeichert.");
+        $zurueck = redirect()->route('module.schulkantine.dishes.menueserve', ['ab' => $ab->format('Y-m-d')]);
+        if ($request->input('aktion') !== 'speiseplan') {
+            return $zurueck->with('status', "Zuordnung für {$gespeichert} Menüs gespeichert.");
+        }
+
+        // Zusätzlich in den Speiseplan der aktiven Saison eintragen.
+        $season = Season::where('is_active', true)->first();
+        if (! $season) {
+            return $zurueck->withErrors(['speiseplan' => 'Es ist keine Saison aktiv.']);
+        }
+        $zuordnungen = DB::table('kantine_menueserve_zuordnungen')
+            ->whereIn('ms_id', $menues->keys())->orderBy('datum')->get()
+            ->each(fn ($z) => $z->linie = $menues->get($z->ms_id)['linie'] ?? null);
+        $ergebnis = (new MenueServeSpeiseplan)->uebernehmen($season, $zuordnungen);
+        $ok = count(array_filter($ergebnis, fn ($e) => $e['ok']));
+
+        return $zurueck
+            ->with('status', "Zuordnung gespeichert, {$ok} von ".count($ergebnis).' Menüs in den Speiseplan übernommen.')
+            ->with('speiseplan_ergebnis', $ergebnis);
     }
 
     private function ab(Request $request): Carbon
     {
         $wert = (string) $request->input('ab', '');
 
-        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $wert) ? Carbon::parse($wert)->startOfDay() : Carbon::today();
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $wert)) {
+            return Carbon::parse($wert)->startOfDay();
+        }
+
+        // Standard: ab dem Start der Intranet-Kantine, danach ab heute.
+        return Carbon::today()->max(Carbon::parse(self::START));
     }
 
     private function authorize(Request $request): void
