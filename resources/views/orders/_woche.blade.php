@@ -16,6 +16,11 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
         ? "relative ml-1.5 -my-1.5 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full align-middle after:absolute after:-inset-1.5 after:content-['']"
         : "relative ml-1 inline-flex translate-y-px cursor-pointer align-middle after:absolute after:-inset-2.5 after:content-['']";
     $infoIcon = $terminal ? 'h-5 w-5' : 'h-3.5 w-3.5';
+    // Klassen: normal (Essen bestellen) oder groß (Terminal, Touch).
+    $t = fn (string $normal, string $gross) => $terminal ? $gross : $normal;
+    // Fleischart-Symbole eines Menüs (aus seinen Gerichten, ohne Doppelte).
+    $menuSymbole = fn ($md) => $md->slots->map(fn ($s) => $s->dish?->symbol())->filter()->unique()->join(' ');
+    $menuArten = fn ($md) => $md->slots->map(fn ($s) => $s->dish?->fleischartName())->filter()->unique()->join(', ');
     $money = fn ($v) => number_format((float) $v, 2, ',', '.').' €';
 @endphp
 
@@ -43,17 +48,17 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             <div>
                 @if ($canPrev)
                     <a href="{{ route($routen['woche'], ['week' => $prevWeek]) }}"
-                       class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">‹<span class="hidden sm:inline"> Vorige Woche</span></a>
+                       class="inline-flex items-center gap-1 border border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 {{ $t('rounded-lg px-3 py-2 text-sm', 'rounded-xl px-6 py-4 text-lg shadow-sm') }}">‹<span class="hidden sm:inline"> Vorige Woche</span></a>
                 @endif
             </div>
             <div class="text-center">
-                <div class="text-sm font-semibold text-gray-800">KW {{ $weekStart->isoWeek() }} · {{ $weekStart->format('d.m.') }} – {{ $weekEnd->format('d.m.Y') }}</div>
-                <div class="text-xs text-gray-400">Saison „{{ $season->name }}"</div>
+                <div class="font-semibold text-gray-800 {{ $t('text-sm', 'text-xl') }}">KW {{ $weekStart->isoWeek() }} · {{ $weekStart->format('d.m.') }} – {{ $weekEnd->format('d.m.Y') }}</div>
+                <div class="text-gray-400 {{ $t('text-xs', 'text-sm') }}">Saison „{{ $season->name }}"</div>
             </div>
             <div>
                 @if ($canNext)
                     <a href="{{ route($routen['woche'], ['week' => $nextWeek]) }}"
-                       class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"><span class="hidden sm:inline">Nächste Woche </span>›</a>
+                       class="inline-flex items-center gap-1 border border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 {{ $t('rounded-lg px-3 py-2 text-sm', 'rounded-xl px-6 py-4 text-lg shadow-sm') }}"><span class="hidden sm:inline">Nächste Woche </span>›</a>
                 @endif
             </div>
         </div>
@@ -203,14 +208,14 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                     @endphp
                                     <div class="flex w-full flex-col overflow-hidden rounded-xl border shadow-sm {{ $col }}">
                                         {{-- Tages-Kopf --}}
-                                        <div class="border-b px-3 py-2 {{ $head }}">
+                                        <div class="border-b {{ $t('px-3 py-2', 'px-4 py-3') }} {{ $head }}">
                                             <div class="flex items-center justify-between">
                                                 <div>
-                                                    <div class="text-sm font-semibold {{ $day['open'] ? 'text-gray-800' : 'text-amber-800' }}">{{ $day['date']->isoFormat('dddd') }}</div>
-                                                    <div class="text-xs {{ $day['open'] ? 'text-gray-400' : 'text-amber-500' }}">{{ $day['date']->format('d.m.Y') }}</div>
+                                                    <div class="font-semibold {{ $t('text-sm', 'text-xl') }} {{ $day['open'] ? 'text-gray-800' : 'text-amber-800' }}">{{ $day['date']->isoFormat('dddd') }}</div>
+                                                    <div class="{{ $t('text-xs', 'text-base') }} {{ $day['open'] ? 'text-gray-400' : 'text-amber-500' }}">{{ $day['date']->format('d.m.Y') }}</div>
                                                 </div>
                                                 @if ($day['open'] && $hasOrder && ! $isOgs)
-                                                    <span class="rounded-full bg-green-600 px-2 py-0.5 text-xs font-semibold text-white">{{ $money($eaterTotal) }}</span>
+                                                    <span class="rounded-full bg-green-600 px-2 py-0.5 font-semibold text-white {{ $t('text-xs', 'text-base') }}">{{ $money($eaterTotal) }}</span>
                                                 @elseif ($day['open'] && $hasOrder && $isOgs)
                                                     <span class="rounded-full bg-green-600 px-2 py-0.5 text-xs font-semibold text-white">{{ $ogsPrice > 0 ? '✓ '.$money($ogsPrice) : '✓ isst' }}</span>
                                                 @endif
@@ -218,7 +223,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                             @unless ($day['open'])
                                                 <div class="mt-0.5 text-xs text-amber-600" title="{{ $day['reason'] }}">🔒 {{ $day['reason'] }}</div>
                                             @else
-                                                <div class="mt-0.5 text-[11px] {{ $day['canOrder'] ? 'text-gray-400' : 'text-amber-600' }}">
+                                                <div class="mt-0.5 {{ $t('text-[11px]', 'text-sm') }} {{ $day['canOrder'] ? 'text-gray-400' : 'text-amber-600' }}">
                                                     @if ($day['canOrder'] && $day['orderDeadline'])
                                                         Bestellschluss {{ $day['orderDeadline']->isoFormat('dd HH:mm') }}
                                                     @else
@@ -229,7 +234,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                         </div>
 
                                         {{-- Tages-Inhalt --}}
-                                        <div class="flex-1 space-y-2 p-2.5">
+                                        <div class="flex-1 {{ $t('space-y-2 p-2.5', 'space-y-3 p-3') }}">
                                             @if (! $day['open'])
                                                 <p class="py-6 text-center text-xs text-amber-500">geschlossen</p>
                                             @elseif ($isOgs)
@@ -299,9 +304,42 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                         <input type="hidden" name="attend" value="{{ $menuAttend }}">
                                                         <button type="{{ $gast ? 'button' : 'submit' }}" @disabled(! $gast && ! $menuClickable)
                                                                 @if ($gast) x-data @click="$dispatch('open-dish', @js($menuData))" @endif
-                                                                class="w-full rounded-lg border p-2 text-left transition
+                                                                class="w-full text-left transition {{ $t('rounded-lg border p-2', 'flex min-h-[12rem] flex-col rounded-xl border-2 p-4') }}
                                                                        {{ $isMenuOrdered ? 'border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-300' : ($menuWarn ? 'border-red-300' : 'border-emerald-200') }}
                                                                        {{ $gast || $menuClickable ? 'cursor-pointer hover:border-emerald-400' : 'cursor-not-allowed opacity-60' }}">
+                                                            @if ($terminal)
+                                                            <div class="flex items-start justify-between gap-2">
+                                                                <span class="text-xl font-bold text-emerald-800">{{ $md->name }}<span x-data @click.stop.prevent="$dispatch('open-dish', @js($menuData))" role="button" tabindex="0" title="Details anzeigen" aria-label="Details anzeigen" class="{{ $infoKnopf }} bg-emerald-50 text-emerald-600 hover:text-emerald-800"><svg class="inline {{ $infoIcon }}" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg></span></span>
+                                                                <span class="whitespace-nowrap text-xl font-bold {{ $isMenuOrdered ? 'text-emerald-700' : 'text-gray-800' }}">{{ $money($mdPreis) }}</span>
+                                                            </div>
+                                                            <div class="mt-3 space-y-1.5">
+                                                                @foreach ($md->slots as $s)
+                                                                    @if ($s->dish)
+                                                                        <div class="text-lg leading-snug text-gray-800">{{ $s->dish->name }}</div>
+                                                                    @endif
+                                                                @endforeach
+                                                            </div>
+                                                            <div class="mt-auto flex items-end justify-between gap-2 pt-3">
+                                                                <div>
+                                                                    @if ($menuWarn)
+                                                                        <span class="inline-flex items-center gap-1 rounded-md bg-red-600 px-2 py-1 text-sm font-bold text-white">⚠️ Nicht geeignet</span>
+                                                                    @endif
+                                                                </div>
+                                                                <span class="text-4xl leading-none" title="{{ $menuArten($md) }}">{{ $menuSymbole($md) }}</span>
+                                                            </div>
+                                                            @unless ($gast)
+                                                                <div class="mt-3 rounded-lg py-3 text-center text-lg font-semibold
+                                                                            {{ $isMenuOrdered ? 'bg-emerald-600 text-white' : ($menuClickable ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-500') }}">
+                                                                    @if ($isMenuOrdered)
+                                                                        ✓ Bestellt{{ $menuClickable ? ' – antippen zum Abbestellen' : '' }}
+                                                                    @elseif ($menuClickable)
+                                                                        Bestellen
+                                                                    @else
+                                                                        Bestellfrist abgelaufen
+                                                                    @endif
+                                                                </div>
+                                                            @endunless
+                                                            @else
                                                             <div class="flex items-center justify-between gap-2">
                                                                 <span class="text-sm font-semibold text-emerald-800">🍽 {{ $md->name }}<span x-data @click.stop.prevent="$dispatch('open-dish', @js($menuData))" role="button" tabindex="0" title="Details anzeigen" aria-label="Details anzeigen" class="{{ $infoKnopf }} text-emerald-600 hover:text-emerald-800 {{ $terminal ? 'bg-emerald-50' : '' }}"><svg class="inline {{ $infoIcon }}" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg></span></span>
                                                                 <span class="flex items-center gap-1 text-xs font-bold {{ $isMenuOrdered ? 'text-emerald-700' : 'text-gray-700' }}">
@@ -311,9 +349,10 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                     {{ $money($mdPreis) }}
                                                                 </span>
                                                             </div>
-                                                            <div class="mt-0.5 text-[11px] text-gray-500">{{ $md->slots->map(fn ($s) => $s->dish?->name)->filter()->join(' + ') }}</div>
+                                                            <div class="mt-0.5 text-[11px] text-gray-500">{{ $md->slots->map(fn ($s) => $s->dish?->name)->filter()->join(' + ') }}<span class="ml-1 text-sm" title="{{ $menuArten($md) }}">{{ $menuSymbole($md) }}</span></div>
                                                             @if ($menuWarn)
                                                                 <div class="mt-1 inline-flex items-center gap-1 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white">⚠️ Nicht geeignet</div>
+                                                            @endif
                                                             @endif
                                                         </button>
                                                     </form>
@@ -340,11 +379,11 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                     @endphp
                                                     <fieldset class="rounded-lg border px-2 pb-2 pt-1 {{ $catColor ? '' : 'border-gray-200' }}"
                                                               @if ($catColor) style="border-color: {{ $catColor }}; background-color: {{ $catColor }}14;" @endif>
-                                                        <legend class="px-1 text-[11px] font-medium uppercase tracking-wide {{ $catColor ? '' : 'text-gray-400' }}"
+                                                        <legend class="px-1 font-medium uppercase tracking-wide {{ $t('text-[11px]', 'text-sm') }} {{ $catColor ? '' : 'text-gray-400' }}"
                                                                 @if ($catColor) style="color: {{ $catColor }};" @endif>{{ $catName }}</legend>
 
                                                         {{-- Handy: 2 Gerichte nebeneinander (vertikale Karten) · ab lg: 1-spaltig (schmale Tagesspalte) --}}
-                                                        <div class="grid grid-cols-2 gap-2 lg:grid-cols-1 lg:gap-1.5">
+                                                        <div class="{{ $t('grid grid-cols-2 gap-2 lg:grid-cols-1 lg:gap-1.5', 'grid grid-cols-1 gap-2') }}">
                                                             @foreach ($catItems as $m)
                                                                 @php
                                                                     // Gericht, dessen Kategorie für dieses Kind gesperrt ist,
@@ -400,7 +439,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                     <input type="hidden" name="dish_id" value="{{ $postDish }}">
                                                                     <button type="{{ $gast ? 'button' : 'submit' }}" @disabled(! $gast && ! $clickable) style="{{ $selStyle }}"
                                                                             @if ($gast) x-data @click="$dispatch('open-dish', @js($dishData))" @endif
-                                                                            class="group relative w-full overflow-hidden rounded-lg border text-left transition
+                                                                            class="group relative w-full overflow-hidden text-left transition {{ $t('rounded-lg border', 'rounded-xl border-2') }}
                                                                                    {{ $isSel ? ($catColor ? '' : 'border-green-500 ring-2 ring-green-300') : ($warn ? 'border-red-300' : 'border-gray-200') }}
                                                                                    {{ $gast || $clickable ? 'hover:border-indigo-400 cursor-pointer' : 'opacity-60 cursor-not-allowed' }}">
                                                                         @if ($isSel)
@@ -408,16 +447,16 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                                  der Rahmen jetzt die Kategoriefarbe trägt. --}}
                                                                             <span class="absolute inset-y-0 left-0 z-10 w-1 bg-green-500" aria-hidden="true"></span>
                                                                         @endif
-                                                                        <div class="flex flex-col lg:flex-row lg:items-stretch">
+                                                                        <div class="{{ $t('flex flex-col lg:flex-row lg:items-stretch', 'flex flex-row items-stretch') }}">
                                                                             @if ($m->dish->photoUrl())
-                                                                                <img src="{{ $m->dish->photoUrl() }}" alt="" class="h-20 w-full flex-none object-cover lg:h-14 lg:w-14">
+                                                                                <img src="{{ $m->dish->photoUrl() }}" alt="" class="flex-none object-cover {{ $t('h-20 w-full lg:h-14 lg:w-14', 'h-24 w-24') }}">
                                                                             @else
-                                                                                <div class="flex h-20 w-full flex-none items-center justify-center bg-gray-100 text-gray-300 lg:h-14 lg:w-14"><x-module-icon name="restaurant" class="text-lg" /></div>
+                                                                                <div class="flex flex-none items-center justify-center bg-gray-100 text-gray-300 {{ $t('h-20 w-full lg:h-14 lg:w-14', 'h-24 w-24') }}"><x-module-icon name="restaurant" class="{{ $t('text-lg', 'text-3xl') }}" /></div>
                                                                             @endif
-                                                                            <div class="min-w-0 flex-1 p-1.5 lg:py-1 lg:pl-2 lg:pr-1">
-                                                                                <div class="flex items-start justify-between gap-1">
-                                                                                    <span class="text-xs font-semibold text-gray-800">{{ $m->dish->name }}<span x-data @click.stop.prevent="$dispatch('open-dish', @js($dishData))" role="button" tabindex="0" title="Details anzeigen" aria-label="Details anzeigen" class="{{ $infoKnopf }} text-indigo-500 hover:text-indigo-700 {{ $terminal ? 'bg-indigo-50' : '' }}"><svg class="inline {{ $infoIcon }}" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg></span></span>
-                                                                                    <span class="flex flex-none items-center gap-1 text-xs font-bold {{ $isSel ? 'text-green-700' : 'text-gray-700' }}">
+                                                                            <div class="min-w-0 flex-1 {{ $t('p-1.5 lg:py-1 lg:pl-2 lg:pr-1', 'p-3') }}">
+                                                                                <div class="{{ $t('flex items-start justify-between gap-1', 'flex flex-col gap-1') }}">
+                                                                                    <span class="font-semibold text-gray-800 {{ $t('text-xs', 'text-lg leading-snug') }}">@if ($m->dish->symbol())<span class="mr-1 {{ $t('', 'text-2xl') }}" title="{{ $m->dish->fleischartName() }}">{{ $m->dish->symbol() }}</span>@endif{{ $m->dish->name }}<span x-data @click.stop.prevent="$dispatch('open-dish', @js($dishData))" role="button" tabindex="0" title="Details anzeigen" aria-label="Details anzeigen" class="{{ $infoKnopf }} text-indigo-500 hover:text-indigo-700 {{ $terminal ? 'bg-indigo-50' : '' }}"><svg class="inline {{ $infoIcon }}" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg></span></span>
+                                                                                    <span class="flex flex-none items-center gap-1 font-bold {{ $t('text-xs', 'text-lg') }} {{ $isSel ? 'text-green-700' : 'text-gray-700' }}">
                                                                                         @if ($isSel)
                                                                                             <span class="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] font-bold text-white">✓</span>
                                                                                         @endif
@@ -429,13 +468,13 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                                     $effAdditives = $m->dish->additives;
                                                                                 @endphp
                                                                                 @if (($season->show_allergens ?? true) && $effAllergens->isNotEmpty())
-                                                                                    <div class="mt-0.5 truncate text-[10px] {{ $warn ? 'text-red-500 font-medium' : 'text-gray-400' }}"
+                                                                                    <div class="mt-0.5 truncate {{ $t('text-[10px]', 'text-sm') }} {{ $warn ? 'text-red-500 font-medium' : 'text-gray-400' }}"
                                                                                          title="Allergene: {{ $effAllergens->map(fn ($a) => $a->code.' '.$a->name)->join(', ') }}">
                                                                                         Allergene: {{ $effAllergens->pluck('code')->join(', ') }}
                                                                                     </div>
                                                                                 @endif
                                                                                 @if (($season->show_additives ?? true) && $effAdditives->isNotEmpty())
-                                                                                    <div class="truncate text-[10px] text-gray-400"
+                                                                                    <div class="truncate text-gray-400 {{ $t('text-[10px]', 'text-sm') }}"
                                                                                          title="Zusatzstoffe: {{ $effAdditives->map(fn ($a) => $a->code.' '.$a->name)->join(', ') }}">
                                                                                         Zusatzstoffe: {{ $effAdditives->pluck('code')->join(', ') }}
                                                                                     </div>
@@ -445,8 +484,20 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                                 @endif
                                                                             </div>
                                                                         </div>
-                                                                    </button>
-                                                                </form>
+                                                                        @if ($terminal && ! $gast)
+                                                                            <div class="border-t py-2.5 text-center text-base font-semibold
+                                                                                        {{ $isSel ? 'border-green-600 bg-green-600 text-white' : ($clickable ? 'border-indigo-100 bg-indigo-50 text-indigo-800' : 'border-gray-100 bg-gray-100 text-gray-500') }}">
+                                                                                @if ($isSel)
+                                                                                    ✓ Bestellt{{ $clickable ? ' – antippen zum Abbestellen' : '' }}
+                                                                                @elseif ($clickable)
+                                                                                    Bestellen
+                                                                                @else
+                                                                                    Bestellfrist abgelaufen
+                                                                                @endif
+                                                                            </div>
+                                                                        @endif
+                                                                        </button>
+                                                                        </form>
                                                             @endforeach
                                                         </div>
                                                     </fieldset>

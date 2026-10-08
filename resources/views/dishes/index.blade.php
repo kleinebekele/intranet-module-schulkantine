@@ -153,6 +153,9 @@
                                         @endif
                                     </td>
                                     <td class="px-3 py-2 font-medium text-gray-800">
+                                        @if ($dish->symbol())
+                                            <span class="mr-1" title="{{ $dish->fleischartName() }}">{{ $dish->symbol() }}</span>
+                                        @endif
                                         @if ($kannBearbeiten)
                                         <a href="{{ route('module.schulkantine.dishes.edit', ['dish' => $dish] + request()->only(['search', 'category', 'status', 'sort'])) }}"
                                            class="text-gray-800 hover:text-indigo-700 hover:underline">{{ $dish->name }}</a>

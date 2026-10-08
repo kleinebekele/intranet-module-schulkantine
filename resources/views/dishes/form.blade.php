@@ -74,6 +74,25 @@
                 <x-input-error :messages="$errors->get('description')" class="mt-2" />
             </div>
 
+            {{-- Fleischart: Symbol im Speiseplan und am Bestell-Terminal --}}
+            <div>
+                <x-input-label value="Fleischart (Symbol im Speiseplan)" />
+                @php $selArt = old('fleischart', $dish->fleischart); @endphp
+                <div class="mt-2 flex flex-wrap gap-2">
+                    <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
+                        <input type="radio" name="fleischart" value="" @checked(! $selArt) class="sr-only">
+                        keine Angabe
+                    </label>
+                    @foreach (\Intranet\Modules\Schulkantine\Models\Dish::FLEISCHARTEN as $key => [$label, $symbol])
+                        <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
+                            <input type="radio" name="fleischart" value="{{ $key }}" @checked($selArt === $key) class="sr-only">
+                            <span class="text-lg leading-none">{{ $symbol }}</span> {{ $label }}
+                        </label>
+                    @endforeach
+                </div>
+                <x-input-error :messages="$errors->get('fleischart')" class="mt-2" />
+            </div>
+
             {{-- Foto --}}
             @if ($dish->exists)
             {{-- Bestehendes Gericht: Foto wird sofort bei Auswahl per Ajax gespeichert,

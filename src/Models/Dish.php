@@ -16,10 +16,27 @@ class Dish extends Model
 {
     protected $table = 'kantine_dishes';
 
+    /**
+     * Fleischart → [Bezeichnung, Symbol] – das Symbol steht im Speiseplan, wie früher
+     * am Menü&Serve-Terminal. Leer = keine Angabe (kein Symbol).
+     */
+    public const FLEISCHARTEN = [
+        'vegan' => ['Vegan', '🌱'],
+        'vegetarisch' => ['Vegetarisch', '🥦'],
+        'fisch' => ['Fisch', '🐟'],
+        'gefluegel' => ['Geflügel', '🐔'],
+        'rind' => ['Rind', '🐄'],
+        'schwein' => ['Schwein', '🐖'],
+        'rind_schwein' => ['Rind/Schwein', '🐄🐖'],
+        'lamm' => ['Lamm', '🐑'],
+        'fleisch' => ['Fleisch', '🍖'],
+    ];
+
     protected $fillable = [
         'category_id',
         'name',
         'description',
+        'fleischart',
         'photo_path',
         'price',
         'contract_prices',
@@ -90,6 +107,18 @@ class Dish extends Model
     public function additives(): BelongsToMany
     {
         return $this->belongsToMany(Additive::class, 'kantine_dish_additive', 'dish_id', 'additive_id');
+    }
+
+    /** Symbol der Fleischart (🐄, 🥦 …) oder null. */
+    public function symbol(): ?string
+    {
+        return self::FLEISCHARTEN[$this->fleischart][1] ?? null;
+    }
+
+    /** Bezeichnung der Fleischart oder null. */
+    public function fleischartName(): ?string
+    {
+        return self::FLEISCHARTEN[$this->fleischart][0] ?? null;
     }
 
     /**
