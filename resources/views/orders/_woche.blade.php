@@ -90,23 +90,6 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                         $isOgs = $mode === \Intranet\Modules\Schulkantine\Models\CustomerGroup::MODE_JA_NEIN;
                         $isSubscribed = $subscribed->has($eater->id);
                         $hasSonderkost = ! empty($e['allergenIds']) || ! empty($e['dietIds']);
-                        // Terminal: nur Tage, an denen man noch etwas tun kann – bestellen, oder
-                        // (die Abbestell-Frist läuft länger) etwas Bestelltes wieder abbestellen.
-                        $machbar = function (array $day) use ($eater, $isOgs, $isSubscribed, $e, $selected, $orderedMenus, $ogsOrdered, $ogsCancelled) {
-                            if (! $day['open']) {
-                                return false;
-                            }
-                            if ($day['canOrder']) {
-                                return true;
-                            }
-                            $d = $day['date']->toDateString();
-                            $bestellt = $isOgs
-                                ? (isset($ogsOrdered[$eater->id][$d]) || (! isset($ogsCancelled[$eater->id][$d])
-                                    && $isSubscribed && in_array($day['date']->dayOfWeekIso, $e['aboWeekdays'])))
-                                : (! empty($selected[$eater->id][$d] ?? []) || ! empty($orderedMenus[$eater->id][$d] ?? []));
-
-                            return $day['canCancel'] && $bestellt;
-                        };
                     @endphp
 
                     <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
@@ -192,12 +175,8 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                  (kein horizontaler Scroll). Das min() verhindert Überlauf, wenn der Platz
                                  schmaler als die Mindestbreite ist – dann bleibt eine Spalte übrig.
                                  Grauer Canvas + Schatten je Karte, damit die Tage klar getrennt sind. --}}
-                            @if ($terminal && collect($days)->filter($machbar)->isEmpty())
-                                <div class="bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">In dieser Woche lässt sich nichts mehr bestellen oder abbestellen – bitte weiterblättern.</div>
-                            @else
                             <div class="grid grid-cols-[repeat(auto-fit,minmax(min(15.5rem,100%),1fr))] gap-3 bg-gray-50 p-3 sm:p-4 sm:gap-4">
                                 @foreach ($days as $day)
-                                    @continue($terminal && ! $machbar($day))
                                     @php
                                         $dateStr = $day['date']->toDateString();
                                         $items = collect($plan[$dateStr] ?? []);
@@ -477,7 +456,6 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                     </div>
                                 @endforeach
                             </div>
-                            @endif
 
                             @if ($hasSonderkost && (($season->show_allergens ?? true) || ($season->show_diets ?? true)))
                                 <div class="border-t border-gray-100 px-4 py-2 text-[11px] text-gray-500">
