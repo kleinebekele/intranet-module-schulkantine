@@ -42,6 +42,14 @@ class MenueServeSpeiseplan
 
                 continue;
             }
+            // Plätze im Menü gibt es nur je Kategorie – ein Gericht ohne Kategorie passt nirgends hin.
+            $ohneKategorie = collect([$haupt, $nach])->filter(fn ($d) => $d && ! $d->category_id);
+            if ($ohneKategorie->isNotEmpty()) {
+                $ergebnis[] = $zeile(false, $ohneKategorie->map(fn ($d) => '„'.$d->name.'"')->implode(' und ')
+                    .($ohneKategorie->count() > 1 ? ' haben' : ' hat').' keine Kategorie – unter Gerichte eintragen, dann erneut übernehmen');
+
+                continue;
+            }
             if ($tag->lt(Carbon::today()) || ! $season->isOpenOn($tag)) {
                 $ergebnis[] = $zeile(false, 'kein Kantinentag der aktiven Saison (oder vorbei)');
 
@@ -69,7 +77,7 @@ class MenueServeSpeiseplan
             }
             if ($passend->count() !== 1) {
                 $ergebnis[] = $zeile(false, $passend->isEmpty()
-                    ? ($menues->isEmpty() ? 'kein Menü an diesem Tag (Menü-Vorlagen prüfen)' : 'kein Menü mit Plätzen für '.$this->kategorien($haupt, $nach))
+                    ? ($menues->isEmpty() ? 'kein Menü an diesem Tag (Menü-Vorlagen prüfen)' : 'kein Menü an diesem Tag hat Plätze für '.$this->kategorien($haupt, $nach).' (Menü-Vorlagen prüfen)')
                     : 'mehrere Menüs passen ('.$passend->pluck('name')->implode(', ').') – bitte im Speiseplan von Hand');
 
                 continue;
