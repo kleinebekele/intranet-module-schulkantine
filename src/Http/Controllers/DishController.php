@@ -198,8 +198,8 @@ class DishController
             'allergens.*' => ['integer', 'exists:kantine_allergens,id'],
             'additives' => ['array'],
             'additives.*' => ['integer', 'exists:kantine_additives,id'],
-            'diets' => ['array'],
-            'diets.*' => ['integer', 'exists:kantine_diets,id'],
+            'geeignet' => ['array'],
+            'geeignet.*' => ['integer', 'exists:kantine_diets,id'],
         ]);
 
         return [
@@ -265,7 +265,9 @@ class DishController
     {
         $dish->allergens()->sync($request->input('allergens', []));
         $dish->additives()->sync($request->input('additives', []));
-        $dish->unsuitableDiets()->sync($request->input('diets', []));
+        // Diäten: angekreuzt wird, wofür es geeignet IST; was aus Fleischart und
+        // Allergenen folgt, setzt das Gericht selbst.
+        $dish->dietenSetzen($request->input('geeignet', []));
     }
 
     /**

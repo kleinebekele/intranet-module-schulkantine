@@ -8,7 +8,6 @@
     @php
         $selAllergens = old('allergens', $dish->exists ? $dish->allergens->pluck('id')->all() : []);
         $selAdditives = old('additives', $dish->exists ? $dish->additives->pluck('id')->all() : []);
-        $selDiets = old('diets', $dish->exists ? $dish->unsuitableDiets->pluck('id')->all() : []);
     @endphp
 
     <div class="max-w-2xl space-y-6">
@@ -174,23 +173,94 @@
                 </div>
             </div>
 
-            {{-- Diäten: NICHT geeignet für (nur Ausnahmen ankreuzen) --}}
-            <div>
-                <x-input-label value="NICHT geeignet für (Diäten)" />
+            {{-- Diäten: angekreuzt wird, wofür das Gericht geeignet IST. Was aus Fleischart und
+                 Allergenen folgt, ist gesperrt (mit Grund) – dieselben Regeln wie Dish::dietRegeln(),
+                 hier live nachgerechnet; verbindlich setzt sie der Server beim Speichern. --}}
+            @php
+                $geeignetAlt = old('geeignet', $dish->exists
+                    ? $diets->pluck('id')->diff($dish->unsuitableDiets->pluck('id'))->values()->all()
+                    : []);
+            @endphp
+            <div x-data="dishDiaeten({
+                    diaeten: @js($diets->map(fn ($d) => ['id' => $d->id, 'name' => $d->name])->values()),
+                    allergene: @js($allergens->mapWithKeys(fn ($a) => [$a->id => ['code' => strtoupper($a->code), 'name' => $a->name]])),
+                    arten: @js(collect(\Intranet\Modules\Schulkantine\Models\Dish::FLEISCHARTEN)->map(fn ($a) => $a[0])),
+                    geeignet: @js(array_map('intval', $geeignetAlt)),
+                 })">
+                <x-input-label value="Geeignet für (Diäten)" />
                 <p class="mt-0.5 text-xs text-gray-400">
-                    Standard: für alles geeignet. Nur ankreuzen, wofür das Gericht <strong>nicht</strong> geeignet ist
-                    (z. B. ein Fleischgericht → „vegetarisch" &amp; „vegan"). Esser mit dieser Diät bekommen dann eine Warnung.
+                    Ankreuzen, wofür das Gericht geeignet ist. Nicht angekreuzt = nicht geeignet: Esser mit dieser Diät bekommen eine Warnung.
+                    Was aus Fleischart und Allergenen folgt, ist vorgegeben (grau, mit Grund).
                 </p>
-                <div class="mt-2 flex flex-wrap gap-x-4 gap-y-2">
-                    @foreach ($diets as $diet)
-                        <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                            <input type="checkbox" name="diets[]" value="{{ $diet->id }}" @checked(in_array($diet->id, $selDiets))
-                                   class="rounded border-gray-300 text-red-600 focus:ring-red-500">
-                            {{ $diet->name }}
+                <div class="mt-2 flex flex-wrap gap-x-5 gap-y-2">
+                    <template x-for="d in diaeten" :key="d.id">
+                        <label class="inline-flex items-center gap-2 text-sm" :class="regel(d) ? 'text-gray-400' : 'text-gray-700'">
+                            <input type="checkbox" name="geeignet[]" :value="d.id"
+                                   :checked="regel(d) ? regel(d)[0] : geeignet.includes(d.id)"
+                                   :disabled="!! regel(d)"
+                                   @change="umschalten(d.id, $event.target.checked)"
+                                   class="rounded border-gray-300 text-green-600 focus:ring-green-500 disabled:opacity-60">
+                            <span x-text="d.name"></span>
+                            <span x-show="regel(d)" class="text-xs" x-text="regel(d) ? '(' + (regel(d)[0] ? '' : 'nicht – ') + regel(d)[1] + ')' : ''"></span>
                         </label>
-                    @endforeach
+                    </template>
                 </div>
             </div>
+            @once
+                <script>
+                    document.addEventListener('alpine:init', () => {
+                        Alpine.data('dishDiaeten', (cfg) => ({
+                            ...cfg,
+                            art: null,
+                            codes: {},   // Code → Name der angekreuzten Allergene
+                            init() {
+                                const form = this.$root.closest('form');
+                                const lesen = () => {
+                                    const r = form.querySelector('input[name=fleischart]:checked');
+                                    this.art = r && r.value ? r.value : null;
+                                    const c = {};
+                                    form.querySelectorAll('input[name="allergens[]"]:checked').forEach(i => {
+                                        const a = this.allergene[i.value];
+                                        if (a) c[a.code] = a.name;
+                                    });
+                                    this.codes = c;
+                                };
+                                form.addEventListener('change', lesen);
+                                lesen();
+                            },
+                            umschalten(id, an) {
+                                this.geeignet = an ? [...new Set([...this.geeignet, id])] : this.geeignet.filter(x => x !== id);
+                            },
+                            namen(wahl) { return wahl.filter(c => this.codes[c]).map(c => this.codes[c]).join(', '); },
+                            // Spiegel von Dish::artWirksam() und Dish::dietRegeln().
+                            wirksam() {
+                                const k = Object.keys(this.codes), a = this.art;
+                                if (['B', 'D', 'N'].some(c => k.includes(c)) && [null, 'fleisch', 'vegan', 'vegetarisch'].includes(a)) return 'fisch';
+                                if (a === 'vegan' && ['C', 'G'].some(c => k.includes(c))) return 'vegetarisch';
+                                return a;
+                            },
+                            get regeln() {
+                                const art = this.wirksam(), name = this.arten[art] || '';
+                                const tier = ['fisch', 'gefluegel', 'rind', 'schwein', 'rind_schwein', 'lamm', 'fleisch'].includes(art);
+                                const schwein = ['schwein', 'rind_schwein'].includes(art);
+                                const nichtVegan = this.namen(['C', 'G']);
+                                const r = {};
+                                if (tier) { r.vegetarisch = [false, name]; r.vegan = [false, name]; }
+                                else if (['vegan', 'vegetarisch'].includes(art)) {
+                                    r.vegetarisch = [true, name];
+                                    r.vegan = nichtVegan ? [false, nichtVegan] : [art === 'vegan', name];
+                                } else if (nichtVegan) { r.vegan = [false, nichtVegan]; }
+                                if (schwein) { r.halal = [false, name]; r.schweinefleischfrei = [false, name]; }
+                                else if (art !== null && art !== 'fleisch') { r.schweinefleischfrei = [true, name]; }
+                                if (this.codes.A) r.glutenfrei = [false, this.codes.A];
+                                if (this.codes.G) r.laktosefrei = [false, this.codes.G];
+                                return r;
+                            },
+                            regel(d) { return this.regeln[d.name.toLowerCase()] || null; },
+                        }));
+                    });
+                </script>
+            @endonce
 
             <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                 <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $dish->is_active))

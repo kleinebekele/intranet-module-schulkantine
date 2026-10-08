@@ -40,6 +40,11 @@ Drei verschiedene Angaben, die oft verwechselt werden:
 Ein fehlender Haken bei „vegetarisch" bedeutet für das System: nicht geeignet. Es wird dann
 gewarnt, auch wenn das Gericht in Wahrheit vegetarisch war.
 
+Vieles ergibt sich von selbst und ist im Formular grau vorgegeben, mit Grund: Die
+**Fleischart** (🐖 Schwein → nicht vegetarisch, nicht vegan, nicht halal) und die
+**Allergene** (Milch → nicht vegan, nicht laktosefrei; Gluten → nicht glutenfrei; Fisch → 🐟).
+Anhaken müssen Sie nur, was sich daraus nicht ablesen lässt – etwa „halal" bei Geflügel.
+
 ## Foto
 
 rollen: admin
