@@ -28,7 +28,7 @@ class MenueServeImportController
         $ab = $this->ab($request);
 
         try {
-            $menues = (new MenueServeGerichte)->menuesAb($ab);
+            $menues = (new MenueServeGerichte)->menuesAb($ab, true);
             $fehler = null;
         } catch (\Throwable $e) {
             report($e);
@@ -43,8 +43,14 @@ class MenueServeImportController
         foreach ($menues as &$m) {
             $z = $gemerkt->get($m['ms_id']);
             $m['gemerkt'] = $z !== null;
-            $m['hauptspeise_id'] = $z ? $z->hauptspeise_id : MenueServeGerichte::vorschlag($m['hauptspeise'], $gerichte);
-            $m['nachspeise_id'] = $z ? $z->nachspeise_id : MenueServeGerichte::vorschlag($m['nachspeise'], $gerichte);
+            if ($m['snack']) {
+                // Snacks laufen alle über ein festes Gericht.
+                $m['hauptspeise_id'] = $z ? $z->hauptspeise_id : ($gerichte->firstWhere('id', MenueServeGerichte::snackGericht())?->id);
+                $m['nachspeise_id'] = null;
+            } else {
+                $m['hauptspeise_id'] = $z ? $z->hauptspeise_id : MenueServeGerichte::vorschlag($m['hauptspeise'], $gerichte);
+                $m['nachspeise_id'] = $z ? $z->nachspeise_id : MenueServeGerichte::vorschlag($m['nachspeise'], $gerichte);
+            }
         }
         unset($m);
 
@@ -68,7 +74,7 @@ class MenueServeImportController
         $ab = $this->ab($request);
 
         // Datum, Titel und Texte frisch aus Menü&Serve – das Formular liefert nur die Auswahl.
-        $menues = collect((new MenueServeGerichte)->menuesAb($ab))->keyBy('ms_id');
+        $menues = collect((new MenueServeGerichte)->menuesAb($ab, true))->keyBy('ms_id');
         $gespeichert = 0;
         foreach ((array) $request->input('menue', []) as $msId => $wahl) {
             $m = $menues->get($msId);
@@ -81,13 +87,13 @@ class MenueServeImportController
                 'hauptspeise_text' => $m['hauptspeise'] !== null ? mb_substr($m['hauptspeise'], 0, 255) : null,
                 'nachspeise_text' => $m['nachspeise'] !== null ? mb_substr($m['nachspeise'], 0, 255) : null,
                 'hauptspeise_id' => ($wahl['hauptspeise_id'] ?? null) ?: null,
-                'nachspeise_id' => ($wahl['nachspeise_id'] ?? null) ?: null,
+                'nachspeise_id' => $m['snack'] ? null : (($wahl['nachspeise_id'] ?? null) ?: null),
                 'updated_by' => $request->user()->id,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
             // Fleischart des Menüs an die Hauptspeise, wenn dort noch keine eigene steht.
-            if ($m['art'] && ! empty($wahl['hauptspeise_id'])) {
+            if ($m['art'] && ! $m['snack'] && ! empty($wahl['hauptspeise_id'])) {
                 $haupt = Dish::with('unsuitableDiets')->find($wahl['hauptspeise_id']);
                 if ($haupt && in_array($haupt->fleischart, [null, 'fleisch'], true)) {
                     $this->fleischartSetzen($haupt, MenueServeGerichte::ART_ZU_FLEISCHART[$m['art']]);
@@ -108,7 +114,10 @@ class MenueServeImportController
         }
         $zuordnungen = DB::table('kantine_menueserve_zuordnungen')
             ->whereIn('ms_id', $menues->keys())->orderBy('datum')->get()
-            ->each(fn ($z) => $z->linie = $menues->get($z->ms_id)['linie'] ?? null);
+            ->each(function ($z) use ($menues) {
+                $z->linie = $menues->get($z->ms_id)['linie'] ?? null;
+                $z->snack = (bool) ($menues->get($z->ms_id)['snack'] ?? false);
+            });
         $ergebnis = (new MenueServeSpeiseplan)->uebernehmen($season, $zuordnungen);
         $ok = count(array_filter($ergebnis, fn ($e) => $e['ok']));
 

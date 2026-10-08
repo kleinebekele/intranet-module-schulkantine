@@ -13,7 +13,7 @@ use Intranet\Modules\Schulkantine\Models\Dish;
  * Ein Menü&Serve-Menü ist EIN Eintrag in `MNUBAS` je Kalendertag (`CALBAS_DT_DATE`)
  * und Menülinie (`MNUPRP`): ein Kurztitel („Pizza") und eine Notiz, deren erste
  * Zeile die Hauptspeise und deren letzte Zeile die Nachspeise ist
- * („Pizza mit Salat … Obst"). Snack-Linien (Typ 5) bleiben außen vor.
+ * („Pizza mit Salat … Obst"). Snack-Linien (Typ 5) nur auf Wunsch ($mitSnacks).
  *
  * `MNUBAS_DT_ATTRIB01` ist die Fleischart, die das Menü&Serve-Terminal anzeigt. Die
  * Klartexte stehen nicht in der Datenbank, sondern im Programm (Auswahlliste im
@@ -23,6 +23,15 @@ class MenueServeGerichte
 {
     /** Fleischart (ATTRIB01) → Klartext. */
     public const ARTEN = [1 => 'Rind', 2 => 'Schwein', 3 => 'Rind/Schwein', 4 => 'Lamm', 5 => 'Geflügel', 6 => 'Fisch', 7 => 'Vegetarisch'];
+
+    /** Menülinien-Typ der Snacks in Menü&Serve (MNUPRP_DT_TYPE). */
+    public const TYP_SNACK = 5;
+
+    /** Unser Gericht für alle Menü&Serve-Snacks (Live-ID; per Config änderbar). */
+    public static function snackGericht(): int
+    {
+        return (int) config('schulkantine.menueserve_snack_gericht', 42);
+    }
 
     /** Fleischart (ATTRIB01) → unsere Fleischart am Gericht (Dish::FLEISCHARTEN). */
     public const ART_ZU_FLEISCHART = [1 => 'rind', 2 => 'schwein', 3 => 'rind_schwein', 4 => 'lamm', 5 => 'gefluegel', 6 => 'fisch', 7 => 'vegetarisch'];
@@ -67,11 +76,11 @@ class MenueServeGerichte
     }
 
     /**
-     * @return list<array{ms_id: string, datum: string, linie: string, titel: string, art: ?int, notiz: string, hauptspeise: ?string, nachspeise: ?string}>
+     * @return list<array{ms_id: string, datum: string, linie: string, titel: string, art: ?int, notiz: string, hauptspeise: ?string, nachspeise: ?string, snack: bool}>
      *
      * @throws \RuntimeException wenn Menü&Serve nicht lesbar ist
      */
-    public function menuesAb(Carbon $ab): array
+    public function menuesAb(Carbon $ab, bool $mitSnacks = false): array
     {
         if (! Ekkon::mssqlKonfiguriert()) {
             throw new \RuntimeException('Keine Verbindung zum SQL-Server von Linear/Menü&Serve konfiguriert.');
@@ -81,14 +90,14 @@ class MenueServeGerichte
         // Datum nur als Text lesen (ODBC-Datetime-Falle), Notiz als nvarchar(400) statt max.
         $zeilen = DB::connection(Ekkon::mssqlConnection())->select(
             "SELECT CONVERT(varchar(36), b.MNUBAS_ID) id, CONVERT(varchar(10), k.CALBAS_DT_DATE, 23) tag,
-                    p.MNUPRP_DT_TITLE linie, b.MNUBAS_DT_ATTRIB01 art, LTRIM(RTRIM(b.MNUBAS_DT_TITLE)) titel,
+                    p.MNUPRP_DT_TITLE linie, p.MNUPRP_DT_TYPE typ, b.MNUBAS_DT_ATTRIB01 art, LTRIM(RTRIM(b.MNUBAS_DT_TITLE)) titel,
                     CONVERT(nvarchar(400), b.MNUBAS_DT_NOTE) notiz
                FROM {$mus}.dbo.MNUBAS b
                JOIN {$mus}.dbo.CALBAS k ON k.CALBAS_ID = b.MNUBAS_FK_CALBAS
                JOIN {$mus}.dbo.MNUPRP p ON p.MNUPRP_ID = b.MNUBAS_FK_MNUPRP
-              WHERE k.CALBAS_DT_DATE >= ? AND p.MNUPRP_DT_TYPE <> 5
+              WHERE k.CALBAS_DT_DATE >= ? AND (? = 1 OR p.MNUPRP_DT_TYPE <> ?)
               ORDER BY k.CALBAS_DT_DATE, p.MNUPRP_DT_TYPE",
-            [$ab->format('Y-m-d')],
+            [$ab->format('Y-m-d'), $mitSnacks ? 1 : 0, self::TYP_SNACK],
         );
 
         $menues = [];
@@ -104,6 +113,7 @@ class MenueServeGerichte
                 'notiz' => $notiz,
                 'hauptspeise' => $teile[0] ?? ((string) $z->titel ?: null),
                 'nachspeise' => count($teile) > 1 ? end($teile) : null,
+                'snack' => (int) $z->typ === self::TYP_SNACK,
             ];
         }
 

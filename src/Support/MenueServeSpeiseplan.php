@@ -5,6 +5,7 @@ namespace Intranet\Modules\Schulkantine\Support;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Intranet\Modules\Schulkantine\Models\Dish;
+use Intranet\Modules\Schulkantine\Models\Menu;
 use Intranet\Modules\Schulkantine\Models\MenuDay;
 use Intranet\Modules\Schulkantine\Models\Season;
 
@@ -15,6 +16,7 @@ use Intranet\Modules\Schulkantine\Models\Season;
  * belegt. Gibt es den Tag im Speiseplan noch nicht, wird seine Woche ausgerollt
  * (wie der Knopf im Speiseplan). Freigegebene Wochen bleiben unberührt; passen
  * mehrere Menüs, entscheidet der Name der Menü&Serve-Menülinie, sonst wird übersprungen.
+ * Snacks kommen nicht in ein Menü, sondern als Einzelgericht auf den Tagesplan.
  */
 class MenueServeSpeiseplan
 {
@@ -61,6 +63,13 @@ class MenueServeSpeiseplan
                 continue;
             }
 
+            if (! empty($z->snack)) {
+                $neu = $this->aufTagesplan($season, $tag, $haupt);
+                $ergebnis[] = $zeile(true, 'Snack „'.$haupt->name.'"'.($neu ? ' auf den Tagesplan gesetzt' : ' stand schon auf dem Tagesplan'));
+
+                continue;
+            }
+
             $menues = $this->menuesAm($season, $tag);
             $woche = $release->weekStart($tag)->toDateString();
             if ($menues->isEmpty() && ! isset($ausgerollt[$woche])) {
@@ -91,6 +100,23 @@ class MenueServeSpeiseplan
         }
 
         return $ergebnis;
+    }
+
+    /** Einzelgericht auf den Tagesplan – idempotent (wie MenuController::addDishToPlan). */
+    private function aufTagesplan(Season $season, Carbon $tag, Dish $dish): bool
+    {
+        $vorhanden = Menu::where('season_id', $season->id)->whereDate('date', $tag->toDateString())->where('dish_id', $dish->id)->exists();
+        if ($vorhanden) {
+            return false;
+        }
+        Menu::create([
+            'season_id' => $season->id,
+            'date' => $tag->toDateString(),
+            'dish_id' => $dish->id,
+            'sort_order' => (int) Menu::where('season_id', $season->id)->whereDate('date', $tag->toDateString())->max('sort_order') + 1,
+        ]);
+
+        return true;
     }
 
     private function menuesAm(Season $season, Carbon $tag): Collection

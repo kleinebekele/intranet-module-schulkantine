@@ -44,7 +44,8 @@
 
         <p class="text-sm text-gray-500">
             Je Menü&amp;Serve-Menü: welche Hauptspeise und welche Nachspeise aus unseren Gerichten ist es?
-            Eindeutige Treffer sind vorausgewählt (<span class="text-sky-700">blau</span> = Vorschlag, noch nicht gespeichert).
+            Eindeutige Treffer sind vorausgewählt (<span class="text-sky-700">blau</span> = Vorschlag, noch nicht gespeichert);
+            Snacks sind mit dem festen Snack-Gericht vorbelegt und kommen als Einzelgericht auf den Tagesplan.
             Gespeichert wird nur die Zuordnung – der Speiseplan bleibt unberührt.
         </p>
 
@@ -95,6 +96,9 @@
                                         </td>
                                         <td class="px-3 py-3">
                                             <div class="font-medium text-gray-900">
+                                                @if ($m['snack'])
+                                                    <span class="mr-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Snack</span>
+                                                @endif
                                                 {{ $m['titel'] }}
                                                 @if ($m['art'])
                                                     <span class="ml-1 text-xs font-normal {{ $m['art'] === 7 ? 'text-green-700' : 'text-gray-500' }}">{{ $arten[$m['art']] }}</span>
@@ -105,6 +109,10 @@
                                         </td>
                                         @foreach (['hauptspeise_id', 'nachspeise_id'] as $feld)
                                             @php $gewaehlt = old('menue.'.$m['ms_id'].'.'.$feld, $m[$feld]); @endphp
+                                            @if ($m['snack'] && $feld === 'nachspeise_id')
+                                                <td class="px-3 py-3 text-xs text-gray-400">Snack: kommt als Einzelgericht auf den Tagesplan</td>
+                                                @continue
+                                            @endif
                                             <td class="px-3 py-3">
                                                 <select name="menue[{{ $m['ms_id'] }}][{{ $feld }}]"
                                                         class="w-full min-w-[14rem] rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 {{ $gewaehlt && ! $m['gemerkt'] ? 'text-sky-700' : '' }}">
