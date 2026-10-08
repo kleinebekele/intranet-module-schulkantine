@@ -5,6 +5,7 @@ namespace Intranet\Modules\Schulkantine\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Intranet\Modules\Schulkantine\Models\Diet;
 use Intranet\Modules\Schulkantine\Models\Dish;
 use Intranet\Modules\Schulkantine\Models\Season;
 use Intranet\Modules\Schulkantine\Support\Access;
@@ -87,9 +88,10 @@ class MenueServeImportController
             ]);
             // Fleischart des Menüs an die Hauptspeise, wenn dort noch keine eigene steht.
             if ($m['art'] && ! empty($wahl['hauptspeise_id'])) {
-                Dish::whereKey($wahl['hauptspeise_id'])
-                    ->where(fn ($q) => $q->whereNull('fleischart')->orWhere('fleischart', 'fleisch'))
-                    ->update(['fleischart' => MenueServeGerichte::ART_ZU_FLEISCHART[$m['art']]]);
+                $haupt = Dish::with('unsuitableDiets')->find($wahl['hauptspeise_id']);
+                if ($haupt && in_array($haupt->fleischart, [null, 'fleisch'], true)) {
+                    $this->fleischartSetzen($haupt, MenueServeGerichte::ART_ZU_FLEISCHART[$m['art']]);
+                }
             }
             $gespeichert++;
         }
@@ -123,7 +125,7 @@ class MenueServeImportController
     {
         $this->authorize($request);
 
-        $gerichte = Dish::with('allergens')->orderBy('name')->get();
+        $gerichte = Dish::with(['allergens', 'unsuitableDiets'])->orderBy('name')->get();
         try {
             $arten = (new MenueServeGerichte)->fleischartJeGericht($gerichte);
         } catch (\Throwable $e) {
@@ -140,13 +142,21 @@ class MenueServeImportController
 
                 continue;
             }
-            $dish->update(['fleischart' => $arten[$dish->id]]);
+            $this->fleischartSetzen($dish, $arten[$dish->id]);
             $gesetzt[] = ['name' => $dish->name, 'symbol' => $dish->symbol()];
         }
 
         return back()
             ->with('status', count($gesetzt).' Fleischarten aus Menü&Serve nachgetragen.')
             ->with('symbole_ergebnis', ['gesetzt' => $gesetzt, 'behalten' => $behalten]);
+    }
+
+    /** Fleischart setzen und die Diäten danach neu ableiten (Handauswahl bleibt). */
+    private function fleischartSetzen(Dish $dish, string $art): void
+    {
+        $geeignet = Diet::pluck('id')->diff($dish->unsuitableDiets->pluck('id'))->values()->all();
+        $dish->update(['fleischart' => $art]);
+        $dish->dietenSetzen($geeignet);
     }
 
     private function ab(Request $request): Carbon
