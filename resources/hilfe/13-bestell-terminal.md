@@ -9,7 +9,7 @@ rollen: admin
 
 Das Bestell-Terminal ist die Vollbild-Ansicht für die Terminals in der Schule. Es braucht
 keine Intranet-Anmeldung: Jeder sieht dort den Speiseplan der Woche, bestellen kann man nach
-Chip-Anmeldung – Chip auflegen, bestellen, „Fertig".
+Chip-Anmeldung – Chip auflegen, bestellen, „Abmelden".
 
 ## Gerät einrichten
 
@@ -39,7 +39,7 @@ Ohne Chip zeigt das Terminal den Speiseplan der Woche; ein Tipp auf ein Gericht 
 Details mit Allergenen und Zusatzstoffen. Mit Chip erscheint dieselbe Ansicht wie unter
 „Essen bestellen" – für den Chip-Inhaber und seine Kinder, mit denselben Fristen.
 
-Mit **Fertig** abmelden. Wer eine Minute nichts tippt, wird automatisch abgemeldet; die
+Mit **Abmelden** oben rechts beenden. Wer 30 Sekunden nichts tippt, wird automatisch abgemeldet; die
 letzten Sekunden zählt ein Hinweis herunter. Legt jemand anderes seinen Chip auf, wechselt das
 Terminal direkt zu dieser Person.
 

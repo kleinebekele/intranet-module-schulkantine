@@ -47,7 +47,7 @@
                 <form method="POST" action="{{ route('kantine.bestellterminal.abmelden') }}" x-ref="abmelden">
                     @csrf
                     <button type="submit" class="rounded-xl bg-indigo-600 px-6 py-3 text-lg font-semibold text-white shadow hover:bg-indigo-700">
-                        Fertig
+                        <svg class="-ml-1 mr-1 inline h-6 w-6 align-[-5px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/></svg>Abmelden
                         <span x-show="rest <= warnAb" x-cloak class="ml-1 text-sm font-normal text-indigo-200" x-text="'(' + rest + ' s)'"></span>
                     </button>
                 </form>
@@ -129,9 +129,9 @@
             busy: false,
             meldung: '',
             // Abmeldung nach Untätigkeit (Sekunden); die letzten warnAb Sekunden mit Hinweis.
-            leerlauf: 60,
-            warnAb: 15,
-            rest: 60,
+            leerlauf: 30,
+            warnAb: 10,
+            rest: 30,
             wedgeBuf: '',
             wedgeAt: 0,
             serialOk: false,

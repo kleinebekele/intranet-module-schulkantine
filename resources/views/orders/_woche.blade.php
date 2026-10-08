@@ -9,12 +9,19 @@
 $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüfung) --}}
 @php
     $gast = $gast ?? false;
+    $terminal = $terminal ?? false;
+    // Info-Knopf an Gerichten/Menüs: unsichtbar vergrößerte Trefferfläche (::after), am
+    // Terminal zusätzlich als runder Knopf – für Finger statt Mauszeiger.
+    $infoKnopf = $terminal
+        ? "relative ml-1.5 -my-1.5 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full align-middle after:absolute after:-inset-1.5 after:content-['']"
+        : "relative ml-1 inline-flex translate-y-px cursor-pointer align-middle after:absolute after:-inset-2.5 after:content-['']";
+    $infoIcon = $terminal ? 'h-5 w-5' : 'h-3.5 w-3.5';
     $money = fn ($v) => number_format((float) $v, 2, ',', '.').' €';
 @endphp
 
 <div class="max-w-full" id="orders-content">
     {{-- Das Terminal hat kein Konto und keine Zugriffsstufe – dort gilt die Chip-Anmeldung. --}}
-    @unless ($terminal ?? false)
+    @unless ($terminal)
         @include('schulkantine::partials.nur-lesen', ['route' => $routen['bestellen'], 'text' => 'bestellen und abbestellen ist nicht möglich.'])
     @endunless
     {{-- Erfolgsmeldungen zeigt das App-Layout bereits global; hier nur Fehler.
@@ -281,7 +288,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                             'eaterId' => $eater->id,
                                                             'date' => $dateStr,
                                                             'isSel' => $isMenuOrdered,
-                                                            'clickable' => $menuClickable,
+                                                            'clickable' => ! $gast && $menuClickable,
                                                         ];
                                                     @endphp
                                                     <form method="POST" action="{{ route($routen['bestellen']) }}">
@@ -296,7 +303,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                        {{ $isMenuOrdered ? 'border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-300' : ($menuWarn ? 'border-red-300' : 'border-emerald-200') }}
                                                                        {{ $gast || $menuClickable ? 'cursor-pointer hover:border-emerald-400' : 'cursor-not-allowed opacity-60' }}">
                                                             <div class="flex items-center justify-between gap-2">
-                                                                <span class="text-sm font-semibold text-emerald-800">🍽 {{ $md->name }}<span x-data @click.stop.prevent="$dispatch('open-dish', @js($menuData))" role="button" tabindex="0" title="Details anzeigen" aria-label="Details anzeigen" class="ml-1 inline-flex translate-y-px cursor-pointer align-middle text-emerald-600 hover:text-emerald-800"><svg class="inline h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg></span></span>
+                                                                <span class="text-sm font-semibold text-emerald-800">🍽 {{ $md->name }}<span x-data @click.stop.prevent="$dispatch('open-dish', @js($menuData))" role="button" tabindex="0" title="Details anzeigen" aria-label="Details anzeigen" class="{{ $infoKnopf }} text-emerald-600 hover:text-emerald-800 {{ $terminal ? 'bg-emerald-50' : '' }}"><svg class="inline {{ $infoIcon }}" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg></span></span>
                                                                 <span class="flex items-center gap-1 text-xs font-bold {{ $isMenuOrdered ? 'text-emerald-700' : 'text-gray-700' }}">
                                                                     @if ($isMenuOrdered)
                                                                         <span class="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">✓</span>
@@ -370,7 +377,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                         'date' => $dateStr,
                                                                         'categoryId' => $catId,
                                                                         'isSel' => $isSel,
-                                                                        'clickable' => $clickable,
+                                                                        'clickable' => ! $gast && $clickable,
                                                                         'postDish' => (string) $postDish,
                                                                         'orderable' => true,
                                                                     ];
@@ -409,7 +416,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                             @endif
                                                                             <div class="min-w-0 flex-1 p-1.5 lg:py-1 lg:pl-2 lg:pr-1">
                                                                                 <div class="flex items-start justify-between gap-1">
-                                                                                    <span class="text-xs font-semibold text-gray-800">{{ $m->dish->name }}<span x-data @click.stop.prevent="$dispatch('open-dish', @js($dishData))" role="button" tabindex="0" title="Details anzeigen" aria-label="Details anzeigen" class="ml-1 inline-flex translate-y-px cursor-pointer align-middle text-indigo-500 hover:text-indigo-700"><svg class="inline h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg></span></span>
+                                                                                    <span class="text-xs font-semibold text-gray-800">{{ $m->dish->name }}<span x-data @click.stop.prevent="$dispatch('open-dish', @js($dishData))" role="button" tabindex="0" title="Details anzeigen" aria-label="Details anzeigen" class="{{ $infoKnopf }} text-indigo-500 hover:text-indigo-700 {{ $terminal ? 'bg-indigo-50' : '' }}"><svg class="inline {{ $infoIcon }}" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg></span></span>
                                                                                     <span class="flex flex-none items-center gap-1 text-xs font-bold {{ $isSel ? 'text-green-700' : 'text-gray-700' }}">
                                                                                         @if ($isSel)
                                                                                             <span class="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] font-bold text-white">✓</span>
