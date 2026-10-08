@@ -3,20 +3,17 @@
 namespace Intranet\Modules\Schulkantine\Support;
 
 use App\Ekkon\Ekkon;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Intranet\Modules\Schulkantine\Models\Dish;
 
 /**
- * Liest die Gerichte aus der alten Menü&Serve-Datenbank (nur lesend).
+ * Liest die Menüs aus der alten Menü&Serve-Datenbank (nur lesend).
  *
- * Menü&Serve kennt keine Gerichte-Stammliste: In `MNUBAS` steht je Kalendertag
- * (`MNUBAS_FK_CALBAS` → `CALBAS`) und Menülinie (`MNUBAS_FK_MNUPRP` → `MNUPRP`)
- * ein freier Titel mit Notiz. Ein „Gericht" ist hier also ein verschiedener Titel;
- * gleiche Titel (Groß-/Kleinschreibung, Leerzeichen egal) werden zusammengefasst.
- * Die Menülinie trägt die Preise PRCCUR01..04 – in der Reihenfolge der
- * Vertragsarten aus der Menü&Serve-Konfiguration (27, 28, 29, 50).
- *
- * Snacks (Typ 5) und „Sonstiges" (Typ 70) bleiben außen vor.
+ * Ein Menü&Serve-Menü ist EIN Eintrag in `MNUBAS` je Kalendertag (`CALBAS_DT_DATE`)
+ * und Menülinie (`MNUPRP`): ein Kurztitel („Pizza") und eine Notiz, deren erste
+ * Zeile die Hauptspeise und deren letzte Zeile die Nachspeise ist
+ * („Pizza mit Salat … Obst"). Snack-Linien (Typ 5) bleiben außen vor.
  *
  * `MNUBAS_DT_ATTRIB01` ist die Fleischart, die das Menü&Serve-Terminal anzeigt. Die
  * Klartexte stehen nicht in der Datenbank, sondern im Programm (Auswahlliste im
@@ -24,121 +21,80 @@ use Intranet\Modules\Schulkantine\Models\Dish;
  */
 class MenueServeGerichte
 {
-    /** Vertragsarten in der Reihenfolge der Preisspalten PRCCUR01..04. */
-    public const PREIS_ARTEN = [27, 28, 29, 50];
-
     /** Fleischart (ATTRIB01) → Klartext. */
     public const ARTEN = [1 => 'Rind', 2 => 'Schwein', 3 => 'Rind/Schwein', 4 => 'Lamm', 5 => 'Geflügel', 6 => 'Fisch', 7 => 'Vegetarisch'];
 
     /**
-     * Fleischart → Ernährungsformen, für die das Gericht NICHT geeignet ist (kantine_diets.name).
-     * Halal vorsichtshalber bei jedem Fleisch – ob geschächtet wurde, weiß Menü&Serve nicht.
-     */
-    public const NICHT_FUER = [
-        1 => ['vegetarisch', 'vegan', 'halal'],
-        2 => ['vegetarisch', 'vegan', 'halal', 'schweinefleischfrei'],
-        3 => ['vegetarisch', 'vegan', 'halal', 'schweinefleischfrei'],
-        4 => ['vegetarisch', 'vegan', 'halal'],
-        5 => ['vegetarisch', 'vegan', 'halal'],
-        6 => ['vegetarisch', 'vegan'],
-        7 => [],
-    ];
-
-    /** Menülinien-Typen, die keine Gerichte sind. */
-    private const OHNE_TYPEN = [5, 70];
-
-    /**
-     * @return array{linien: array<string, array>, gerichte: list<array>}
+     * @return list<array{ms_id: string, datum: string, linie: string, titel: string, art: ?int, notiz: string, hauptspeise: ?string, nachspeise: ?string}>
      *
      * @throws \RuntimeException wenn Menü&Serve nicht lesbar ist
      */
-    public function lesen(): array
+    public function menuesAb(Carbon $ab): array
     {
         if (! Ekkon::mssqlKonfiguriert()) {
             throw new \RuntimeException('Keine Verbindung zum SQL-Server von Linear/Menü&Serve konfiguriert.');
         }
-        $db = DB::connection(Ekkon::mssqlConnection());
         $mus = (string) config('schulkantine.menueserve_db', 'MenuAndServe');
-        $ohne = implode(', ', self::OHNE_TYPEN);
 
-        $linien = [];
-        foreach ($db->select(
-            "SELECT CONVERT(varchar(36), MNUPRP_ID) id, MNUPRP_DT_TITLE titel, MNUPRP_DT_TYPE typ,
-                    MNUPRP_DT_PRCCUR01 p1, MNUPRP_DT_PRCCUR02 p2, MNUPRP_DT_PRCCUR03 p3, MNUPRP_DT_PRCCUR04 p4
-               FROM {$mus}.dbo.MNUPRP WHERE MNUPRP_DT_TYPE NOT IN ({$ohne})"
-        ) as $l) {
-            $preise = [];
-            foreach (self::PREIS_ARTEN as $i => $art) {
-                $p = round((float) $l->{'p'.($i + 1)}, 2);
-                if ($p > 0) {
-                    $preise[$art] = $p;
-                }
-            }
-            $linien[strtolower($l->id)] = ['id' => strtolower($l->id), 'titel' => trim((string) $l->titel), 'preise' => $preise, 'anzahl' => 0];
-        }
-
-        // Datum je Eintrag aus dem Kalender – die Datumsspalte suchen wir uns, statt sie zu raten.
-        $datumSpalte = $db->selectOne(
-            "SELECT TOP 1 COLUMN_NAME c FROM {$mus}.INFORMATION_SCHEMA.COLUMNS
-              WHERE TABLE_NAME = 'CALBAS' AND DATA_TYPE IN ('date', 'datetime', 'smalldatetime', 'datetime2')
-              ORDER BY ORDINAL_POSITION"
-        )?->c;
-        $datum = $datumSpalte ? "CONVERT(varchar(10), MAX(c.[{$datumSpalte}]), 23)" : 'NULL';
-        $kalender = $datumSpalte ? "LEFT JOIN {$mus}.dbo.CALBAS c ON c.CALBAS_ID = b.MNUBAS_FK_CALBAS" : '';
-
-        // Notiz als nvarchar(400) – nvarchar(max) über ODBC ist fehleranfällig.
-        $zeilen = $db->select(
-            "SELECT CONVERT(varchar(36), b.MNUBAS_FK_MNUPRP) linie, LTRIM(RTRIM(b.MNUBAS_DT_TITLE)) titel, b.MNUBAS_DT_ATTRIB01 art, COUNT(*) n,
-                    MAX(CONVERT(nvarchar(400), b.MNUBAS_DT_NOTE)) notiz, {$datum} zuletzt
-               FROM {$mus}.dbo.MNUBAS b {$kalender}
-              WHERE LTRIM(RTRIM(ISNULL(b.MNUBAS_DT_TITLE, ''))) <> ''
-              GROUP BY b.MNUBAS_FK_MNUPRP, LTRIM(RTRIM(b.MNUBAS_DT_TITLE)), b.MNUBAS_DT_ATTRIB01"
+        // Datum nur als Text lesen (ODBC-Datetime-Falle), Notiz als nvarchar(400) statt max.
+        $zeilen = DB::connection(Ekkon::mssqlConnection())->select(
+            "SELECT CONVERT(varchar(36), b.MNUBAS_ID) id, CONVERT(varchar(10), k.CALBAS_DT_DATE, 23) tag,
+                    p.MNUPRP_DT_TITLE linie, b.MNUBAS_DT_ATTRIB01 art, LTRIM(RTRIM(b.MNUBAS_DT_TITLE)) titel,
+                    CONVERT(nvarchar(400), b.MNUBAS_DT_NOTE) notiz
+               FROM {$mus}.dbo.MNUBAS b
+               JOIN {$mus}.dbo.CALBAS k ON k.CALBAS_ID = b.MNUBAS_FK_CALBAS
+               JOIN {$mus}.dbo.MNUPRP p ON p.MNUPRP_ID = b.MNUBAS_FK_MNUPRP
+              WHERE k.CALBAS_DT_DATE >= ? AND p.MNUPRP_DT_TYPE <> 5
+              ORDER BY k.CALBAS_DT_DATE, p.MNUPRP_DT_TYPE",
+            [$ab->format('Y-m-d')],
         );
 
-        $vorhanden = Dish::pluck('name')->mapWithKeys(fn ($n) => [self::schluessel($n) => true]);
-
-        $gerichte = [];
+        $menues = [];
         foreach ($zeilen as $z) {
-            $linie = strtolower((string) $z->linie);
-            if (! isset($linien[$linie])) {
-                continue; // Snack, Sonstiges oder verwaiste Linie
-            }
-            $titel = preg_replace('/\s+/u', ' ', trim((string) $z->titel));
-            $key = self::schluessel($titel);
-            $g = $gerichte[$key] ?? ['key' => $key, 'titel' => $titel, 'anzahl' => 0, 'linien' => [], 'arten' => [], 'notiz' => '', 'zuletzt' => null,
-                'vorhanden' => isset($vorhanden[$key])];
-            $g['anzahl'] += (int) $z->n;
-            $g['linien'][$linie] = ($g['linien'][$linie] ?? 0) + (int) $z->n;
-            if (isset(self::ARTEN[(int) $z->art])) {
-                $g['arten'][(int) $z->art] = ($g['arten'][(int) $z->art] ?? 0) + (int) $z->n;
-            }
             $notiz = trim((string) $z->notiz);
-            if ($notiz !== '' && mb_strlen($notiz) > mb_strlen($g['notiz'])) {
-                $g['notiz'] = $notiz;
-            }
-            if ($z->zuletzt && (! $g['zuletzt'] || $z->zuletzt > $g['zuletzt'])) {
-                $g['zuletzt'] = (string) $z->zuletzt;
-            }
-            $gerichte[$key] = $g;
-            $linien[$linie]['anzahl']++;
+            $teile = array_values(array_filter(array_map('trim', preg_split('/\R/u', $notiz)), fn ($t) => $t !== ''));
+            $menues[] = [
+                'ms_id' => strtolower((string) $z->id),
+                'datum' => (string) $z->tag,
+                'linie' => trim((string) $z->linie),
+                'titel' => (string) $z->titel,
+                'art' => isset(self::ARTEN[(int) $z->art]) ? (int) $z->art : null,
+                'notiz' => $notiz,
+                'hauptspeise' => $teile[0] ?? ((string) $z->titel ?: null),
+                'nachspeise' => count($teile) > 1 ? end($teile) : null,
+            ];
         }
 
-        // Hauptlinie = die, in der das Gericht am häufigsten stand.
-        foreach ($gerichte as &$g) {
-            arsort($g['linien']);
-            $g['linie'] = array_key_first($g['linien']);
-            // Fleischart = die häufigste angegebene (ohne Angabe: null).
-            arsort($g['arten']);
-            $g['art'] = array_key_first($g['arten']);
+        return $menues;
+    }
+
+    /**
+     * Unser Gericht zu einem Menü&Serve-Text – nur wenn eindeutig: gleicher Name, sonst
+     * genau ein Gericht, dessen Name im Text steckt oder den Text enthält.
+     *
+     * @param  iterable<Dish>  $gerichte
+     */
+    public static function vorschlag(?string $text, iterable $gerichte): ?int
+    {
+        $t = self::schluessel((string) $text);
+        if ($t === '') {
+            return null;
         }
-        unset($g);
+        $gleich = [];
+        $teil = [];
+        foreach ($gerichte as $d) {
+            $n = self::schluessel($d->name);
+            if ($n === $t) {
+                $gleich[] = $d->id;
+            } elseif ($n !== '' && (str_contains($t, $n) || str_contains($n, $t))) {
+                $teil[] = $d->id;
+            }
+        }
+        if (count($gleich) === 1) {
+            return $gleich[0];
+        }
 
-        usort($gerichte, fn ($a, $b) => [$b['zuletzt'] ?? '', $a['titel']] <=> [$a['zuletzt'] ?? '', $b['titel']]);
-
-        return [
-            'linien' => array_filter($linien, fn ($l) => $l['anzahl'] > 0),
-            'gerichte' => $gerichte,
-        ];
+        return $gleich === [] && count($teil) === 1 ? $teil[0] : null;
     }
 
     /** Vergleichsschlüssel: Kleinbuchstaben, Leerzeichen zusammengefasst. */

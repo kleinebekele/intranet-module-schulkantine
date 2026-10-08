@@ -82,9 +82,9 @@ Route::middleware(['web', 'auth'])
         // Gerichte
         Route::get('gerichte', [DishController::class, 'index'])->name('dishes.index');
         Route::get('gerichte/neu', [DishController::class, 'create'])->name('dishes.create');
-        // Übernahme aus der alten Menü&Serve-Datenbank (liest dort nur).
+        // Menü&Serve-Menüs unseren Gerichten zuordnen (liest dort nur).
         Route::get('gerichte/menueserve', [MenueServeImportController::class, 'index'])->name('dishes.menueserve');
-        Route::post('gerichte/menueserve', [MenueServeImportController::class, 'import'])->name('dishes.menueserve.import');
+        Route::post('gerichte/menueserve', [MenueServeImportController::class, 'save'])->name('dishes.menueserve.save');
         Route::post('gerichte', [DishController::class, 'store'])->name('dishes.store');
         Route::get('gerichte/{dish}/bearbeiten', [DishController::class, 'edit'])->name('dishes.edit');
         Route::put('gerichte/{dish}', [DishController::class, 'update'])->name('dishes.update');
