@@ -2,13 +2,18 @@
 
 namespace Intranet\Modules\Schulkantine\Http\Controllers;
 
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Intranet\Modules\Schulkantine\Models\CustomerGroup;
-use App\Models\Setting;
 use Intranet\Modules\Schulkantine\Models\NfcChip;
+use Intranet\Modules\Schulkantine\Models\Order;
+use Intranet\Modules\Schulkantine\Models\Season;
+use Intranet\Modules\Schulkantine\Models\Subscription;
 use Intranet\Modules\Schulkantine\Support\Access;
 use Intranet\Modules\Schulkantine\Support\Bestellterminal;
+use Intranet\Modules\Schulkantine\Support\DeadlineService;
 
 /**
  * Bestell-Terminal: Vollbild-Kiosk auf den Schul-Terminals, OHNE Intranet-
@@ -66,7 +71,7 @@ class BestellTerminalController
 
         if (! $besteller) {
             // Ohne Chip: der Speiseplan der Woche zum Ansehen, ohne Bestellungen.
-            $daten = $orders->wochenDaten($request, $this->gast());
+            $daten = $this->wochenDaten($request, $orders, $this->gast(), null);
             if ($daten['season']) {
                 $daten['eaters'] = collect([[
                     'user' => $this->gast(),
@@ -87,7 +92,7 @@ class BestellTerminalController
             ]);
         }
 
-        return view('schulkantine::bestellterminal.index', $orders->wochenDaten($request, $besteller) + [
+        return view('schulkantine::bestellterminal.index', $this->wochenDaten($request, $orders, $besteller, $besteller) + [
             'besteller' => $besteller,
             'simChips' => collect(),
         ]);
@@ -125,6 +130,68 @@ class BestellTerminalController
     public function abo(Request $request, OrderController $orders)
     {
         return $orders->aboSpeichern($request, $this->bestellerOderAbbruch($request));
+    }
+
+    /**
+     * Wochendaten fürs Terminal: ohne Wochenangabe (oder davor) die Woche des nächsten
+     * Tages, an dem man noch etwas tun kann; weiter zurück lässt sich nicht blättern.
+     */
+    private function wochenDaten(Request $request, OrderController $orders, User $fuer, ?User $besteller): array
+    {
+        $season = Season::where('is_active', true)->first();
+        $erster = $season ? $this->ersterMachbarerTag($season, $besteller) : null;
+        $abWoche = $erster?->copy()->startOfWeek(Carbon::MONDAY);
+
+        if ($abWoche) {
+            try {
+                $gewuenscht = $request->filled('week') ? Carbon::parse($request->query('week'))->startOfWeek(Carbon::MONDAY) : null;
+            } catch (\Exception $e) {
+                $gewuenscht = null;
+            }
+            if (! $gewuenscht || $gewuenscht->lt($abWoche)) {
+                $request->query->set('week', $abWoche->toDateString());
+            }
+        }
+
+        $daten = $orders->wochenDaten($request, $fuer);
+        if ($abWoche && $daten['season']) {
+            $daten['canPrev'] = $daten['weekStart']->gt($abWoche);
+        }
+
+        return $daten;
+    }
+
+    /**
+     * Der nächste Öffnungstag ab heute, an dem man noch bestellen kann – oder, weil die
+     * Abbestell-Frist länger läuft, an dem der Besteller (oder ein Kind) etwas Bestelltes
+     * noch abbestellen kann. Null, wenn in den nächsten 60 Tagen nichts mehr geht.
+     */
+    private function ersterMachbarerTag(Season $season, ?User $besteller): ?Carbon
+    {
+        $deadline = new DeadlineService;
+        $ids = $besteller
+            ? $besteller->children()->pluck('users.id')->push($besteller->id)->all()
+            : [];
+        // OGS mit Abo isst ohne Bestell-Zeile – dann zählt jeder Tag mit offener Abbestell-Frist.
+        $ogsAbo = $ids && Subscription::where('season_id', $season->id)->whereIn('user_id', $ids)->where('active', true)->exists();
+
+        $tag = Carbon::today()->max($season->start_date->copy()->startOfDay());
+        $bis = Carbon::today()->addDays(60)->min($season->end_date);
+        for (; $tag->lte($bis); $tag->addDay()) {
+            if (! $season->isOpenOn($tag)) {
+                continue;
+            }
+            if ($deadline->canOrder($season, $tag)) {
+                return $tag->copy();
+            }
+            if ($ids && $deadline->canCancel($season, $tag) && ($ogsAbo || Order::where('season_id', $season->id)
+                ->whereIn('user_id', $ids)->whereDate('date', $tag->toDateString())
+                ->where('status', Order::STATUS_ORDERED)->exists())) {
+                return $tag->copy();
+            }
+        }
+
+        return null;
     }
 
     /** Der per Chip angemeldete Besteller – oder null (nie angemeldet/abgelaufen). */
