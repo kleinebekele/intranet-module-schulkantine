@@ -132,6 +132,8 @@
             leerlauf: 30,
             warnAb: 10,
             rest: 30,
+            // Ohne Chip: nach so vielen Sekunden ohne Eingabe die Seite neu laden.
+            neuLadenNach: 300,
             wedgeBuf: '',
             wedgeAt: 0,
             serialOk: false,
@@ -151,10 +153,19 @@
                         this.rest--;
                         if (this.rest <= 0) this.$refs.abmelden.submit();
                     }, 1000);
-                } else if (new URLSearchParams(location.search).has('week')) {
-                    // Ohne Chip in eine andere Woche geblättert: nach Untätigkeit zurück zur aktuellen.
+                } else {
+                    // Ohne Chip: nach Untätigkeit neu laden (Startwoche). Aus einer anderen Woche
+                    // nach leerlauf Sekunden, sonst alle 5 Minuten – so kommen neuer Speiseplan und
+                    // neue Versionen nach einem Deploy ohne F5 an.
+                    const andereWoche = new URLSearchParams(location.search).has('week');
+                    let ruhe = 0;
+                    ['pointerdown', 'keydown', 'scroll', 'wheel'].forEach(ev =>
+                        window.addEventListener(ev, () => { ruhe = 0; }, { passive: true }));
                     setInterval(() => {
-                        if (--this.rest <= 0) location.href = location.pathname;
+                        ruhe++;
+                        if (! this.busy && ((andereWoche && ruhe >= this.leerlauf) || ruhe >= this.neuLadenNach)) {
+                            location.href = location.pathname;
+                        }
                     }, 1000);
                 }
             },
