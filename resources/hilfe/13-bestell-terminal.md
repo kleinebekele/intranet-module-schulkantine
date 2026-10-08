@@ -23,8 +23,12 @@ am besten einmal an einem Schul-Terminal nachsehen und von außerhalb gegenprüf
 Am Terminal die Adresse als Startseite öffnen, am besten im Kiosk-Modus von Chrome oder Edge.
 
 Erkannt werden die USB-Leser, die die Kennung wie eine Tastatur eintippen, und der alte
-Chipleser am COM-Anschluss. Den COM-Leser einmal je Gerät über „COM-Leser verbinden"
-unten rechts freigeben, danach verbindet er sich selbst.
+Chipleser am COM-Anschluss.
+
+Der Hinweis „Chip auflegen" oben rechts und der Knopf „COM-Leser verbinden" unten rechts
+sind standardmäßig ausgeblendet. Je Gerät einschalten: die Adresse einmal mit `?chip=an`
+am Ende öffnen (mit `?chip=aus` wieder aus), das Gerät merkt sich das. Den COM-Leser einmal
+je Gerät darüber freigeben, danach verbindet er sich selbst – auch wenn der Knopf wieder aus ist.
 
 ## Bestellen am Terminal
 

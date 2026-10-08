@@ -53,7 +53,7 @@
                 </form>
             </div>
         @else
-            <div class="flex items-center gap-3 rounded-xl bg-indigo-600 px-5 py-3 text-white shadow" :class="busy ? 'animate-pulse' : ''">
+            <div x-show="chipUi" x-cloak class="flex items-center gap-3 rounded-xl bg-indigo-600 px-5 py-3 text-white shadow" :class="busy ? 'animate-pulse' : ''">
                 <svg class="h-8 w-8 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/></svg>
                 <div>
                     <div class="text-lg font-semibold leading-tight">Chip auflegen</div>
@@ -113,14 +113,16 @@
     @endif
 
     {{-- Alter COM-Leser (Web Serial): einmalig je Gerät freigeben, danach verbindet er sich selbst. --}}
-    <footer class="px-4 pb-3 text-right" x-show="hasSerial() && ! serialOk" x-cloak>
+    <footer class="px-4 pb-3 text-right" x-show="chipUi && hasSerial() && ! serialOk" x-cloak>
         <button type="button" @click="serialConnect(true)" class="text-xs text-gray-400 underline hover:text-gray-600">COM-Leser verbinden (alter Leser)</button>
     </footer>
 </div>
 
+@include('schulkantine::partials.chip-bedienung')
 <script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('bestellTerminal', () => ({
+            chipUi: false,   // „Chip auflegen" + COM-Knopf: je Gerät per ?chip=an einschalten
             angemeldet: @js((bool) $besteller),
             urlAnmelden: @js(route('kantine.bestellterminal.anmelden')),
             csrf: document.querySelector('meta[name=csrf-token]').content,
@@ -136,6 +138,7 @@
             serialBuf: '',
 
             init() {
+                this.chipUi = window.kantineChipBedienung();
                 // USB-Leser in Tastatur-Emulation: immer global mithören.
                 window.addEventListener('keydown', (e) => this.onWedgeKey(e));
                 // Bereits freigegebener COM-Leser: ohne Klick wieder verbinden.
@@ -148,7 +151,7 @@
                         this.rest--;
                         if (this.rest <= 0) this.$refs.abmelden.submit();
                     }, 1000);
-                } else if (location.search) {
+                } else if (new URLSearchParams(location.search).has('week')) {
                     // Ohne Chip in eine andere Woche geblättert: nach Untätigkeit zurück zur aktuellen.
                     setInterval(() => {
                         if (--this.rest <= 0) location.href = location.pathname;

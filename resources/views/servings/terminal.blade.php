@@ -35,9 +35,11 @@
     </div>
 @else
 
+@include('schulkantine::partials.chip-bedienung')
 <script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('terminal', () => ({
+            chipUi: false,   // Chip-Menü unten links: je Gerät per ?chip=an einschalten
             // --- Serverdaten ---
             date: @js($date->toDateString()),
             csrf: document.querySelector('meta[name=csrf-token]').content,
@@ -126,6 +128,8 @@
                 this.checkSize();
                 this.$nextTick(() => this.measureRight());
                 window.addEventListener('resize', () => { this.checkSize(); this.measureRight(); });
+
+                this.chipUi = window.kantineChipBedienung();
 
                 // Aktuelle Ansicht im URL-Anker halten, damit F5 sie wiederherstellt.
                 this.$watch('mode', (m) => {
@@ -1181,7 +1185,7 @@
 
     {{-- Steuerleiste unten links: Chip(-Simulation) + Terminal verlassen nebeneinander --}}
     <div class="fixed bottom-3 left-3 z-30 flex items-center gap-2">
-        <div class="relative" x-data="{ openSim: false }">
+        <div class="relative" x-data="{ openSim: false }" x-show="chipUi" x-cloak>
             <button @click="openSim = !openSim" class="rounded-full bg-gray-800/80 px-4 py-2 text-sm font-medium text-white shadow-lg">
                 <span x-show="!scanning">🔌 Chip</span>
                 <span x-show="scanning" x-cloak>📡 Scan aktiv</span>

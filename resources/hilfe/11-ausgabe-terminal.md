@@ -23,9 +23,12 @@ Kein Chip zur Hand? Über die Suche finden Sie die Person auch über den Namen.
 
 rollen: kantine_kellner, admin
 
-Auf Geräten ohne NFC-Unterstützung im Browser steht eine Auswahl aller aktiven Chips zur
-Verfügung, mit der sich ein Scan auswählen lässt. Das ist als Rückfalltür und zum Testen
-gedacht – im Alltag ist der echte Chip schneller.
+Das Chip-Menü unten links (NFC-Scan auf Android, alten COM-Leser verbinden, Chip-Auswahl)
+ist standardmäßig ausgeblendet. Es wird je Gerät eingeschaltet: das Terminal einmal mit
+`?chip=an` am Ende der Adresse öffnen, mit `?chip=aus` wieder aus. Das Gerät merkt sich das.
+
+Die Chip-Auswahl ist als Rückfalltür und zum Testen gedacht – im Alltag ist der echte Chip
+schneller. USB-Leser, die die Kennung wie eine Tastatur eintippen, brauchen das Menü nicht.
 
 ## Was die Warnungen bedeuten
 
