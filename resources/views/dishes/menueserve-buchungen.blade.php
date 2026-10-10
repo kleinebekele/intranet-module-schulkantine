@@ -51,6 +51,7 @@
                                 @foreach ($statusText as $s => $text)
                                     <th class="px-3 py-2 text-right font-medium {{ $farbe($s) }}">{{ $text }}</th>
                                 @endforeach
+                                <th class="px-3 py-2"></th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
@@ -65,6 +66,18 @@
                                         @php $n = $liste->where('status', $s)->count(); @endphp
                                         <td class="px-3 py-2 text-right tabular-nums {{ $n ? $farbe($s) : 'text-gray-300' }}">{{ $n ?: '–' }}</td>
                                     @endforeach
+                                    @php $tagBereit = $liste->where('status', 'bereit')->count(); @endphp
+                                    <td class="px-3 py-2 text-right">
+                                        @if ($tagBereit > 0)
+                                            <form method="POST" action="{{ route('module.schulkantine.dishes.menueserve.buchungen.uebernehmen') }}"
+                                                  onsubmit="return confirm(@js($tagBereit.' Buchungen vom '.\Illuminate\Support\Carbon::parse($tag)->format('d.m.Y').' als Bestellung anlegen?'))">
+                                                @csrf
+                                                <input type="hidden" name="ab" value="{{ $ab->format('Y-m-d') }}">
+                                                <input type="hidden" name="tag" value="{{ $tag }}">
+                                                <button type="submit" class="whitespace-nowrap rounded-md border border-sky-300 bg-white px-2 py-1 text-xs font-medium text-sky-800 hover:bg-sky-50">Tag übernehmen</button>
+                                            </form>
+                                        @endif
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -72,8 +85,43 @@
                 </div>
             </div>
 
-            {{-- Was nicht geht, mit Namen – damit man es nachziehen kann --}}
-            @php $probleme = collect($plan)->whereIn('status', ['person', 'zuordnung', 'speiseplan']); @endphp
+            {{-- Unbekannte Konten: wer ist das? --}}
+            @if ($unbekannt)
+                <div class="overflow-hidden rounded-xl border border-amber-200 bg-white">
+                    <div class="border-b border-amber-100 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800">Bei uns unbekannt – {{ count($unbekannt) }} Konten</div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400">
+                                    <th class="px-4 py-2 font-medium">Konto in Menü&amp;Serve</th>
+                                    <th class="px-3 py-2 font-medium">Linear</th>
+                                    <th class="px-3 py-2 text-right font-medium">Buchungen</th>
+                                    <th class="px-3 py-2 font-medium">Warum unbekannt</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                @foreach ($unbekannt as $u)
+                                    <tr>
+                                        <td class="px-4 py-2">
+                                            <div class="font-medium text-gray-900">{{ $u['name'] !== '' ? $u['name'] : '(ohne Namen)' }}</div>
+                                            @if ($u['kartenart'])<div class="text-xs text-gray-400">{{ $u['kartenart'] }}</div>@endif
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-2 text-gray-600">
+                                            {{ $u['adrnr'] !== '' ? $u['adrnr'] : '–' }}@if ($u['linear']) · {{ $u['linear'] }}@endif
+                                        </td>
+                                        <td class="px-3 py-2 text-right tabular-nums text-gray-600"
+                                            title="{{ collect($u['tage'])->map(fn ($t) => \Illuminate\Support\Carbon::parse($t)->format('d.m.'))->implode(', ') }}">{{ $u['buchungen'] }}</td>
+                                        <td class="px-3 py-2 text-amber-700">{{ $u['hinweis'] }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endif
+
+            {{-- Was sonst nicht geht – damit man es nachziehen kann --}}
+            @php $probleme = collect($plan)->whereIn('status', ['zuordnung', 'speiseplan']); @endphp
             @if ($probleme->isNotEmpty())
                 <div class="overflow-hidden rounded-xl border border-amber-200 bg-white">
                     <div class="border-b border-amber-100 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800">Nicht übernehmbar – {{ $probleme->count() }} Buchungen</div>

@@ -177,16 +177,19 @@ class MenueServeImportController
         $season = Season::where('is_active', true)->first();
 
         try {
-            $plan = $season ? (new MenueServeBuchungen)->plan($season, $ab) : [];
+            $buchungen = new MenueServeBuchungen;
+            $plan = $season ? $buchungen->plan($season, $ab) : [];
+            $unbekannt = $buchungen->unbekannte($plan);
             $fehler = $season ? null : 'Es ist keine Saison aktiv.';
         } catch (\Throwable $e) {
             report($e);
             $plan = [];
+            $unbekannt = [];
             $fehler = $e->getMessage();
         }
 
         return view('schulkantine::dishes.menueserve-buchungen', [
-            'plan' => $plan, 'fehler' => $fehler, 'ab' => $ab,
+            'plan' => $plan, 'unbekannt' => $unbekannt, 'fehler' => $fehler, 'ab' => $ab,
             'statusText' => MenueServeBuchungen::STATUS,
         ]);
     }
@@ -197,10 +200,13 @@ class MenueServeImportController
         $ab = $this->ab($request);
         $season = Season::where('is_active', true)->firstOrFail();
 
-        $e = (new MenueServeBuchungen)->uebernehmen($season, $ab, $request->user()->id);
+        // Nur ein Tag (Knopf in der Tageszeile) oder alle ab $ab.
+        $tag = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->input('tag')) ? (string) $request->input('tag') : null;
+        $e = (new MenueServeBuchungen)->uebernehmen($season, $ab, $request->user()->id, $tag);
 
         return redirect()->route('module.schulkantine.dishes.menueserve.buchungen', ['ab' => $ab->format('Y-m-d')])
-            ->with('status', "{$e['angelegt']} Buchungen aus Menü&Serve als Bestellung übernommen.");
+            ->with('status', "{$e['angelegt']} Buchungen aus Menü&Serve als Bestellung übernommen"
+                .($tag ? ' ('.Carbon::parse($tag)->format('d.m.Y').').' : '.'));
     }
 
     private function ab(Request $request): Carbon

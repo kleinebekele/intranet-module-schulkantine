@@ -83,18 +83,100 @@ class MenueServeBuchungen
     }
 
     /**
-     * Alle bereiten Buchungen ab $ab als Bestellung anlegen.
+     * Wer steckt hinter den Konten, die wir keiner Person zuordnen können? Je Konto
+     * die Namensfelder aus Menü&Serve (ACCBAS) und – bei Linear-Nummer – Name und
+     * Kennzeichen aus Linear (`Adresse`), samt Vermutung, warum es bei uns fehlt.
+     *
+     * @param  list<array>  $plan
+     * @return list<array{konto: string, adrnr: string, name: string, kartenart: ?string, linear: ?string, hinweis: string, buchungen: int, tage: list<string>}>
+     */
+    public function unbekannte(array $plan): array
+    {
+        $liste = collect($plan)->where('status', 'person')->groupBy('konto');
+        if ($liste->isEmpty()) {
+            return [];
+        }
+        $db = DB::connection(Ekkon::mssqlConnection());
+        $mus = (string) config('schulkantine.menueserve_db', 'MenuAndServe');
+
+        // Namensspalten von ACCBAS suchen statt raten (Text-Spalten mit NAME/TITLE/TEXT im Namen).
+        $spalten = collect($db->select(
+            "SELECT COLUMN_NAME c FROM {$mus}.INFORMATION_SCHEMA.COLUMNS
+              WHERE TABLE_NAME = 'ACCBAS' AND DATA_TYPE IN ('nvarchar', 'varchar', 'nchar', 'char')
+                AND (COLUMN_NAME LIKE '%NAME%' OR COLUMN_NAME LIKE '%TITLE%' OR COLUMN_NAME LIKE '%TEXT%')
+              ORDER BY ORDINAL_POSITION"
+        ))->pluck('c')->all();
+        // Kartenart (Klartexte aus TABPOS, Tabelle ACCBAS_DT_TYPE) – Gruppenkarten sind z. B. Sammelbuchungen.
+        $kartenarten = ['A' => 'Administratorkarte', 'G' => 'Gruppenkarte', 'S' => 'Standardkarte', 'V' => 'Stellvertreterkarte', 'Y' => 'Systemkarte'];
+        $namen = [];
+        $arten = [];
+        try {
+            foreach ($liste->keys()->chunk(500) as $teil) {
+                $platz = implode(',', array_fill(0, count($teil), '?'));
+                foreach ($db->select("SELECT CONVERT(varchar(36), ACCBAS_ID) id, ACCBAS_DT_TYPE t FROM {$mus}.dbo.ACCBAS WHERE ACCBAS_ID IN ({$platz})", $teil->values()->all()) as $r) {
+                    $t = strtoupper(trim((string) $r->t));
+                    $arten[strtolower($r->id)] = $kartenarten[$t] ?? ($t !== '' ? "Kartenart {$t}" : null);
+                }
+            }
+        } catch (\Throwable $e) {
+            report($e); // nur Zusatzinfo – die Liste geht auch ohne
+        }
+        if ($spalten) {
+            $auswahl = implode(', ', array_map(fn ($s) => "[{$s}]", $spalten));
+            foreach ($liste->keys()->chunk(500) as $teil) {
+                $platz = implode(',', array_fill(0, count($teil), '?'));
+                foreach ($db->select("SELECT CONVERT(varchar(36), ACCBAS_ID) id, {$auswahl} FROM {$mus}.dbo.ACCBAS WHERE ACCBAS_ID IN ({$platz})", $teil->values()->all()) as $r) {
+                    $r = (array) $r;
+                    $namen[strtolower($r['id'])] = collect($spalten)->map(fn ($s) => trim((string) ($r[$s] ?? '')))->filter()->unique()->implode(' · ');
+                }
+            }
+        }
+
+        // Linear-Name für Konten mit Nummer.
+        $nummern = $liste->map(fn ($b) => $b->first()['adrnr'])->filter(fn ($n) => ctype_digit($n))->unique()->values();
+        $linear = $nummern->isEmpty() ? collect() : collect($db->select(
+            'SELECT AdrNr, Vorname, Nachname, Schuler, Lehrer, Eltern, Mitarbeiter FROM Adresse WHERE AdrNr IN ('
+                .implode(',', array_fill(0, $nummern->count(), '?')).')',
+            $nummern->map(fn ($n) => (int) $n)->all(),
+        ))->keyBy(fn ($a) => (string) (int) $a->AdrNr);
+
+        return $liste->map(function ($buchungen, $konto) use ($namen, $arten, $linear) {
+            $adrnr = (string) $buchungen->first()['adrnr'];
+            $a = $adrnr !== '' ? $linear->get((string) (int) $adrnr) : null;
+            $kennzeichen = $a ? collect(['Schuler' => 'Schüler', 'Lehrer' => 'Lehrer', 'Eltern' => 'Eltern', 'Mitarbeiter' => 'Mitarbeiter'])
+                ->filter(fn ($_, $f) => trim((string) $a->$f) === 'J')->values() : collect();
+
+            return [
+                'konto' => $konto,
+                'adrnr' => $adrnr,
+                'name' => $namen[$konto] ?? '',
+                'kartenart' => $arten[$konto] ?? null,
+                'linear' => $a ? trim($a->Vorname.' '.$a->Nachname) : null,
+                'hinweis' => match (true) {
+                    $adrnr === '' => 'Konto in Menü&Serve ohne Linear-Nummer',
+                    ! $a => 'Linear-Nummer gibt es in Linear nicht',
+                    $kennzeichen->isEmpty() => 'in Linear weder Schüler, Lehrer, Eltern noch Mitarbeiter – wird nicht importiert',
+                    default => 'in Linear '.$kennzeichen->implode('/').' – beim nächsten Linear-Import erwartet',
+                },
+                'buchungen' => $buchungen->count(),
+                'tage' => $buchungen->pluck('tag')->unique()->sort()->values()->all(),
+            ];
+        })->sortBy('name')->values()->all();
+    }
+
+    /**
+     * Bereite Buchungen ab $ab als Bestellung anlegen – alle oder nur die eines Tages.
      *
      * @return array{angelegt: int, plan: list<array>}
      */
-    public function uebernehmen(Season $season, Carbon $ab, ?int $durch): array
+    public function uebernehmen(Season $season, Carbon $ab, ?int $durch, ?string $nurTag = null): array
     {
         $plan = $this->plan($season, $ab);
         $angelegt = 0;
 
-        DB::transaction(function () use ($season, $plan, $durch, &$angelegt) {
+        DB::transaction(function () use ($season, $plan, $durch, $nurTag, &$angelegt) {
             foreach ($plan as $b) {
-                if ($b['status'] !== 'bereit') {
+                if ($b['status'] !== 'bereit' || ($nurTag !== null && $b['tag'] !== $nurTag)) {
                     continue;
                 }
                 // Zwei Buchungen derselben Person am selben Tag (z. B. doppelt gebucht) nur einmal.
@@ -113,7 +195,7 @@ class MenueServeBuchungen
         return ['angelegt' => $angelegt, 'plan' => $plan];
     }
 
-    /** @return list<array{id: string, ms_id: string, tag: string, adrnr: string, menge: int, recsts: string, snack: bool}> */
+    /** @return list<array{id: string, ms_id: string, konto: string, tag: string, adrnr: string, menge: int, recsts: string, snack: bool}> */
     private function lesen(Carbon $ab): array
     {
         if (! Ekkon::mssqlKonfiguriert()) {
@@ -124,6 +206,7 @@ class MenueServeBuchungen
         return array_map(fn ($r) => [
             'id' => strtolower((string) $r->id),
             'ms_id' => strtolower((string) $r->ms_id),
+            'konto' => strtolower((string) $r->konto),
             'tag' => (string) $r->tag,
             'adrnr' => trim((string) $r->adrnr),
             'menge' => (int) $r->menge,
@@ -131,6 +214,7 @@ class MenueServeBuchungen
             'snack' => (int) $r->typ === MenueServeGerichte::TYP_SNACK,
         ], DB::connection(Ekkon::mssqlConnection())->select(
             "SELECT CONVERT(varchar(36), o.BOOBAS_ID) id, CONVERT(varchar(36), o.BOOBAS_FK_MNUBAS) ms_id,
+                    CONVERT(varchar(36), o.BOOBAS_FK_ACCBAS) konto,
                     CONVERT(varchar(10), k.CALBAS_DT_DATE, 23) tag, a.ACCBAS_DT_CODE adrnr,
                     o.BOOBAS_DT_QTY menge, o.BOOBAS_DT_RECSTS recsts, p.MNUPRP_DT_TYPE typ
                FROM {$mus}.dbo.BOOBAS o
