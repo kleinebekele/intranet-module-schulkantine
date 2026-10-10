@@ -105,7 +105,7 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
             // Zugriffsstufen, wo die Regel aus Anfrageart/Routenname nicht passt
             // (MODULES.md im Core, „Zugriffsstufen").
             ->lesend('servings.lookup', 'servings.lookup-eater', 'servings.terminal.search') // suchen nur
-            ->stufe(Zugriffsstufe::Verwalten, 'seasons.import', 'eaters.chip.issue', 'chips.register', 'dishes.menueserve.buchungen.uebernehmen') // legen an
+            ->stufe(Zugriffsstufe::Verwalten, 'seasons.import', 'eaters.chip.issue', 'chips.register', 'dishes.menueserve.buchungen.uebernehmen', 'dishes.menueserve.buchungen.ogs') // legen an
             ->stufe(Zugriffsstufe::Bearbeiten, 'dishes.photo.delete') // Teil von „Gericht bearbeiten"
             // Bereiche, die auf der Seite eines anderen Menüpunkts gepflegt werden –
             // sonst gälte die höchste Stufe im ganzen Modul (bei Eltern „verwalten").

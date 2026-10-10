@@ -12,6 +12,7 @@ use Intranet\Modules\Schulkantine\Models\Menu;
 use Intranet\Modules\Schulkantine\Models\MenuDay;
 use Intranet\Modules\Schulkantine\Models\Order;
 use Intranet\Modules\Schulkantine\Models\Season;
+use Intranet\Modules\Schulkantine\Models\Subscription;
 
 /**
  * Übernimmt die in Menü&Serve schon gebuchten Essen als Bestellungen.
@@ -162,6 +163,112 @@ class MenueServeBuchungen
                 'tage' => $buchungen->pluck('tag')->unique()->sort()->values()->all(),
             ];
         })->sortBy('name')->values()->all();
+    }
+
+    /**
+     * OGS-Abgleich: Für jedes OGS-Kind mit Menü&Serve-Buchungen im Zeitraum wird je
+     * Tag verglichen, ob es dort gebucht ist und ob es bei uns isst (Abo + einzelne
+     * An-/Abmeldungen, {@see OgsAttendance}). Abweichende Tage → Anmeldung bzw.
+     * Abmeldung für den Tag. OGS-Kinder mit aktivem Abo, die in Menü&Serve im ganzen
+     * Zeitraum nichts gebucht haben, werden nur aufgelistet (vielleicht ohne Konto dort).
+     *
+     * @param  list<array>  $plan
+     * @return array{kinder: list<array>, tage: list<string>, ohneBuchung: list<array>}
+     */
+    public function ogsAbgleich(Season $season, array $plan): array
+    {
+        $tage = collect($plan)->pluck('tag')->unique()->sort()
+            ->filter(fn ($t) => $season->isOpenOn(Carbon::parse($t)))->values();
+        if ($tage->isEmpty()) {
+            return ['kinder' => [], 'tage' => [], 'ohneBuchung' => []];
+        }
+        $ogs = collect($plan)->where('status', 'ogs');
+        $kinder = $ogs->groupBy(fn ($b) => $b['user']->id);
+        $subs = Subscription::where('season_id', $season->id)->get()->keyBy('user_id');
+        $zeilen = Order::where('season_id', $season->id)->whereNull('category_id')
+            ->whereIn('user_id', $kinder->keys())
+            ->whereBetween('date', [$tage->first(), $tage->last().' 23:59:59'])->get()
+            ->groupBy('user_id');
+
+        $liste = [];
+        foreach ($kinder as $userId => $buchungen) {
+            $gebucht = $buchungen->pluck('tag')->flip();
+            $eigene = $zeilen->get($userId, collect());
+            $sub = $subs->get($userId);
+            $abweichungen = [];
+            foreach ($tage as $t) {
+                $wir = OgsAttendance::attends($sub, Carbon::parse($t),
+                    $eigene->contains(fn ($o) => $o->date->toDateString() === $t && $o->status === Order::STATUS_ORDERED),
+                    $eigene->contains(fn ($o) => $o->date->toDateString() === $t && $o->status === Order::STATUS_CANCELLED));
+                $ms = $gebucht->has($t);
+                if ($ms !== $wir) {
+                    $abweichungen[$t] = $ms ? 'anmelden' : 'abmelden';
+                }
+            }
+            $liste[] = ['user' => $buchungen->first()['user'], 'abo' => $this->aboText($sub), 'gebucht' => $gebucht->count(), 'abweichungen' => $abweichungen];
+        }
+
+        // Mit Abo bei uns, aber in Menü&Serve nichts gebucht – nur zur Info.
+        $ohne = $subs->filter(fn ($s) => $s->active && ! $kinder->has($s->user_id))->keys();
+        $ohneBuchung = User::whereIn('id', $ohne)->orderBy('name')->get()
+            ->filter(fn ($u) => CustomerGroup::forUser($u)?->ordering_mode === CustomerGroup::MODE_JA_NEIN)
+            ->map(fn ($u) => ['user' => $u, 'abo' => $this->aboText($subs->get($u->id))])->values()->all();
+
+        usort($liste, fn ($a, $b) => [count($b['abweichungen']) === 0, $a['user']->name] <=> [count($a['abweichungen']) === 0, $b['user']->name]);
+
+        return ['kinder' => $liste, 'tage' => $tage->all(), 'ohneBuchung' => $ohneBuchung];
+    }
+
+    /**
+     * OGS-Abweichungen angleichen (wie OrderController::handleOgs, ohne Fristen) –
+     * alle oder nur die eines Tages.
+     *
+     * @return int Zahl der angeglichenen Kind-Tage
+     */
+    public function ogsAngleichen(Season $season, array $plan, ?string $nurTag = null): int
+    {
+        $abgleich = $this->ogsAbgleich($season, $plan);
+        $subs = Subscription::where('season_id', $season->id)->get()->keyBy('user_id');
+        $n = 0;
+
+        DB::transaction(function () use ($season, $abgleich, $subs, $nurTag, &$n) {
+            foreach ($abgleich['kinder'] as $k) {
+                foreach ($k['abweichungen'] as $tag => $aktion) {
+                    if ($nurTag !== null && $tag !== $nurTag) {
+                        continue;
+                    }
+                    $sub = $subs->get($k['user']->id);
+                    $standard = $sub && $sub->active && $sub->eatsWeekday(Carbon::parse($tag)->dayOfWeekIso);
+                    $basis = Order::where('season_id', $season->id)->where('user_id', $k['user']->id)
+                        ->whereDate('date', $tag)->whereNull('category_id');
+
+                    if ($aktion === 'anmelden') {
+                        (clone $basis)->where('status', Order::STATUS_CANCELLED)->delete();
+                        if (! $standard && ! (clone $basis)->where('status', Order::STATUS_ORDERED)->exists()) {
+                            Order::create(['season_id' => $season->id, 'user_id' => $k['user']->id, 'date' => $tag, 'status' => Order::STATUS_ORDERED]);
+                        }
+                    } else {
+                        (clone $basis)->where('status', Order::STATUS_ORDERED)->delete();
+                        if ($standard && ! (clone $basis)->where('status', Order::STATUS_CANCELLED)->exists()) {
+                            Order::create(['season_id' => $season->id, 'user_id' => $k['user']->id, 'date' => $tag, 'status' => Order::STATUS_CANCELLED]);
+                        }
+                    }
+                    $n++;
+                }
+            }
+        });
+
+        return $n;
+    }
+
+    private function aboText(?Subscription $sub): string
+    {
+        if (! $sub || ! $sub->active) {
+            return 'kein Abo';
+        }
+        $namen = [1 => 'Mo', 2 => 'Di', 3 => 'Mi', 4 => 'Do', 5 => 'Fr', 6 => 'Sa', 7 => 'So'];
+
+        return empty($sub->weekdays) ? 'Abo alle Tage' : 'Abo '.collect($sub->weekdays)->map(fn ($d) => $namen[$d] ?? $d)->implode(', ');
     }
 
     /**

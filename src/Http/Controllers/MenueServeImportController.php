@@ -180,16 +180,18 @@ class MenueServeImportController
             $buchungen = new MenueServeBuchungen;
             $plan = $season ? $buchungen->plan($season, $ab) : [];
             $unbekannt = $buchungen->unbekannte($plan);
+            $ogs = $season ? $buchungen->ogsAbgleich($season, $plan) : null;
             $fehler = $season ? null : 'Es ist keine Saison aktiv.';
         } catch (\Throwable $e) {
             report($e);
             $plan = [];
             $unbekannt = [];
+            $ogs = null;
             $fehler = $e->getMessage();
         }
 
         return view('schulkantine::dishes.menueserve-buchungen', [
-            'plan' => $plan, 'unbekannt' => $unbekannt, 'fehler' => $fehler, 'ab' => $ab,
+            'plan' => $plan, 'unbekannt' => $unbekannt, 'ogs' => $ogs, 'fehler' => $fehler, 'ab' => $ab,
             'statusText' => MenueServeBuchungen::STATUS,
         ]);
     }
@@ -207,6 +209,21 @@ class MenueServeImportController
         return redirect()->route('module.schulkantine.dishes.menueserve.buchungen', ['ab' => $ab->format('Y-m-d')])
             ->with('status', "{$e['angelegt']} Buchungen aus Menü&Serve als Bestellung übernommen"
                 .($tag ? ' ('.Carbon::parse($tag)->format('d.m.Y').').' : '.'));
+    }
+
+    /** OGS-Kinder an Menü&Serve angleichen (An-/Abmeldung je abweichendem Tag) – alle oder ein Tag. */
+    public function ogsAngleichen(Request $request)
+    {
+        $this->authorize($request);
+        $ab = $this->ab($request);
+        $season = Season::where('is_active', true)->firstOrFail();
+        $tag = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->input('tag')) ? (string) $request->input('tag') : null;
+
+        $buchungen = new MenueServeBuchungen;
+        $n = $buchungen->ogsAngleichen($season, $buchungen->plan($season, $ab), $tag);
+
+        return redirect()->route('module.schulkantine.dishes.menueserve.buchungen', ['ab' => $ab->format('Y-m-d')])
+            ->with('status', "OGS: {$n} Tage an Menü&Serve angeglichen".($tag ? ' ('.Carbon::parse($tag)->format('d.m.Y').').' : '.'));
     }
 
     private function ab(Request $request): Carbon
