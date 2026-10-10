@@ -24,6 +24,10 @@
                                 title="Fleischart (Symbol) aus der Menü&amp;Serve-Historie nachtragen – nur bei Gerichten ohne Angabe oder mit „Fleisch“">🐄🥦 Fleischarten nachholen</button>
                     </form>
                 @enddarfRoute
+                @darfRoute('module.schulkantine.dishes.menueserve.buchungen.uebernehmen')
+                    <a href="{{ route('module.schulkantine.dishes.menueserve.buchungen', ['ab' => $ab->format('Y-m-d')]) }}"
+                       class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Buchungen übernehmen</a>
+                @enddarfRoute
                 <a href="{{ route('module.schulkantine.dishes.index') }}" class="text-sm text-gray-500 hover:text-gray-700">← zurück zu den Gerichten</a>
             </div>
         </div>

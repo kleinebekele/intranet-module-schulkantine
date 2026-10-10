@@ -9,6 +9,7 @@ use Intranet\Modules\Schulkantine\Models\Diet;
 use Intranet\Modules\Schulkantine\Models\Dish;
 use Intranet\Modules\Schulkantine\Models\Season;
 use Intranet\Modules\Schulkantine\Support\Access;
+use Intranet\Modules\Schulkantine\Support\MenueServeBuchungen;
 use Intranet\Modules\Schulkantine\Support\MenueServeGerichte;
 use Intranet\Modules\Schulkantine\Support\MenueServeSpeiseplan;
 
@@ -166,6 +167,40 @@ class MenueServeImportController
         $geeignet = Diet::pluck('id')->diff($dish->unsuitableDiets->pluck('id'))->values()->all();
         $dish->update(['fleischart' => $art]);
         $dish->dietenSetzen($geeignet);
+    }
+
+    /** Vorschau: welche Menü&Serve-Buchungen würden als Bestellung übernommen? */
+    public function buchungen(Request $request)
+    {
+        $this->authorize($request);
+        $ab = $this->ab($request);
+        $season = Season::where('is_active', true)->first();
+
+        try {
+            $plan = $season ? (new MenueServeBuchungen)->plan($season, $ab) : [];
+            $fehler = $season ? null : 'Es ist keine Saison aktiv.';
+        } catch (\Throwable $e) {
+            report($e);
+            $plan = [];
+            $fehler = $e->getMessage();
+        }
+
+        return view('schulkantine::dishes.menueserve-buchungen', [
+            'plan' => $plan, 'fehler' => $fehler, 'ab' => $ab,
+            'statusText' => MenueServeBuchungen::STATUS,
+        ]);
+    }
+
+    public function buchungenUebernehmen(Request $request)
+    {
+        $this->authorize($request);
+        $ab = $this->ab($request);
+        $season = Season::where('is_active', true)->firstOrFail();
+
+        $e = (new MenueServeBuchungen)->uebernehmen($season, $ab, $request->user()->id);
+
+        return redirect()->route('module.schulkantine.dishes.menueserve.buchungen', ['ab' => $ab->format('Y-m-d')])
+            ->with('status', "{$e['angelegt']} Buchungen aus Menü&Serve als Bestellung übernommen.");
     }
 
     private function ab(Request $request): Carbon

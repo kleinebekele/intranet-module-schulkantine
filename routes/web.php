@@ -85,6 +85,8 @@ Route::middleware(['web', 'auth'])
         // Menü&Serve-Menüs unseren Gerichten zuordnen (liest dort nur).
         Route::get('gerichte/menueserve', [MenueServeImportController::class, 'index'])->name('dishes.menueserve');
         Route::post('gerichte/menueserve', [MenueServeImportController::class, 'save'])->name('dishes.menueserve.save');
+        Route::get('gerichte/menueserve/buchungen', [MenueServeImportController::class, 'buchungen'])->name('dishes.menueserve.buchungen');
+        Route::post('gerichte/menueserve/buchungen', [MenueServeImportController::class, 'buchungenUebernehmen'])->name('dishes.menueserve.buchungen.uebernehmen');
         Route::post('gerichte/menueserve/symbole', [MenueServeImportController::class, 'symbole'])->name('dishes.menueserve.symbole');
         Route::post('gerichte', [DishController::class, 'store'])->name('dishes.store');
         Route::get('gerichte/{dish}/bearbeiten', [DishController::class, 'edit'])->name('dishes.edit');
