@@ -39,16 +39,19 @@ class MyBillingController
         $rechner = new HaushaltsAbrechnung;
         $frueher = Season::where('id', '!=', $aktiv->id)->whereDate('start_date', '<', $aktiv->start_date)
             ->orderByDesc('start_date')->get();
-        // Was das Altsystem vor der ersten Saison abgerechnet hat (ab 2026) – je Schuljahr.
+        // Was das Altsystem vor der ersten Saison abgerechnet hat (ab 2026), gehört mit in
+        // die aktuelle Tabelle – abgetrennt werden nur echte frühere Saisons.
         $ersteSaison = Season::orderBy('start_date')->value('start_date');
+        $aktuell = $rechner->mitAltsystem(
+            $rechner->saison($aktiv, $haushalt),
+            $rechner->altZeitraeume($haushalt, $ersteSaison ? Carbon::parse($ersteSaison) : null),
+            $haushalt,
+        );
 
         return view('schulkantine::billing.index', [
             'season' => $aktiv,
-            'aktuell' => $rechner->saison($aktiv, $haushalt),
-            'frueher' => array_merge(
-                $frueher->map(fn (Season $s) => $rechner->saison($s, $haushalt))->all(),
-                $rechner->altZeitraeume($haushalt, $ersteSaison ? Carbon::parse($ersteSaison) : null),
-            ),
+            'aktuell' => $aktuell,
+            'frueher' => $frueher->map(fn (Season $s) => $rechner->saison($s, $haushalt))->all(),
             'linearStand' => \Intranet\Modules\Schulkantine\Models\Setting::current()->linear_charges_at,
         ]);
     }
@@ -61,7 +64,8 @@ class MyBillingController
         [$y, $m] = [(int) $mm[1], (int) $mm[2]];
 
         $daten = (new HaushaltsAbrechnung)->monat($this->household($viewer), $y, $m);
-        abort_unless($daten && $daten['monat']['abgeschlossen'], 404, 'Für laufende Monate gibt es noch kein PDF.');
+        abort_unless($daten && $daten['monat']['abgeschlossen'] && ! $daten['monat']['nurAlt'], 404,
+            'Ein PDF gibt es nur für abgeschlossene Monate mit Einzelposten.');
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulkantine::billing.pdf', [
             'titel' => $daten['season']?->name ? 'Saison „'.$daten['season']->name.'"' : 'aus dem Altsystem',
