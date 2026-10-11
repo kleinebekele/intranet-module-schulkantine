@@ -1,9 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center gap-2">
-            <x-module-icon name="restaurant" class="text-2xl text-indigo-600" />
-            <h1 class="text-xl font-semibold text-gray-800">Buchungen aus Menü&amp;Serve übernehmen</h1>
-        </div>
+        @include('schulkantine::seasons._kopf')
     </x-slot>
 
     @php
@@ -17,26 +14,22 @@
     @endphp
 
     <div class="w-full space-y-5">
+        @include('schulkantine::seasons._menueserve-nav', ['unter' => 'buchungen'])
         <div class="flex flex-wrap items-end justify-between gap-3">
-            <form method="GET" action="{{ route('module.schulkantine.dishes.menueserve.buchungen') }}" class="flex items-end gap-2">
+            <form method="GET" action="{{ route('module.schulkantine.seasons.menueserve.buchungen') }}" class="flex items-end gap-2">
                 <div>
                     <label for="ab" class="block text-xs font-medium text-gray-500">Buchungen ab</label>
                     <input id="ab" name="ab" type="date" value="{{ $ab->format('Y-m-d') }}" onchange="this.form.submit()"
                            class="mt-1 rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </div>
             </form>
-            <div class="flex items-center gap-3">
-                <a href="{{ route('module.schulkantine.dishes.menueserve.ogs-muster') }}"
-                   class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">OGS-Abos aus Historie</a>
-                <a href="{{ route('module.schulkantine.dishes.menueserve', ['ab' => $ab->format('Y-m-d')]) }}" class="text-sm text-gray-500 hover:text-gray-700">← zurück zur Menü-Zuordnung</a>
-            </div>
         </div>
 
         <p class="text-sm text-gray-500">
             Jede Buchung wird über die Linear-Nummer einer Person zugeordnet und als Bestellung für das Speiseplan-Menü
             des Tages angelegt (ohne Bestellfristen). Voraussetzung: das Menü ist zugeordnet und steht vollständig im Speiseplan.
             <strong>Für jeden übernommenen Tag werden alle bisherigen Menü- und Gericht-Bestellungen bei uns ersetzt</strong>
-            (Menü&amp;Serve ist bis zum Umstieg die Quelle; ein zweiter Lauf ergibt dasselbe). OGS-Kinder laufen bei uns über das Abo – dafür der OGS-Abgleich unten.
+            (Menü&amp;Serve ist bis zum Umstieg die Quelle; ein zweiter Lauf ergibt dasselbe). OGS-Kinder laufen bei uns über das Abo – dafür der Tab „OGS übernehmen".
         </p>
 
         @if ($fehler)
@@ -78,7 +71,7 @@
                                     <td class="px-3 py-2 text-right tabular-nums {{ $ersetzt ? 'text-red-700' : 'text-gray-300' }}">{{ $ersetzt ?: '–' }}</td>
                                     <td class="px-3 py-2 text-right">
                                         @if ($tagBereit > 0)
-                                            <form method="POST" action="{{ route('module.schulkantine.dishes.menueserve.buchungen.uebernehmen') }}"
+                                            <form method="POST" action="{{ route('module.schulkantine.seasons.menueserve.buchungen.uebernehmen') }}"
                                                   onsubmit="return confirm(@js($tagBereit.' Buchungen vom '.\Illuminate\Support\Carbon::parse($tag)->format('d.m.Y').' als Bestellung anlegen? '.$ersetzt.' bisherige Bestellzeilen dieses Tages werden ersetzt.'))">
                                                 @csrf
                                                 <input type="hidden" name="ab" value="{{ $ab->format('Y-m-d') }}">
@@ -93,88 +86,6 @@
                     </table>
                 </div>
             </div>
-
-            {{-- OGS-Abgleich: Menü&Serve-Buchung gegen Abo + An-/Abmeldungen bei uns --}}
-            @if ($ogs && $ogs['kinder'])
-                @php
-                    $abweichend = collect($ogs['kinder'])->filter(fn ($k) => $k['abweichungen']);
-                    $ogsSumme = $abweichend->sum(fn ($k) => count($k['abweichungen']));
-                @endphp
-                <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
-                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-2">
-                        <div class="text-sm font-semibold text-gray-700">
-                            OGS-Abgleich – {{ count($ogs['kinder']) }} Kinder mit Menü&amp;Serve-Buchung,
-                            {{ $abweichend->count() }} weichen an {{ $ogsSumme }} Tagen ab
-                        </div>
-                        @if ($ogsSumme > 0)
-                            <form method="POST" action="{{ route('module.schulkantine.dishes.menueserve.buchungen.ogs') }}"
-                                  onsubmit="return confirm(@js('Alle '.$ogsSumme.' abweichenden OGS-Tage an Menü&Serve angleichen (An-/Abmeldung je Tag)?'))">
-                                @csrf
-                                <input type="hidden" name="ab" value="{{ $ab->format('Y-m-d') }}">
-                                <button type="submit" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700">Alle angleichen</button>
-                            </form>
-                        @endif
-                    </div>
-                    <p class="px-4 py-2 text-xs text-gray-500">
-                        <span class="font-semibold text-green-700">+</span> = in Menü&amp;Serve gebucht, isst bei uns nicht → wird angemeldet ·
-                        <span class="font-semibold text-red-700">−</span> = isst bei uns laut Abo, in Menü&amp;Serve nicht gebucht → wird abgemeldet ·
-                        <span class="text-gray-400">·</span> = stimmt überein.
-                    </p>
-                    @if ($ogsSumme > 0)
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
-                                <thead>
-                                    <tr class="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400">
-                                        <th class="px-4 py-2 font-medium">Kind</th>
-                                        <th class="px-3 py-2 font-medium">bei uns</th>
-                                        @foreach ($ogs['tage'] as $t)
-                                            <th class="px-2 py-2 text-center font-medium">{{ \Illuminate\Support\Carbon::parse($t)->locale('de')->isoFormat('dd DD.MM.') }}</th>
-                                        @endforeach
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100">
-                                    @foreach ($abweichend as $k)
-                                        <tr>
-                                            <td class="whitespace-nowrap px-4 py-1.5 font-medium text-gray-900">{{ $k['user']->name }}</td>
-                                            <td class="whitespace-nowrap px-3 py-1.5 text-xs text-gray-500">{{ $k['abo'] }}</td>
-                                            @foreach ($ogs['tage'] as $t)
-                                                @php $a = $k['abweichungen'][$t] ?? null; @endphp
-                                                <td class="px-2 py-1.5 text-center font-semibold {{ $a === 'anmelden' ? 'text-green-700' : ($a ? 'text-red-700' : 'text-gray-300') }}"
-                                                    title="{{ $a === 'anmelden' ? 'wird angemeldet' : ($a ? 'wird abgemeldet' : 'stimmt') }}">{{ $a === 'anmelden' ? '+' : ($a ? '−' : '·') }}</td>
-                                            @endforeach
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                                <tfoot>
-                                    <tr class="border-t border-gray-200 bg-gray-50">
-                                        <td colspan="2" class="px-4 py-1.5 text-xs text-gray-500">je Tag</td>
-                                        @foreach ($ogs['tage'] as $t)
-                                            @php $nTag = $abweichend->filter(fn ($k) => isset($k['abweichungen'][$t]))->count(); @endphp
-                                            <td class="px-2 py-1.5 text-center">
-                                                @if ($nTag > 0)
-                                                    <form method="POST" action="{{ route('module.schulkantine.dishes.menueserve.buchungen.ogs') }}"
-                                                          onsubmit="return confirm(@js($nTag.' OGS-Kinder am '.\Illuminate\Support\Carbon::parse($t)->format('d.m.Y').' angleichen?'))">
-                                                        @csrf
-                                                        <input type="hidden" name="ab" value="{{ $ab->format('Y-m-d') }}">
-                                                        <input type="hidden" name="tag" value="{{ $t }}">
-                                                        <button type="submit" class="rounded-md border border-sky-300 bg-white px-1.5 py-0.5 text-xs font-medium text-sky-800 hover:bg-sky-50" title="Diesen Tag angleichen">{{ $nTag }}</button>
-                                                    </form>
-                                                @endif
-                                            </td>
-                                        @endforeach
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    @endif
-                    @if ($ogs['ohneBuchung'])
-                        <div class="border-t border-gray-100 px-4 py-2 text-xs text-gray-500">
-                            Mit Abo bei uns, aber in Menü&amp;Serve im Zeitraum nichts gebucht (bleibt unverändert):
-                            {{ collect($ogs['ohneBuchung'])->map(fn ($o) => $o['user']->name.' ('.$o['abo'].')')->implode(', ') }}
-                        </div>
-                    @endif
-                </div>
-            @endif
 
             {{-- Unbekannte Konten: wer ist das? --}}
             @if ($unbekannt)
@@ -228,7 +139,7 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('module.schulkantine.dishes.menueserve.buchungen.uebernehmen') }}" class="flex justify-end"
+            <form method="POST" action="{{ route('module.schulkantine.seasons.menueserve.buchungen.uebernehmen') }}" class="flex justify-end"
                   onsubmit="return confirm(@js($bereit.' Buchungen als Bestellung anlegen? Alle bisherigen Menü-/Gericht-Bestellungen dieser Tage ('.array_sum($vorhanden).' Zeilen) werden ersetzt.'))">
                 @csrf
                 <input type="hidden" name="ab" value="{{ $ab->format('Y-m-d') }}">

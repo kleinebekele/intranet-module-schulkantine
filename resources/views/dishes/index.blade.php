@@ -6,13 +6,6 @@
                 <h1 class="text-xl font-semibold text-gray-800">Gerichte</h1>
             </div>
             <div class="flex items-center gap-2">
-                @darfRoute('module.schulkantine.dishes.menueserve.save')
-                <a href="{{ route('module.schulkantine.dishes.menueserve') }}"
-                   class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                    <x-module-icon name="download" class="text-base" />
-                    Menü&amp;Serve zuordnen
-                </a>
-                @enddarfRoute
                 @darfRoute('module.schulkantine.dishes.create')
                 <a href="{{ route('module.schulkantine.dishes.create', request()->only(['search', 'category', 'status', 'sort'])) }}"
                    class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">

@@ -1,9 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center gap-2">
-            <x-module-icon name="restaurant" class="text-2xl text-indigo-600" />
-            <h1 class="text-xl font-semibold text-gray-800">OGS-Abos aus der Menü&amp;Serve-Historie</h1>
-        </div>
+        @include('schulkantine::seasons._kopf')
     </x-slot>
 
     @php
@@ -12,8 +9,11 @@
     @endphp
 
     <div class="w-full space-y-5">
+        @include('schulkantine::seasons._menueserve-nav', ['unter' => 'ogs'])
+        <h2 class="text-base font-semibold text-gray-800">OGS-Abos aus der Menü&amp;Serve-Historie</h2>
         <div class="flex flex-wrap items-end justify-between gap-3">
-            <form method="GET" action="{{ route('module.schulkantine.dishes.menueserve.ogs-muster') }}" class="flex items-end gap-2">
+            <form method="GET" action="{{ route('module.schulkantine.seasons.menueserve.ogs') }}" class="flex items-end gap-2">
+                <input type="hidden" name="ab" value="{{ $ab->format('Y-m-d') }}">
                 <div>
                     <label for="von" class="block text-xs font-medium text-gray-500">von</label>
                     <input id="von" name="von" type="date" value="{{ $von->format('Y-m-d') }}" onchange="this.form.submit()"
@@ -25,7 +25,6 @@
                            class="mt-1 rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </div>
             </form>
-            <a href="{{ route('module.schulkantine.dishes.menueserve.buchungen') }}" class="text-sm text-gray-500 hover:text-gray-700">← zurück zu den Buchungen</a>
         </div>
 
         <p class="text-sm text-gray-500">
@@ -53,7 +52,7 @@
                 $offen = collect($muster['kinder'])->reject($erledigt)->values();
                 $fertig = collect($muster['kinder'])->filter($erledigt)->values();
             @endphp
-            <form method="POST" action="{{ route('module.schulkantine.dishes.menueserve.ogs-muster.setzen') }}" class="space-y-4"
+            <form method="POST" action="{{ route('module.schulkantine.seasons.menueserve.ogs.abos') }}" class="space-y-4"
                   onsubmit="return confirm('Abos der angehakten Kinder nach den gewählten Wochentagen setzen?')">
                 @csrf
                 <input type="hidden" name="von" value="{{ $von->format('Y-m-d') }}">
@@ -90,5 +89,25 @@
         @elseif (! $fehler)
             <div class="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-500">Im Zeitraum gibt es keine OGS-Buchungen in Menü&amp;Serve.</div>
         @endif
+
+        <div class="space-y-3 border-t border-gray-200 pt-5">
+            <div class="flex flex-wrap items-end justify-between gap-3">
+                <h2 class="text-base font-semibold text-gray-800">Tageweiser Abgleich mit den Menü&amp;Serve-Buchungen</h2>
+                <form method="GET" action="{{ route('module.schulkantine.seasons.menueserve.ogs') }}" class="flex items-end gap-2">
+                    <input type="hidden" name="von" value="{{ $von->format('Y-m-d') }}">
+                    <input type="hidden" name="bis" value="{{ $bis->format('Y-m-d') }}">
+                    <div>
+                        <label for="ab" class="block text-xs font-medium text-gray-500">Buchungen ab</label>
+                        <input id="ab" name="ab" type="date" value="{{ $ab->format('Y-m-d') }}" onchange="this.form.submit()"
+                               class="mt-1 rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </div>
+                </form>
+            </div>
+            @if ($ogs && $ogs['kinder'])
+                @include('schulkantine::dishes.partials.ogs-abgleich')
+            @elseif (! $fehler)
+                <div class="rounded-xl border border-gray-200 bg-white px-4 py-6 text-center text-sm text-gray-500">Keine OGS-Buchungen in Menü&amp;Serve ab {{ $ab->format('d.m.Y') }}.</div>
+            @endif
+        </div>
     </div>
 </x-app-layout>

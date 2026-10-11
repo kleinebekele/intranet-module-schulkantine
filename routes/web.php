@@ -48,6 +48,15 @@ Route::middleware(['web', 'auth', AlsPerson::class])
         Route::get('saisons/neu', [SeasonController::class, 'create'])->name('seasons.create');
         Route::post('saisons', [SeasonController::class, 'store'])->name('seasons.store');
         Route::get('saisons/{season}', [SeasonController::class, 'show'])->name('seasons.show');
+        // Import aus Menü&Serve – als Tab der (einen) Umstiegs-Saison (liest dort nur).
+        Route::get('saisons/{season}/menueserve', [MenueServeImportController::class, 'index'])->name('seasons.menueserve');
+        Route::post('saisons/{season}/menueserve', [MenueServeImportController::class, 'save'])->name('seasons.menueserve.save');
+        Route::post('saisons/{season}/menueserve/symbole', [MenueServeImportController::class, 'symbole'])->name('seasons.menueserve.symbole');
+        Route::get('saisons/{season}/menueserve/buchungen', [MenueServeImportController::class, 'buchungen'])->name('seasons.menueserve.buchungen');
+        Route::post('saisons/{season}/menueserve/buchungen', [MenueServeImportController::class, 'buchungenUebernehmen'])->name('seasons.menueserve.buchungen.uebernehmen');
+        Route::get('saisons/{season}/menueserve/ogs', [MenueServeImportController::class, 'ogs'])->name('seasons.menueserve.ogs');
+        Route::post('saisons/{season}/menueserve/ogs/angleichen', [MenueServeImportController::class, 'ogsAngleichen'])->name('seasons.menueserve.ogs.angleichen');
+        Route::post('saisons/{season}/menueserve/ogs/abos', [MenueServeImportController::class, 'ogsMusterSetzen'])->name('seasons.menueserve.ogs.abos');
         Route::get('saisons/{season}/bearbeiten', [SeasonController::class, 'edit'])->name('seasons.edit');
         Route::put('saisons/{season}', [SeasonController::class, 'update'])->name('seasons.update');
         Route::delete('saisons/{season}', [SeasonController::class, 'destroy'])->name('seasons.destroy');
@@ -84,15 +93,6 @@ Route::middleware(['web', 'auth', AlsPerson::class])
         // Gerichte
         Route::get('gerichte', [DishController::class, 'index'])->name('dishes.index');
         Route::get('gerichte/neu', [DishController::class, 'create'])->name('dishes.create');
-        // Menü&Serve-Menüs unseren Gerichten zuordnen (liest dort nur).
-        Route::get('gerichte/menueserve', [MenueServeImportController::class, 'index'])->name('dishes.menueserve');
-        Route::post('gerichte/menueserve', [MenueServeImportController::class, 'save'])->name('dishes.menueserve.save');
-        Route::get('gerichte/menueserve/buchungen', [MenueServeImportController::class, 'buchungen'])->name('dishes.menueserve.buchungen');
-        Route::post('gerichte/menueserve/buchungen', [MenueServeImportController::class, 'buchungenUebernehmen'])->name('dishes.menueserve.buchungen.uebernehmen');
-        Route::post('gerichte/menueserve/buchungen/ogs', [MenueServeImportController::class, 'ogsAngleichen'])->name('dishes.menueserve.buchungen.ogs');
-        Route::get('gerichte/menueserve/ogs-muster', [MenueServeImportController::class, 'ogsMuster'])->name('dishes.menueserve.ogs-muster');
-        Route::post('gerichte/menueserve/ogs-muster', [MenueServeImportController::class, 'ogsMusterSetzen'])->name('dishes.menueserve.ogs-muster.setzen');
-        Route::post('gerichte/menueserve/symbole', [MenueServeImportController::class, 'symbole'])->name('dishes.menueserve.symbole');
         Route::post('gerichte', [DishController::class, 'store'])->name('dishes.store');
         Route::get('gerichte/{dish}/bearbeiten', [DishController::class, 'edit'])->name('dishes.edit');
         Route::put('gerichte/{dish}', [DishController::class, 'update'])->name('dishes.update');

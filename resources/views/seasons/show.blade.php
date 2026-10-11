@@ -53,6 +53,11 @@
             <button type="button" @click="tab = 'einstellungen'"
                     :class="tab === 'einstellungen' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'"
                     class="rounded-md px-3 py-1.5 font-medium">Einstellungen</button>
+            {{-- Import aus dem Altsystem – nur bei der Saison des Umstiegs --}}
+            @if (\Intranet\Modules\Schulkantine\Http\Controllers\MenueServeImportController::fuerSaison($season))
+                <a href="{{ route('module.schulkantine.seasons.menueserve', $season) }}"
+                   class="rounded-md px-3 py-1.5 font-medium text-gray-600 hover:bg-gray-50">Menü&amp;Serve</a>
+            @endif
         </div>
 
         {{-- ========================= TAB 1: SCHLIESSTAGE ========================= --}}

@@ -1,14 +1,12 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center gap-2">
-            <x-module-icon name="restaurant" class="text-2xl text-indigo-600" />
-            <h1 class="text-xl font-semibold text-gray-800">Menü&amp;Serve-Menüs zuordnen</h1>
-        </div>
+        @include('schulkantine::seasons._kopf')
     </x-slot>
 
     <div class="w-full space-y-5">
+        @include('schulkantine::seasons._menueserve-nav', ['unter' => 'menues'])
         <div class="flex flex-wrap items-end justify-between gap-3">
-            <form method="GET" action="{{ route('module.schulkantine.dishes.menueserve') }}" class="flex items-end gap-2">
+            <form method="GET" action="{{ route('module.schulkantine.seasons.menueserve') }}" class="flex items-end gap-2">
                 <div>
                     <label for="ab" class="block text-xs font-medium text-gray-500">Menüs ab</label>
                     <input id="ab" name="ab" type="date" value="{{ $ab->format('Y-m-d') }}" onchange="this.form.submit()"
@@ -16,19 +14,14 @@
                 </div>
             </form>
             <div class="flex items-center gap-4">
-                @darfRoute('module.schulkantine.dishes.menueserve.symbole')
-                    <form method="POST" action="{{ route('module.schulkantine.dishes.menueserve.symbole') }}"
+                @darfRoute('module.schulkantine.seasons.menueserve.symbole')
+                    <form method="POST" action="{{ route('module.schulkantine.seasons.menueserve.symbole') }}"
                           onsubmit="return confirm('Fleischarten aus allen bisherigen Menü&Serve-Menüs nachtragen? Gerichte mit eigener Fleischart bleiben unverändert.')">
                         @csrf
                         <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                                 title="Fleischart (Symbol) aus der Menü&amp;Serve-Historie nachtragen – nur bei Gerichten ohne Angabe oder mit „Fleisch“">🐄🥦 Fleischarten nachholen</button>
                     </form>
                 @enddarfRoute
-                @darfRoute('module.schulkantine.dishes.menueserve.buchungen.uebernehmen')
-                    <a href="{{ route('module.schulkantine.dishes.menueserve.buchungen', ['ab' => $ab->format('Y-m-d')]) }}"
-                       class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Buchungen übernehmen</a>
-                @enddarfRoute
-                <a href="{{ route('module.schulkantine.dishes.index') }}" class="text-sm text-gray-500 hover:text-gray-700">← zurück zu den Gerichten</a>
             </div>
         </div>
 
@@ -76,7 +69,7 @@
         @endif
 
         @if ($menues)
-            <form method="POST" action="{{ route('module.schulkantine.dishes.menueserve.save') }}" class="space-y-4">
+            <form method="POST" action="{{ route('module.schulkantine.seasons.menueserve.save') }}" class="space-y-4">
                 @csrf
                 <input type="hidden" name="ab" value="{{ $ab->format('Y-m-d') }}">
 
