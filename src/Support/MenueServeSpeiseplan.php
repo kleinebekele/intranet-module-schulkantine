@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 use Intranet\Modules\Schulkantine\Models\Dish;
 use Intranet\Modules\Schulkantine\Models\Menu;
 use Intranet\Modules\Schulkantine\Models\MenuDay;
+use Intranet\Modules\Schulkantine\Models\Order;
 use Intranet\Modules\Schulkantine\Models\Season;
 
 /**
@@ -23,10 +24,14 @@ class MenueServeSpeiseplan
 {
     /**
      * @param  Collection<int, object>  $zuordnungen  Zeilen aus kantine_menueserve_zuordnungen (+ linie)
+     * @param  bool  $andereEntfernen  an jedem vollständig übernommenen Tag alle übrigen Speisen
+     *                                 (andere Menüs, Einzelgerichte) samt ihren Bestellungen entfernen
      * @return list<array{datum: string, titel: string, ok: bool, text: string}>
      */
-    public function uebernehmen(Season $season, Collection $zuordnungen): array
+    public function uebernehmen(Season $season, Collection $zuordnungen, bool $andereEntfernen = false): array
     {
+        // Je Tag: was aus Menü&Serve kam (bleibt) und ob etwas schiefging (dann nichts entfernen).
+        $behalten = [];
         $release = new ReleaseService;
         $rollout = new MenuRolloutService($release);
         $gerichte = Dish::whereIn('id', $zuordnungen->pluck('hauptspeise_id')->merge($zuordnungen->pluck('nachspeise_id'))->filter())
@@ -36,7 +41,15 @@ class MenueServeSpeiseplan
 
         foreach ($zuordnungen as $z) {
             $tag = Carbon::parse($z->datum)->startOfDay();
-            $zeile = fn (bool $ok, string $text) => ['datum' => $tag->format('d.m.Y'), 'titel' => $z->titel, 'ok' => $ok, 'text' => $text];
+            $ds = $tag->toDateString();
+            $behalten[$ds] ??= ['menuDays' => [], 'menus' => [], 'fehler' => false];
+            $zeile = function (bool $ok, string $text) use ($tag, $z, $ds, &$behalten) {
+                if (! $ok) {
+                    $behalten[$ds]['fehler'] = true;
+                }
+
+                return ['datum' => $tag->format('d.m.Y'), 'titel' => $z->titel, 'ok' => $ok, 'text' => $text];
+            };
             $haupt = $gerichte->get($z->hauptspeise_id);
             $nach = $gerichte->get($z->nachspeise_id);
 
@@ -63,6 +76,7 @@ class MenueServeSpeiseplan
 
             if (! empty($z->snack)) {
                 $neu = $this->aufTagesplan($season, $tag, $haupt);
+                $behalten[$ds]['menus'][] = Menu::where('season_id', $season->id)->whereDate('date', $ds)->where('dish_id', $haupt->id)->value('id');
                 $ergebnis[] = $zeile(true, 'Snack „'.$haupt->name.'"'.($neu ? ' auf den Tagesplan gesetzt' : ' stand schon auf dem Tagesplan'));
 
                 continue;
@@ -92,13 +106,43 @@ class MenueServeSpeiseplan
             }
 
             $menuDay = $passend->first();
+            $behalten[$ds]['menuDays'][] = $menuDay->id;
             foreach ($this->plaetze($menuDay, $haupt, $nach) as $slotId => $dishId) {
                 $menuDay->slots->firstWhere('id', $slotId)->update(['dish_id' => $dishId]);
             }
             $ergebnis[] = $zeile(true, '„'.$menuDay->name.'": '.collect([$haupt?->name, $nach?->name])->filter()->implode(' + '));
         }
 
+        if ($andereEntfernen) {
+            foreach ($behalten as $ds => $b) {
+                if ($b['fehler'] || ($b['menuDays'] === [] && $b['menus'] === [])) {
+                    continue;
+                }
+                $ergebnis[] = $this->andereEntfernen($season, $ds, $b['menuDays'], array_filter($b['menus']));
+            }
+        }
+
         return $ergebnis;
+    }
+
+    /**
+     * Alle übrigen Speisen eines Tages entfernen: Menüs und Einzelgerichte, die nicht
+     * aus Menü&Serve kamen – und ihre Bestellungen (sonst blieben sie ohne Speise stehen).
+     */
+    private function andereEntfernen(Season $season, string $ds, array $menuDays, array $menus): array
+    {
+        $wegMd = MenuDay::where('season_id', $season->id)->whereDate('date', $ds)->whereNotIn('id', $menuDays)->get();
+        $wegM = Menu::where('season_id', $season->id)->whereDate('date', $ds)->whereNotIn('id', $menus)->get();
+        $bestellungen = Order::where('season_id', $season->id)->whereDate('date', $ds)
+            ->where(fn ($q) => $q->whereIn('menu_day_id', $wegMd->pluck('id'))->orWhereIn('menu_id', $wegM->pluck('id')))
+            ->delete();
+        $wegMd->each->delete();
+        $wegM->each->delete();
+
+        return ['datum' => Carbon::parse($ds)->format('d.m.Y'), 'titel' => 'Übrige Speisen', 'ok' => true,
+            'text' => $wegMd->isEmpty() && $wegM->isEmpty()
+                ? 'nichts weiter zu entfernen'
+                : $wegMd->count().' Menüs und '.$wegM->count().' Einzelgerichte entfernt'.($bestellungen ? " ({$bestellungen} Bestellzeilen)" : '')];
     }
 
     /** Einzelgericht auf den Tagesplan – idempotent (wie MenuController::addDishToPlan). */

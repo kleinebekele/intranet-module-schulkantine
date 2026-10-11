@@ -116,7 +116,7 @@ class MenueServeImportController
                 $z->linie = $menues->get($z->ms_id)['linie'] ?? null;
                 $z->snack = (bool) ($menues->get($z->ms_id)['snack'] ?? false);
             });
-        $ergebnis = (new MenueServeSpeiseplan)->uebernehmen($season, $zuordnungen);
+        $ergebnis = (new MenueServeSpeiseplan)->uebernehmen($season, $zuordnungen, $request->boolean('andere_entfernen'));
         $ok = count(array_filter($ergebnis, fn ($e) => $e['ok']));
 
         return $zurueck

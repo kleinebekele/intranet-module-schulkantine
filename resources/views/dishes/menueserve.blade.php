@@ -138,10 +138,18 @@
                     </div>
                 </div>
 
-                <div class="flex flex-wrap justify-end gap-2">
+                <div x-data="{ andere: false }" class="flex flex-wrap items-center justify-end gap-3">
+                    <label class="flex items-center gap-2 text-sm text-gray-700"
+                           title="An jedem übernommenen Tag alles entfernen, was nicht aus Menü&Serve kommt – andere Menüs, Einzelgerichte und deren Bestellungen">
+                        <input type="checkbox" name="andere_entfernen" value="1" x-model="andere"
+                               class="rounded border-gray-300 text-red-600 focus:ring-red-500">
+                        übrige Speisen dieser Tage entfernen
+                    </label>
                     <button type="submit" name="aktion" value="speichern" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Zuordnung speichern</button>
                     <button type="submit" name="aktion" value="speiseplan"
-                            onclick="return confirm('Zuordnung speichern und alle Menüs in den Speiseplan eintragen? Die Plätze für Haupt- und Nachspeise werden dort überschrieben.')"
+                            :data-bestaetigen="andere
+                                ? 'Zuordnung speichern und alle Menüs in den Speiseplan eintragen? An jedem übernommenen Tag werden außerdem ALLE anderen Speisen entfernt – andere Menüs, Einzelgerichte und deren Bestellungen.'
+                                : 'Zuordnung speichern und alle Menüs in den Speiseplan eintragen? Die Plätze für Haupt- und Nachspeise werden dort überschrieben; andere Speisen des Tages bleiben.'"
                             class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Speichern und in den Speiseplan übernehmen</button>
                 </div>
             </form>
