@@ -44,7 +44,10 @@
         @if ($muster && $muster['kinder'])
             @php
                 $wt = $muster['wochentage'];
-                $anders = collect($muster['kinder'])->filter(fn ($k) => $k['vorschlag'] !== $k['aktuell']);
+                // Erledigt = Abo passt zum eindeutigen Muster, oder bei unklaren Kindern: es ist ein Abo gesetzt.
+                $erledigt = fn ($k) => $k['unklar'] ? $k['aktuell'] !== [] : $k['vorschlag'] === $k['aktuell'];
+                $offen = collect($muster['kinder'])->reject($erledigt)->values();
+                $fertig = collect($muster['kinder'])->filter($erledigt)->values();
             @endphp
             <form method="POST" action="{{ route('module.schulkantine.dishes.menueserve.ogs-muster.setzen') }}" class="space-y-4"
                   onsubmit="return confirm('Abos der angehakten Kinder nach den gewählten Wochentagen setzen?')">
@@ -55,54 +58,26 @@
 
                 <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
                     <div class="border-b border-gray-100 px-4 py-2 text-sm font-semibold text-gray-700">
-                        {{ count($muster['kinder']) }} OGS-Kinder · Kantinentage:
+                        Offen – {{ $offen->count() }} von {{ count($muster['kinder']) }} OGS-Kindern · Kantinentage:
                         {{ collect($muster['jeWochentag'])->map(fn ($n, $d) => $namen[$d].' '.$n)->implode(', ') }}
-                        · {{ $anders->count() }} mit anderem Muster als ihr Abo (vorausgewählt)
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead>
-                                <tr class="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400">
-                                    <th class="w-8 px-4 py-2"></th>
-                                    <th class="px-3 py-2 font-medium">Kind</th>
-                                    @foreach ($wt as $d)
-                                        <th class="px-3 py-2 text-center font-medium">{{ $namen[$d] }}</th>
-                                    @endforeach
-                                    <th class="px-3 py-2 font-medium">Vorschlag</th>
-                                    <th class="px-3 py-2 font-medium">Abo jetzt</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100">
-                                @foreach ($muster['kinder'] as $k)
-                                    @php $id = $k['user']->id; @endphp
-                                    <tr class="{{ $k['unklar'] ? 'bg-amber-50/40' : '' }}">
-                                        <td class="px-4 py-1.5">
-                                            <input type="checkbox" name="auswahl[]" value="{{ $id }}" @checked($k['vorschlag'] !== $k['aktuell'] && ! $k['unklar'])
-                                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                                        </td>
-                                        <td class="whitespace-nowrap px-3 py-1.5">
-                                            <span class="font-medium text-gray-900">{{ $k['user']->name }}</span>
-                                            <span class="ml-1 text-xs text-gray-400">{{ $k['tage'] }} Tage</span>
-                                            @if ($k['unklar'])<span class="ml-1 text-xs font-medium text-amber-700">unklar</span>@endif
-                                        </td>
-                                        @foreach ($wt as $d)
-                                            @php $a = $k['anteile'][$d] ?? 0; @endphp
-                                            <td class="px-3 py-1.5 text-center">
-                                                <label class="inline-flex items-center gap-1.5">
-                                                    <input type="checkbox" name="tage[{{ $id }}][]" value="{{ $d }}" @checked(in_array($d, $k['vorschlag'], true))
-                                                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                                                    <span class="w-9 text-right text-xs tabular-nums {{ $a >= 0.75 ? 'text-gray-900' : ($a > 0.25 ? 'text-amber-700' : 'text-gray-400') }}">{{ (int) round($a * 100) }} %</span>
-                                                </label>
-                                            </td>
-                                        @endforeach
-                                        <td class="whitespace-nowrap px-3 py-1.5 text-gray-700">{{ $kurz($k['vorschlag'], $wt) }}</td>
-                                        <td class="whitespace-nowrap px-3 py-1.5 {{ $k['vorschlag'] !== $k['aktuell'] ? 'text-amber-700' : 'text-gray-500' }}">{{ $k['abo'] }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+                    @if ($offen->isNotEmpty())
+                        @include('schulkantine::dishes.partials.ogs-muster-tabelle', ['kinder' => $offen, 'erledigt' => false])
+                    @else
+                        <div class="px-4 py-6 text-center text-sm text-gray-500">Alle Abos sind gesetzt.</div>
+                    @endif
                 </div>
+
+                @if ($fertig->isNotEmpty())
+                    <details class="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                        <summary class="cursor-pointer select-none px-4 py-2 text-sm font-semibold text-gray-700">
+                            Bereits übernommen – {{ $fertig->count() }} Kinder (aufklappen zum Ändern: Wochentage anpassen, links anhaken, setzen)
+                        </summary>
+                        <div class="border-t border-gray-100">
+                            @include('schulkantine::dishes.partials.ogs-muster-tabelle', ['kinder' => $fertig, 'erledigt' => true])
+                        </div>
+                    </details>
+                @endif
 
                 <div class="flex justify-end">
                     <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Abos der angehakten Kinder setzen</button>
