@@ -176,6 +176,7 @@ Route::middleware(['web', 'auth', AlsPerson::class])
         Route::put('meine-sonderkost/{user}', [SonderkostController::class, 'update'])->name('sonderkost.update');
         // Budget (Spontankäufe) + Kategorie-Freigaben eines Kindes – nur Eltern.
         Route::post('meine-sonderkost/{user}/limits', [SonderkostController::class, 'saveLimits'])->name('sonderkost.limits');
+        Route::post('meine-sonderkost/{user}/budget', [SonderkostController::class, 'saveWeekBudget'])->name('sonderkost.budget');
 
         // Eigene NFC-Chips (Selbstbedienung: ich + meine Kinder) – jeder Nutzer.
         // Die Anzeige ist in „Meine Daten" (sonderkost) integriert; hier nur die Aktionen.

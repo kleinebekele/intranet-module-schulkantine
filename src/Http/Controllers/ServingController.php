@@ -550,7 +550,7 @@ class ServingController
         }
 
         // Wochenbudget für Spontankäufe (falls von den Eltern gesetzt).
-        $budget = Budget::weeklyAmount($eater->id);
+        $budget = Budget::fuerWoche($eater->id, $date->copy()->startOfWeek(Carbon::MONDAY));
         if ($budget !== null) {
             $weekStart = $date->copy()->startOfWeek(Carbon::MONDAY);
             $spent = (float) Serving::where('user_id', $eater->id)
@@ -1300,7 +1300,7 @@ class ServingController
         foreach ($nachschlag as $n) {
             $extraSum += (float) $n['amount'] * (int) $n['qty'];
         }
-        $budget = Budget::weeklyAmount($eater->id);
+        $budget = Budget::fuerWoche($eater->id, $date->copy()->startOfWeek(Carbon::MONDAY));
         if ($budget !== null && $extraSum > 0) {
             $weekStart = $date->copy()->startOfWeek(Carbon::MONDAY);
             $spent = (float) Serving::where('user_id', $eater->id)->where('spontaneous', true)

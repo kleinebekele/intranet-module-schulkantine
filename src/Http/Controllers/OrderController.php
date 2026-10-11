@@ -36,7 +36,38 @@ class OrderController
 
     public function index(Request $request)
     {
-        return view('schulkantine::orders.index', $this->wochenDaten($request, $request->user()));
+        $daten = $this->wochenDaten($request, $request->user());
+
+        return view('schulkantine::orders.index', $daten + ['budgets' => $this->budgets($daten, $request->user())]);
+    }
+
+    /**
+     * Wochenbudget je Kind für den Kopf „Essen bestellen" – nur, was der Besteller
+     * selbst einstellen darf: eigene Nicht-OGS-Kinder (nicht er selbst). Nicht am
+     * Bestell-Terminal (das ruft wochenDaten direkt).
+     *
+     * @return array<int, array{betrag: ?float, nurWoche: bool, allgemein: ?float, genutzt: float}>
+     */
+    private function budgets(array $daten, User $user): array
+    {
+        if (empty($daten['season'])) {
+            return [];
+        }
+        $woche = $daten['weekStart']->copy()->startOfWeek(Carbon::MONDAY);
+        $budgets = [];
+        foreach ($daten['eaters'] as $e) {
+            if ($e['user']->id === $user->id || $e['mode'] === CustomerGroup::MODE_JA_NEIN) {
+                continue;
+            }
+            $budgets[$e['user']->id] = \Intranet\Modules\Schulkantine\Models\Budget::stand($e['user']->id, $woche) + [
+                'genutzt' => (float) \Intranet\Modules\Schulkantine\Models\Serving::where('user_id', $e['user']->id)
+                    ->where('spontaneous', true)
+                    ->whereBetween('date', [$woche->toDateString(), $woche->copy()->addDays(6)->toDateString()])
+                    ->sum('price_snapshot'),
+            ];
+        }
+
+        return $budgets;
     }
 
     /**

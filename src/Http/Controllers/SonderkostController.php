@@ -144,6 +144,57 @@ class SonderkostController
     }
 
     /** Nur für sich selbst oder ein eigenes Kind. */
+    /**
+     * Wochenbudget aus „Essen bestellen" (Modal): dauerhaft (allgemein) oder nur für
+     * eine Woche. Dauerhaft entfernt auch ein Sonderbudget der gezeigten Woche, damit
+     * die neue Zahl dort sofort gilt. Leer = kein Limit (dauerhaft) bzw. zurück zum
+     * dauerhaften Budget (nur diese Woche).
+     */
+    public function saveWeekBudget(Request $request, User $user)
+    {
+        $actor = $request->user();
+        abort_if($actor->id === $user->id, 403, 'Das Budget legen die Eltern fest, nicht man selbst.');
+        abort_unless($this->mayEditFor($actor, $user), 403, 'Du darfst das für diese Person nicht festlegen.');
+        abort_if(CustomerGroup::forUser($user)?->ordering_mode === CustomerGroup::MODE_JA_NEIN, 422, 'Für OGS-Kinder gibt es kein Budget.');
+
+        // Komma als Dezimaltrenner zulassen („2,50").
+        $request->merge(['betrag' => str_replace(',', '.', trim((string) $request->input('betrag', '')))]);
+        $data = $request->validate([
+            'betrag' => ['nullable', 'numeric', 'min:0', 'max:9999.99'],
+            'geltung' => ['required', 'in:woche,dauerhaft'],
+            'woche' => ['required', 'date'],
+        ]);
+        $woche = \Illuminate\Support\Carbon::parse($data['woche'])->startOfWeek(\Illuminate\Support\Carbon::MONDAY);
+        $betrag = $request->filled('betrag') ? round((float) $data['betrag'], 2) : null;
+        $sonder = Budget::where('user_id', $user->id)->whereDate('week_start', $woche->toDateString());
+        $kw = 'KW '.$woche->isoWeek();
+
+        if ($data['geltung'] === 'dauerhaft') {
+            $allgemein = Budget::where('user_id', $user->id)->whereNull('week_start')->first();
+            if ($betrag === null) {
+                $allgemein?->delete();
+            } else {
+                $allgemein
+                    ? $allgemein->update(['amount' => $betrag])
+                    : Budget::create(['user_id' => $user->id, 'week_start' => null, 'amount' => $betrag]);
+            }
+            $sonder->delete();
+            $text = $betrag === null ? 'kein Wochenbudget mehr (kein Limit)' : 'Wochenbudget dauerhaft '.number_format($betrag, 2, ',', '.').' €';
+        } else {
+            if ($betrag === null) {
+                $sonder->delete();
+                $text = "für {$kw} wieder das dauerhafte Wochenbudget";
+            } else {
+                (clone $sonder)->exists()
+                    ? $sonder->update(['amount' => $betrag])
+                    : Budget::create(['user_id' => $user->id, 'week_start' => $woche->toDateString(), 'amount' => $betrag]);
+                $text = "Budget nur für {$kw}: ".number_format($betrag, 2, ',', '.').' €';
+            }
+        }
+
+        return back()->with('status', $user->name.': '.$text.'.');
+    }
+
     private function mayEditFor(User $actor, User $target): bool
     {
         return $actor->id === $target->id || $actor->children()->whereKey($target->id)->exists();

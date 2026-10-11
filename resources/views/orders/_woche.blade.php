@@ -67,6 +67,20 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
                 🔒 Diese Woche ist noch nicht zum Bestellen freigegeben.
             </div>
+            {{-- Das Wochenbudget lässt sich trotzdem schon für diese Woche festlegen. --}}
+            @if (! $gast && ! empty($budgets))
+                <div class="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white">
+                    @foreach ($eaters as $e)
+                        @php $eater = $e['user']; $bud = $budgets[$eater->id] ?? null; @endphp
+                        @if ($bud)
+                            <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                                <span class="font-semibold text-gray-800">{{ $eater->name }}</span>
+                                @include('schulkantine::orders._budget')
+                            </div>
+                        @endif
+                    @endforeach
+                </div>
+            @endif
         @elseif (empty($days))
             <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
                 Für diese Saison sind keine Kantinen-Wochentage hinterlegt.
@@ -169,10 +183,17 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                     </div>
                                 @endif
                             </div>
+                            <div class="flex flex-wrap items-center gap-3">
+                            {{-- Wochenbudget für Spontankäufe (nur eigene Nicht-OGS-Kinder; Modal: diese Woche oder dauerhaft) --}}
+                            @php $bud = ($budgets ?? [])[$eater->id] ?? null; @endphp
+                            @if ($bud && ! $gast)
+                                @include('schulkantine::orders._budget')
+                            @endif
                             {{-- Kosten DIESER Person in der angezeigten Woche (der Monat steht oben im Kopf) --}}
                             <div class="{{ $gast ? 'hidden' : '' }} flex items-center gap-1.5" title="Monat {{ $monthStart->isoFormat('MMMM') }}: {{ $money($monthByUser[$eater->id] ?? 0) }}">
                                 <span class="text-[11px] uppercase tracking-wide text-gray-400">Kosten KW {{ $weekStart->isoWeek() }}</span>
                                 <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-sm font-bold text-indigo-700">{{ $money($weekByUser[$eater->id] ?? 0) }}</span>
+                            </div>
                             </div>
                         </div>
 
