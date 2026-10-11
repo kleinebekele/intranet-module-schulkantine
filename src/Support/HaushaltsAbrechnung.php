@@ -71,23 +71,6 @@ class HaushaltsAbrechnung
             })->values()->all();
     }
 
-    /**
-     * Altsystem-Monate unten an einen Zeitraum anhängen (neuester Monat bleibt oben);
-     * die Esser-Spalten neu bestimmen.
-     *
-     * @param  list<array>  $alt  Zeiträume aus altZeitraeume()
-     */
-    public function mitAltsystem(array $zeitraum, array $alt, Collection $haushalt): array
-    {
-        foreach ($alt as $a) {
-            $zeitraum['monate'] = array_merge($zeitraum['monate'], $a['monate']);
-        }
-        $esser = $haushalt->filter(fn (User $u) => collect($zeitraum['monate'])->contains(fn ($mo) => $mo['zellen'][$u->id]['betrag'] !== null))->values();
-        $zeitraum['esser'] = ($esser->isEmpty() ? $haushalt->values() : $esser)->all();
-
-        return $zeitraum;
-    }
-
     /** Der Zeitraum (Saison oder Altsystem-Schuljahr), in dem ein Monat liegt – für das PDF. */
     public function monat(Collection $haushalt, int $y, int $m): ?array
     {

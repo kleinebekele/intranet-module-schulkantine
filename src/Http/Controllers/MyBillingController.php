@@ -39,19 +39,17 @@ class MyBillingController
         $rechner = new HaushaltsAbrechnung;
         $frueher = Season::where('id', '!=', $aktiv->id)->whereDate('start_date', '<', $aktiv->start_date)
             ->orderByDesc('start_date')->get();
-        // Was das Altsystem vor der ersten Saison abgerechnet hat (ab 2026), gehört mit in
-        // die aktuelle Tabelle – abgetrennt werden nur echte frühere Saisons.
+        // Was das Altsystem vor der ersten Saison abgerechnet hat (ab 2026) – je Schuljahr
+        // darunter, wie eine frühere Saison.
         $ersteSaison = Season::orderBy('start_date')->value('start_date');
-        $aktuell = $rechner->mitAltsystem(
-            $rechner->saison($aktiv, $haushalt),
-            $rechner->altZeitraeume($haushalt, $ersteSaison ? Carbon::parse($ersteSaison) : null),
-            $haushalt,
-        );
 
         return view('schulkantine::billing.index', [
             'season' => $aktiv,
-            'aktuell' => $aktuell,
-            'frueher' => $frueher->map(fn (Season $s) => $rechner->saison($s, $haushalt))->all(),
+            'aktuell' => $rechner->saison($aktiv, $haushalt),
+            'frueher' => array_merge(
+                $frueher->map(fn (Season $s) => $rechner->saison($s, $haushalt))->all(),
+                $rechner->altZeitraeume($haushalt, $ersteSaison ? Carbon::parse($ersteSaison) : null),
+            ),
             'linearStand' => \Intranet\Modules\Schulkantine\Models\Setting::current()->linear_charges_at,
         ]);
     }

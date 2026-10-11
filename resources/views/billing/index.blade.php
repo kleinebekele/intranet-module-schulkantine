@@ -32,7 +32,7 @@
             @foreach ($frueher as $daten)
                 <details class="rounded-xl border border-gray-200 bg-white">
                     <summary class="cursor-pointer select-none px-4 py-3 text-sm font-semibold text-gray-700">
-                        Frühere {{ $daten['titel'] }}
+                        {{ $daten['season'] ? 'Frühere ' : '' }}{{ $daten['titel'] }}
                     </summary>
                     <div class="border-t border-gray-100 p-4">
                         @include('schulkantine::billing._saison', ['daten' => $daten])
