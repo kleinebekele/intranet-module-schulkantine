@@ -165,7 +165,17 @@
                                             <span class="cursor-help font-semibold text-red-400" title="Kein Chip registriert">✗</span>
                                         @endif
                                     </td>
-                                    <td class="px-3 py-2 text-right">
+                                    <td class="whitespace-nowrap px-3 py-2 text-right">
+                                        @darfRoute('module.schulkantine.eaters.als')
+                                        @unless ($user->is(auth()->user()))
+                                        <form method="POST" action="{{ route('module.schulkantine.eaters.als', $user) }}" class="inline"
+                                              onsubmit="return confirm(@js('Als '.$user->name.' handeln? Bis du es beendest, gilt alles, was du in der Kantine einstellst, für diese Person.'))">
+                                            @csrf
+                                            <button type="submit" title="Als {{ $user->name }} handeln"
+                                                    class="inline-flex items-center rounded-md px-1.5 py-1 text-xs font-medium text-gray-400 hover:bg-red-50 hover:text-red-700">als …</button>
+                                        </form>
+                                        @endunless
+                                        @enddarfRoute
                                         @darfRoute('module.schulkantine.eaters.edit')
                                         <a href="{{ route('module.schulkantine.eaters.edit', $search !== '' ? ['user' => $user, 'search' => $search] : $user) }}" title="Teilnehmer bearbeiten"
                                            class="inline-flex items-center rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">

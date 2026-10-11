@@ -39,6 +39,18 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
     {
         parent::boot();
 
+        // „Als Person handeln": roter Balken unter der Kopfleiste, solange aktiv.
+        \App\Support\Kopfleiste::registrieren('kantine-als-person', function (User $user) {
+            $person = \Intranet\Modules\Schulkantine\Http\Middleware\AlsPerson::person();
+
+            return $person ? view('schulkantine::als-person-banner', ['person' => $person]) : null;
+        });
+        \App\Support\Audit::benennen([
+            'kantine.als_person_start' => 'Kantine: als Person handeln – Beginn',
+            'kantine.als_person_ende' => 'Kantine: als Person handeln – Ende',
+            'kantine.als_person_aenderung' => 'Kantine: Änderung als andere Person',
+        ]);
+
         // Jeder Esser IST ein Benutzer (eigener Account). Die Sonderkost hängt
         // direkt am Benutzer – wir hängen die Relations dem Core-User-Model
         // dynamisch an, ohne dieses Modell selbst zu verändern.
@@ -105,7 +117,7 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
             // Zugriffsstufen, wo die Regel aus Anfrageart/Routenname nicht passt
             // (MODULES.md im Core, „Zugriffsstufen").
             ->lesend('servings.lookup', 'servings.lookup-eater', 'servings.terminal.search') // suchen nur
-            ->stufe(Zugriffsstufe::Verwalten, 'seasons.import', 'eaters.chip.issue', 'chips.register', 'dishes.menueserve.buchungen.uebernehmen', 'dishes.menueserve.buchungen.ogs', 'dishes.menueserve.ogs-muster.setzen') // legen an
+            ->stufe(Zugriffsstufe::Verwalten, 'seasons.import', 'eaters.chip.issue', 'chips.register', 'dishes.menueserve.buchungen.uebernehmen', 'dishes.menueserve.buchungen.ogs', 'dishes.menueserve.ogs-muster.setzen', 'eaters.als') // legen an
             ->stufe(Zugriffsstufe::Bearbeiten, 'dishes.photo.delete') // Teil von „Gericht bearbeiten"
             // Bereiche, die auf der Seite eines anderen Menüpunkts gepflegt werden –
             // sonst gälte die höchste Stufe im ganzen Modul (bei Eltern „verwalten").

@@ -19,6 +19,8 @@ use Intranet\Modules\Schulkantine\Http\Controllers\ReportController;
 use Intranet\Modules\Schulkantine\Http\Controllers\SeasonController;
 use Intranet\Modules\Schulkantine\Http\Controllers\ServingController;
 use Intranet\Modules\Schulkantine\Http\Controllers\SonderkostController;
+use Intranet\Modules\Schulkantine\Http\Controllers\AlsPersonController;
+use Intranet\Modules\Schulkantine\Http\Middleware\AlsPerson;
 use Intranet\Modules\Schulkantine\Http\Middleware\NurSchulnetz;
 
 /*
@@ -31,7 +33,7 @@ use Intranet\Modules\Schulkantine\Http\Middleware\NurSchulnetz;
  |
  | Die Landing-Page des Moduls ist die Route "module.schulkantine.index".
 */
-Route::middleware(['web', 'auth'])
+Route::middleware(['web', 'auth', AlsPerson::class])
     ->prefix('modules/schulkantine')
     ->name('module.schulkantine.')
     ->group(function () {
@@ -184,6 +186,9 @@ Route::middleware(['web', 'auth'])
         // Teilnehmer (= Benutzer). Angelegt werden Benutzer über den Benutzer-Import;
         // hier pflegt man nur die Kantinen-Zusatzdaten (Gruppe je Saison, Sonderkost).
         Route::get('teilnehmer', [EaterController::class, 'index'])->name('eaters.index');
+        // „Als Person handeln" (Kantinen-Verwaltung) – beginnen und beenden.
+        Route::post('teilnehmer/{user}/als', [AlsPersonController::class, 'start'])->name('eaters.als');
+        Route::post('als-person/ende', [AlsPersonController::class, 'ende'])->name('als.ende');
         Route::get('teilnehmer/{user}/bearbeiten', [EaterController::class, 'edit'])->name('eaters.edit');
         Route::put('teilnehmer/{user}', [EaterController::class, 'update'])->name('eaters.update');
 
