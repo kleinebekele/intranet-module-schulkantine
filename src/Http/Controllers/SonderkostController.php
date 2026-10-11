@@ -48,6 +48,7 @@ class SonderkostController
                 'isOgs' => $isOgs,
                 'canLimits' => $canLimits,
                 'weeklyBudget' => $canLimits ? Budget::weeklyAmount($m->id) : null,
+                'budgetAmTerminal' => $canLimits && Budget::amAusgabeterminal($m->id),
                 'perms' => $canLimits ? ChildCategoryPermission::mapFor($m->id) : collect(),
                 'selAllergens' => $m->kantineAllergens->pluck('id')->all(),
                 'selDiets' => $m->kantineDiets->pluck('id')->all(),
@@ -120,6 +121,8 @@ class SonderkostController
                 : Budget::create(['user_id' => $user->id, 'week_start' => null, 'amount' => $amount]);
         }
 
+        Budget::amAusgabeterminalSetzen($user->id, $request->boolean('am_ausgabeterminal'));
+
         // Kategorie-Freigaben (Zeile nur speichern, wenn eingeschränkt).
         $preorder = collect($request->input('preorder', []))->map(fn ($v) => (int) $v);
         $walkin = collect($request->input('walkin', []))->map(fn ($v) => (int) $v);
@@ -143,12 +146,12 @@ class SonderkostController
             ->with('status', 'Budget &amp; Freigaben von „'.$user->name.'" gespeichert.');
     }
 
-    /** Nur für sich selbst oder ein eigenes Kind. */
     /**
      * Wochenbudget aus „Essen bestellen" (Modal): dauerhaft (allgemein) oder nur für
      * eine Woche. Dauerhaft entfernt auch ein Sonderbudget der gezeigten Woche, damit
-     * die neue Zahl dort sofort gilt. Leer = kein Limit (dauerhaft) bzw. zurück zum
-     * dauerhaften Budget (nur diese Woche).
+     * die neue Zahl dort sofort gilt. Leer = 0 € (dauerhaft – Kinder haben ohne Eintrag
+     * kein Budget) bzw. zurück zum dauerhaften Budget (nur diese Woche). Dazu die
+     * Einstellung „Budget an der Ausgabe anzeigen".
      */
     public function saveWeekBudget(Request $request, User $user)
     {
@@ -179,7 +182,7 @@ class SonderkostController
                     : Budget::create(['user_id' => $user->id, 'week_start' => null, 'amount' => $betrag]);
             }
             $sonder->delete();
-            $text = $betrag === null ? 'kein Wochenbudget mehr (kein Limit)' : 'Wochenbudget dauerhaft '.number_format($betrag, 2, ',', '.').' €';
+            $text = $betrag === null ? 'Wochenbudget dauerhaft 0 € (keine spontanen Käufe)' : 'Wochenbudget dauerhaft '.number_format($betrag, 2, ',', '.').' €';
         } else {
             if ($betrag === null) {
                 $sonder->delete();
@@ -191,10 +194,38 @@ class SonderkostController
                 $text = "Budget nur für {$kw}: ".number_format($betrag, 2, ',', '.').' €';
             }
         }
+        if ($request->has('am_ausgabeterminal')) {
+            Budget::amAusgabeterminalSetzen($user->id, $request->boolean('am_ausgabeterminal'));
+        }
 
         return back()->with('status', $user->name.': '.$text.'.');
     }
 
+    /**
+     * Eine an der Ausgabe erlaubte Budget-Überschreitung bestätigen (Eltern). Erst
+     * danach ist an der Ausgabe wieder eine Überschreitung möglich.
+     */
+    public function ueberschreitungBestaetigen(Request $request, User $user, int $ueberschreitung)
+    {
+        $actor = $request->user();
+        abort_if($actor->id === $user->id, 403, 'Das bestätigen die Eltern, nicht man selbst.');
+        abort_unless($this->mayEditFor($actor, $user), 403, 'Du darfst das für diese Person nicht bestätigen.');
+
+        $zeile = \Illuminate\Support\Facades\DB::table('kantine_budget_ueberschreitungen')
+            ->where('id', $ueberschreitung)->where('user_id', $user->id)->first();
+        abort_unless($zeile, 404);
+        if ($zeile->akzeptiert_at === null) {
+            \Illuminate\Support\Facades\DB::table('kantine_budget_ueberschreitungen')->where('id', $zeile->id)
+                ->update(['akzeptiert_at' => now(), 'akzeptiert_von' => $actor->id, 'updated_at' => now()]);
+            \App\Support\Audit::schreiben('kantine.budget_ueberschreitung_bestaetigt',
+                'Budget-Überschreitung '.number_format((float) $zeile->ueber, 2, ',', '.').' € vom '.\Illuminate\Support\Carbon::parse($zeile->tag)->format('d.m.Y').' bestätigt',
+                betroffener: $user);
+        }
+
+        return back()->with('status', $user->name.': Budget-Überschreitung bestätigt.');
+    }
+
+    /** Nur für sich selbst oder ein eigenes Kind. */
     private function mayEditFor(User $actor, User $target): bool
     {
         return $actor->id === $target->id || $actor->children()->whereKey($target->id)->exists();

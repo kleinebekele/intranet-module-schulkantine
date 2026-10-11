@@ -538,7 +538,7 @@
                 return { eater_id: this.person.user_id, date: this.date, menu, walkin, nachschlag };
             },
 
-            async commit(silent = false) {
+            async commit(silent = false, budgetUeberschreiten = false) {
                 if (!this.person) return false;
                 if (this.busy) return false;
                 this.busy = true;
@@ -546,9 +546,18 @@
                     const res = await fetch(this.urls.commit, {
                         method: 'POST',
                         headers: { 'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': this.csrf },
-                        body: JSON.stringify(this.buildPayload()),
+                        body: JSON.stringify({ ...this.buildPayload(), budget_ueberschreiten: budgetUeberschreiten }),
                     });
                     const data = await res.json();
+                    // Wochenbudget reicht nicht: die Ausgabe entscheidet, ob überschritten werden darf.
+                    if (!data.ok && data.budget_frage && !budgetUeberschreiten) {
+                        this.busy = false;
+                        if (window.confirm(data.error + '\n\nDie Eltern müssen die Überschreitung danach bestätigen; bis dahin ist keine weitere möglich.')) {
+                            return this.commit(silent, true);
+                        }
+                        this.banner = { ok:false, text: 'Nicht gebucht – Wochenbudget reicht nicht.' };
+                        return false;
+                    }
                     if (!data.ok) { this.banner = { ok:false, text: data.error || 'Buchung fehlgeschlagen.' }; this.busy = false; return false; }
                     if (data.plan) this.planGroups = data.plan; // Zaehler aktualisieren
                     if (!silent) this.banner = { ok:true, text: 'Gebucht: ' + data.name + (this.extrasTotal > 0 ? ' · Extras ' + this.euro(this.extrasTotal) : '') };
@@ -812,6 +821,10 @@
                 <span class="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-lg font-semibold text-indigo-700" x-text="person?.label || '–'"></span>
                 <span x-show="person?.warn" x-cloak class="shrink-0 rounded-full bg-red-600 px-3 py-1 text-base font-bold text-white">⚠️ Verträglichkeiten prüfen</span>
                 <span x-show="servedOnLoad" x-cloak class="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-base font-semibold text-amber-800">↺ bereits gebucht – änderbar</span>
+                {{-- Wochenbudget (nur wenn die Eltern die Anzeige an der Ausgabe erlaubt haben) --}}
+                <span x-show="person?.budget" x-cloak class="shrink-0 rounded-full px-3 py-1 text-base font-semibold"
+                      :class="person?.budget && person.budget.rest < 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800'"
+                      x-text="person?.budget ? 'Budget ' + euro(person.budget.betrag) + ' · übrig ' + euro(person.budget.rest) + (person.budget.offen ? ' · Überschreitung offen' : '') : ''"></span>
                 <span class="min-w-0 truncate text-sm text-gray-500" x-show="person && (person.allergens.length || person.diets.length)">
                     <span x-show="person?.allergens.length">Allergien: <span x-text="person?.allergens.join(', ')"></span>. </span>
                     <span x-show="person?.diets.length">Diäten: <span x-text="person?.diets.join(', ')"></span>.</span>

@@ -92,9 +92,14 @@ class BestellTerminalController
             ]);
         }
 
-        return view('schulkantine::bestellterminal.index', $this->wochenDaten($request, $orders, $besteller, $besteller) + [
+        $daten = $this->wochenDaten($request, $orders, $besteller, $besteller);
+
+        return view('schulkantine::bestellterminal.index', $daten + [
             'besteller' => $besteller,
             'simChips' => collect(),
+            // Wochenbudget der Kinder nur zum Ansehen (ändern dürfen es nur die Eltern im Intranet).
+            'budgets' => $this->budgets($daten),
+            'budgetNurAnsicht' => true,
         ]);
     }
 
@@ -136,6 +141,24 @@ class BestellTerminalController
      * Wochendaten fürs Terminal: ohne Wochenangabe (oder davor) die Woche des nächsten
      * Tages, an dem man noch etwas tun kann; weiter zurück lässt sich nicht blättern.
      */
+    /** Budget je Kind (Nicht-OGS, mit Eltern) für die Woche – Budget::ansicht. */
+    private function budgets(array $daten): array
+    {
+        if (empty($daten['season'])) {
+            return [];
+        }
+        $woche = $daten['weekStart']->copy()->startOfWeek(Carbon::MONDAY);
+        $budgets = [];
+        foreach ($daten['eaters'] as $e) {
+            if ($e['mode'] !== \Intranet\Modules\Schulkantine\Models\CustomerGroup::MODE_JA_NEIN
+                && \Intranet\Modules\Schulkantine\Models\Budget::istKind($e['user']->id)) {
+                $budgets[$e['user']->id] = \Intranet\Modules\Schulkantine\Models\Budget::ansicht($e['user']->id, $woche);
+            }
+        }
+
+        return $budgets;
+    }
+
     private function wochenDaten(Request $request, OrderController $orders, User $fuer, ?User $besteller): array
     {
         $season = Season::where('is_active', true)->first();

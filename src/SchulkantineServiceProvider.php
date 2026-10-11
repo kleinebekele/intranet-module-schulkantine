@@ -53,6 +53,7 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
             'kantine.als_person_start' => 'Kantine: als Person handeln – Beginn',
             'kantine.als_person_ende' => 'Kantine: als Person handeln – Ende',
             'kantine.als_person_aenderung' => 'Kantine: Änderung als andere Person',
+            'kantine.budget_ueberschreitung_bestaetigt' => 'Kantine: Budget-Überschreitung bestätigt',
         ]);
 
         // Jeder Esser IST ein Benutzer (eigener Account). Die Sonderkost hängt

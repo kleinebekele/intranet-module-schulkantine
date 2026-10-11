@@ -76,11 +76,19 @@
                             <div class="mt-1 flex items-center gap-2">
                                 <input type="number" step="0.01" min="0" name="weekly_budget"
                                        value="{{ $m['weeklyBudget'] !== null ? number_format((float) $m['weeklyBudget'], 2, '.', '') : '' }}"
-                                       placeholder="leer = kein Limit"
+                                       placeholder="leer = 0 €"
                                        class="block w-44 rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 <span class="text-sm text-gray-400">€ / Woche</span>
                             </div>
-                            <p class="mt-1 text-xs text-gray-400">Gilt nur für spontane Käufe am Ausgabetresen – nicht für Vorbestellungen.</p>
+                            <p class="mt-1 text-xs text-gray-400">
+                                Gilt nur für spontane Käufe am Ausgabetresen – nicht für Vorbestellungen. Leer = 0 € (keine spontanen Käufe).
+                                Für einzelne Wochen unter „Essen bestellen" änderbar.
+                            </p>
+                            <label class="mt-2 flex items-center gap-2 text-sm text-gray-700">
+                                <input type="checkbox" name="am_ausgabeterminal" value="1" @checked($m['budgetAmTerminal'])
+                                       class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                Budget an der Ausgabe anzeigen
+                            </label>
                         </div>
 
                         <div>

@@ -390,6 +390,8 @@ class ServingController
             'allergenIds' => $allergenIds->all(),
             'dietIds' => $dietIds->all(),
             'warn' => collect($dishes)->contains(fn ($d) => ! empty($d['allergenHits']) || ! empty($d['dietHits'])),
+            // Wochenbudget – nur, wenn die Eltern die Anzeige an der Ausgabe eingeschaltet haben.
+            'budget' => $this->budgetAnzeige($eater, $date),
         ];
     }
 
@@ -549,20 +551,15 @@ class ServingController
             return $fail('Für '.$eater->name.' ist der Spontankauf dieser Kategorie nicht freigegeben.');
         }
 
-        // Wochenbudget für Spontankäufe (falls von den Eltern gesetzt).
-        $budget = Budget::fuerWoche($eater->id, $date->copy()->startOfWeek(Carbon::MONDAY));
-        if ($budget !== null) {
-            $weekStart = $date->copy()->startOfWeek(Carbon::MONDAY);
-            $spent = (float) Serving::where('user_id', $eater->id)
-                ->where('spontaneous', true)
-                ->whereBetween('date', [$weekStart->toDateString(), $weekStart->copy()->addDays(6)->toDateString()])
-                ->sum('price_snapshot');
-            if ($spent + $dish->preisFuer($eater) > $budget + 0.001) {
-                return $fail($eater->name.': Wochenbudget für Spontankäufe erreicht (Limit '
-                    .number_format($budget, 2, ',', '.').' €, diese Woche schon '
-                    .number_format($spent, 2, ',', '.').' € genutzt).');
-            }
+        // Wochenbudget für Spontankäufe (Kinder: ohne Eintrag 0 €). Überschreiten nur,
+        // wenn die Ausgabe es ausdrücklich erlaubt und keine ältere offen ist.
+        $pruefung = $this->budgetPruefen($eater, $date, $dish->preisFuer($eater), $request->boolean('budget_ueberschreiten'));
+        if (! $pruefung['ok']) {
+            return $request->wantsJson()
+                ? response()->json(['ok' => false, 'error' => $pruefung['fehler'], 'budget_frage' => $pruefung['frage'] ?? false], 200)
+                : back()->withErrors(['ausgabe' => $pruefung['fehler']]);
         }
+        $this->ueberschreitungMerken($pruefung['ueber'] ?? null, $user->id);
 
         $serving = Serving::create([
             'season_id' => $season->id,
@@ -585,6 +582,75 @@ class ServingController
         }
 
         return back()->with('status', 'Spontane Abholung erfasst: '.$dish->name.' für '.$eater->name.'.');
+    }
+
+    /**
+     * Wochenbudget prüfen (Spontankäufe: Extras + Nachschlag). Kinder haben ohne
+     * Eintrag 0 €. Reicht es nicht, fragt die Ausgabe (frage = true) – erlaubt sie
+     * es, entsteht eine Überschreitung, die bis zur Bestätigung durch die Eltern
+     * „in der Schwebe" steht; solange ist keine weitere Überschreitung möglich.
+     *
+     * @param  bool  $tagErsetzt  die Buchung ersetzt die Extras dieses Tages (Terminal)
+     * @return array{ok: bool, fehler?: string, frage?: bool, ueber?: array}
+     */
+    private function budgetPruefen(User $eater, Carbon $date, float $extra, bool $erlauben, bool $tagErsetzt = false): array
+    {
+        $woche = $date->copy()->startOfWeek(Carbon::MONDAY);
+        $budget = Budget::fuerWoche($eater->id, $woche);
+        if ($budget === null || $extra <= 0) {
+            return ['ok' => true];
+        }
+
+        $genutzt = Budget::genutzt($eater->id, $woche);
+        if ($tagErsetzt) {
+            $genutzt -= (float) Serving::where('user_id', $eater->id)->where('spontaneous', true)
+                ->whereDate('date', $date->toDateString())->sum('price_snapshot');
+        }
+        $nachher = round($genutzt + $extra, 2);
+        if ($nachher <= $budget + 0.001) {
+            return ['ok' => true];
+        }
+
+        $euro = fn ($v) => number_format((float) $v, 2, ',', '.').' €';
+        $text = "{$eater->name}: Wochenbudget {$euro($budget)}, schon genutzt {$euro($genutzt)}, mit diesem Kauf {$euro($nachher)}.";
+        if (Budget::offeneUeberschreitungen($eater->id)->isNotEmpty()) {
+            return ['ok' => false, 'fehler' => $text.' Eine frühere Überschreitung haben die Eltern noch nicht bestätigt – keine weitere möglich.'];
+        }
+        if (! $erlauben) {
+            return ['ok' => false, 'frage' => true, 'fehler' => $text.' Budget um '.$euro($nachher - $budget).' überschreiten?'];
+        }
+
+        return ['ok' => true, 'ueber' => [
+            'user_id' => $eater->id, 'woche' => $woche->toDateString(), 'tag' => $date->toDateString(),
+            'budget' => $budget, 'genutzt' => $nachher, 'ueber' => round($nachher - $budget, 2),
+        ]];
+    }
+
+    /** @return array{betrag: float, genutzt: float, rest: float, offen: bool}|null */
+    private function budgetAnzeige(User $eater, Carbon $date): ?array
+    {
+        if (! Budget::amAusgabeterminal($eater->id)) {
+            return null;
+        }
+        $woche = $date->copy()->startOfWeek(Carbon::MONDAY);
+        $betrag = Budget::fuerWoche($eater->id, $woche);
+        if ($betrag === null) {
+            return null;
+        }
+        $genutzt = Budget::genutzt($eater->id, $woche);
+
+        return ['betrag' => $betrag, 'genutzt' => $genutzt, 'rest' => round($betrag - $genutzt, 2),
+            'offen' => Budget::offeneUeberschreitungen($eater->id)->isNotEmpty()];
+    }
+
+    /** Eine erlaubte Überschreitung festhalten (wartet dann auf die Eltern). */
+    private function ueberschreitungMerken(?array $ueber, int $erlaubtVon): void
+    {
+        if ($ueber) {
+            DB::table('kantine_budget_ueberschreitungen')->insert($ueber + [
+                'erlaubt_von' => $erlaubtVon, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
     }
 
     /** Eine Ausgabe-Zeile entfernen (v. a. eine spontane Abholung korrigieren). */
@@ -1300,20 +1366,15 @@ class ServingController
         foreach ($nachschlag as $n) {
             $extraSum += (float) $n['amount'] * (int) $n['qty'];
         }
-        $budget = Budget::fuerWoche($eater->id, $date->copy()->startOfWeek(Carbon::MONDAY));
-        if ($budget !== null && $extraSum > 0) {
-            $weekStart = $date->copy()->startOfWeek(Carbon::MONDAY);
-            $spent = (float) Serving::where('user_id', $eater->id)->where('spontaneous', true)
-                ->whereBetween('date', [$weekStart->toDateString(), $weekStart->copy()->addDays(6)->toDateString()])
-                ->sum('price_snapshot');
-            if ($spent + $extraSum > $budget + 0.001) {
-                return $fail($eater->name.': Wochenbudget für Extras erreicht (Limit '
-                    .number_format($budget, 2, ',', '.').' €, diese Woche schon '
-                    .number_format($spent, 2, ',', '.').' € genutzt).');
-            }
+        // Die Buchung ersetzt die Extras dieses Tages (s. u.) – die zählen hier also nicht mit.
+        $pruefung = $this->budgetPruefen($eater, $date, $extraSum, $request->boolean('budget_ueberschreiten'), tagErsetzt: true);
+        if (! $pruefung['ok']) {
+            return response()->json(['ok' => false, 'error' => $pruefung['fehler'], 'budget_frage' => $pruefung['frage'] ?? false], 200);
         }
+        $ueber = $pruefung['ueber'] ?? null;
 
-        DB::transaction(function () use ($season, $eater, $date, $user, $menu, $walkinDishes, $nachschlag) {
+        DB::transaction(function () use ($season, $eater, $date, $user, $menu, $walkinDishes, $nachschlag, $ueber) {
+            $this->ueberschreitungMerken($ueber, $user->id);
             // 1) Menü-Ausgabe – ersetzt die bisherigen nicht-spontanen Zeilen (wie serveConfirm).
             if ($menu) {
                 $orders = Order::where('season_id', $season->id)->where('user_id', $eater->id)

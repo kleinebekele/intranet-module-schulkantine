@@ -46,7 +46,7 @@ class OrderController
      * selbst einstellen darf: eigene Nicht-OGS-Kinder (nicht er selbst). Nicht am
      * Bestell-Terminal (das ruft wochenDaten direkt).
      *
-     * @return array<int, array{betrag: ?float, nurWoche: bool, allgemein: ?float, genutzt: float}>
+     * @return array<int, array> je Kind: Budget::ansicht()
      */
     private function budgets(array $daten, User $user): array
     {
@@ -59,12 +59,7 @@ class OrderController
             if ($e['user']->id === $user->id || $e['mode'] === CustomerGroup::MODE_JA_NEIN) {
                 continue;
             }
-            $budgets[$e['user']->id] = \Intranet\Modules\Schulkantine\Models\Budget::stand($e['user']->id, $woche) + [
-                'genutzt' => (float) \Intranet\Modules\Schulkantine\Models\Serving::where('user_id', $e['user']->id)
-                    ->where('spontaneous', true)
-                    ->whereBetween('date', [$woche->toDateString(), $woche->copy()->addDays(6)->toDateString()])
-                    ->sum('price_snapshot'),
-            ];
+            $budgets[$e['user']->id] = \Intranet\Modules\Schulkantine\Models\Budget::ansicht($e['user']->id, $woche);
         }
 
         return $budgets;
