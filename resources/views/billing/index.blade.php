@@ -23,7 +23,7 @@
                     </span>
                 </div>
                 <p class="text-xs text-gray-500">
-                    Seit Oktober 2026 rechnet die Kantine über das Intranet ab. Aus dem alten System liegen nur die
+                    Ab November 2026 rechnet die Kantine über das Intranet ab. Aus dem alten System liegen nur die
                     Abrechnungsbeträge ab 2026 vor (ohne Einzelposten); wo wir nichts wissen, steht „keine Daten".
                 </p>
                 @include('schulkantine::billing._saison', ['daten' => $aktuell])

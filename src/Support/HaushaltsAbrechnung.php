@@ -291,10 +291,14 @@ class HaushaltsAbrechnung
         return $posten;
     }
 
-    /** Erster Tag, an dem die Kantine über das Intranet lief (vorher: Menü&Serve). */
+    /**
+     * Erster Tag, ab dem das Intranet abrechnet (vorher rechnete Menü&Serve ab – bis
+     * dahin Testphase). Davor gilt allein, was aus dem Altsystem übernommen wurde, und
+     * der Linear-Export sendet nichts.
+     */
     public static function intranetAb(): string
     {
-        return (string) config('schulkantine.intranet_ab', '2026-10-12');
+        return (string) config('schulkantine.intranet_ab', '2026-11-01');
     }
 
     public static function monatLabel(int $y, int $m): string

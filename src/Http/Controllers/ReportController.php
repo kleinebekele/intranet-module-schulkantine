@@ -86,6 +86,7 @@ class ReportController
             'sendezeitpunkt' => $zeitpunkt,
             'lesbar' => $vorschau['linearLesbar'] ?? true,
             'vertraegeStand' => $vorschau['vertraegeStand'],
+            'altsystem' => $vorschau['altsystem'] ?? false,
         ];
     }
 

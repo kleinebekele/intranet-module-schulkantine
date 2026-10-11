@@ -23,9 +23,12 @@ use Intranet\Modules\Schulkantine\Models\Subscription;
  * gesucht, das genau diese Gerichte enthält (Snacks: das Einzelgericht auf dem
  * Tagesplan), und dafür bestellt – wie „Menü bestellen", nur ohne Fristen.
  *
+ * Menü&Serve ist bis zum Umstieg die Quelle: Für jeden übernommenen Tag werden ALLE
+ * Menü-/Gericht-Bestellungen bei uns gelöscht und aus den Buchungen neu angelegt (ein
+ * zweiter Lauf ergibt dasselbe). OGS-Zeilen bleiben – die gleicht der OGS-Abgleich an.
+ *
  * Nicht übernommen: stornierte/gesperrte Buchungen (Menge 0, Status L), Personen
- * ohne Konto bei uns, OGS-Kinder (laufen über das Abo), Tage ohne passendes Menü und
- * alles, was schon bestellt oder schon einmal übernommen ist.
+ * ohne Konto bei uns, OGS-Kinder (laufen über das Abo) und Tage ohne passendes Menü.
  */
 class MenueServeBuchungen
 {
@@ -34,8 +37,6 @@ class MenueServeBuchungen
 
     public const STATUS = [
         'bereit' => 'wird übernommen',
-        'uebernommen' => 'schon übernommen',
-        'vorhanden' => 'schon bei uns bestellt',
         'storniert' => 'in Menü&Serve storniert/gesperrt',
         'person' => 'Person bei uns unbekannt',
         'ogs' => 'OGS – läuft über das Abo',
@@ -53,8 +54,6 @@ class MenueServeBuchungen
         $buchungen = $this->lesen($ab);
         $zuordnungen = DB::table('kantine_menueserve_zuordnungen')
             ->whereIn('ms_id', array_unique(array_column($buchungen, 'ms_id')))->get()->keyBy('ms_id');
-        $schon = DB::table('kantine_menueserve_buchungen')
-            ->whereIn('boobas_id', array_column($buchungen, 'id'))->pluck('boobas_id')->flip();
         $personen = User::whereIn('externe_id', array_unique(array_column($buchungen, 'adrnr')))->get()->keyBy('externe_id');
         $gruppen = CustomerGroup::all()->keyBy('role_id');
         $ziele = [];
@@ -68,8 +67,6 @@ class MenueServeBuchungen
 
             if ($b['menge'] <= 0 || $b['recsts'] === 'L') {
                 $b['status'] = 'storniert';
-            } elseif (isset($schon[$b['id']])) {
-                $b['status'] = 'uebernommen';
             } elseif (! $user) {
                 $b['status'] = 'person';
             } elseif (CustomerGroup::forUser($user, $gruppen)?->ordering_mode === CustomerGroup::MODE_JA_NEIN) {
@@ -78,7 +75,7 @@ class MenueServeBuchungen
                 $b['status'] = 'zuordnung';
             } else {
                 $b['ziel'] = $ziele[$b['ms_id']] ??= $this->ziel($season, $b['tag'], $z, $b['snack']);
-                $b['status'] = ! $b['ziel'] ? 'speiseplan' : ($this->schonBestellt($season, $user, $b['tag'], $b['ziel']) ? 'vorhanden' : 'bereit');
+                $b['status'] = $b['ziel'] ? 'bereit' : 'speiseplan';
             }
         }
         unset($b);
@@ -275,18 +272,44 @@ class MenueServeBuchungen
     }
 
     /**
-     * Bereite Buchungen ab $ab als Bestellung anlegen – alle oder nur die eines Tages.
+     * Wie viele Menü-/Gericht-Bestellungen je Tag bei uns schon stehen – die
+     * ersetzt die Übernahme (OGS-Zeilen zählen nicht).
      *
-     * @return array{angelegt: int, plan: list<array>}
+     * @return array<string, int>  Y-m-d → Anzahl Bestellzeilen
+     */
+    public function vorhandeneJeTag(Season $season, array $plan): array
+    {
+        $tage = array_values(array_unique(array_column($plan, 'tag')));
+        if ($tage === []) {
+            return [];
+        }
+
+        return Order::where('season_id', $season->id)->whereNotNull('category_id')
+            ->whereBetween('date', [min($tage), max($tage).' 23:59:59'])->get(['date'])
+            ->countBy(fn ($o) => $o->date->toDateString())->all();
+    }
+
+    /**
+     * Buchungen ab $ab übernehmen – alle Tage oder nur einer. Je Tag werden zuerst
+     * ALLE Menü-/Gericht-Bestellungen gelöscht, dann aus den Buchungen neu angelegt.
+     *
+     * @return array{angelegt: int, geloescht: int, plan: list<array>}
      */
     public function uebernehmen(Season $season, Carbon $ab, ?int $durch, ?string $nurTag = null): array
     {
         $plan = $this->plan($season, $ab);
         $angelegt = 0;
+        $geloescht = 0;
+        $tage = collect($plan)->pluck('tag')->unique()
+            ->filter(fn ($t) => $nurTag === null || $t === $nurTag)->values();
 
-        DB::transaction(function () use ($season, $plan, $durch, $nurTag, &$angelegt) {
+        DB::transaction(function () use ($season, $plan, $durch, $tage, &$angelegt, &$geloescht) {
+            foreach ($tage as $tag) {
+                $geloescht += Order::where('season_id', $season->id)->whereNotNull('category_id')
+                    ->whereDate('date', $tag)->delete();
+            }
             foreach ($plan as $b) {
-                if ($b['status'] !== 'bereit' || ($nurTag !== null && $b['tag'] !== $nurTag)) {
+                if ($b['status'] !== 'bereit' || ! $tage->contains($b['tag'])) {
                     continue;
                 }
                 // Zwei Buchungen derselben Person am selben Tag (z. B. doppelt gebucht) nur einmal.
@@ -294,15 +317,15 @@ class MenueServeBuchungen
                     continue;
                 }
                 $this->bestellen($season, $b['user'], $b['tag'], $b['ziel']);
-                DB::table('kantine_menueserve_buchungen')->insert([
-                    'boobas_id' => $b['id'], 'user_id' => $b['user']->id, 'datum' => $b['tag'],
+                DB::table('kantine_menueserve_buchungen')->updateOrInsert(['boobas_id' => $b['id']], [
+                    'user_id' => $b['user']->id, 'datum' => $b['tag'],
                     'uebernommen_von' => $durch, 'created_at' => now(), 'updated_at' => now(),
                 ]);
                 $angelegt++;
             }
         });
 
-        return ['angelegt' => $angelegt, 'plan' => $plan];
+        return ['angelegt' => $angelegt, 'geloescht' => $geloescht, 'plan' => $plan];
     }
 
     /** @return list<array{id: string, ms_id: string, konto: string, tag: string, adrnr: string, menge: int, recsts: string, snack: bool}> */

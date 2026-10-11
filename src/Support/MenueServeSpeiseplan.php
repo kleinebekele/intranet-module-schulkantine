@@ -14,8 +14,9 @@ use Intranet\Modules\Schulkantine\Models\Season;
  * Speiseplan ein: Am Tag wird das Menü gesucht, das einen Platz für die Kategorie
  * der Hauptspeise und einen für die der Nachspeise hat, und diese Plätze werden
  * belegt. Gibt es den Tag im Speiseplan noch nicht, wird seine Woche ausgerollt
- * (wie der Knopf im Speiseplan). Freigegebene Wochen bleiben unberührt; passen
- * mehrere Menüs, entscheidet der Name der Menü&Serve-Menülinie, sonst wird übersprungen.
+ * (wie der Knopf im Speiseplan). Überschreibt das ganze Schuljahr – auch Vergangenes
+ * und freigegebene Wochen; passen mehrere Menüs, entscheidet der Name der
+ * Menü&Serve-Menülinie, sonst wird übersprungen.
  * Snacks kommen nicht in ein Menü, sondern als Einzelgericht auf den Tagesplan.
  */
 class MenueServeSpeiseplan
@@ -52,13 +53,10 @@ class MenueServeSpeiseplan
 
                 continue;
             }
-            if ($tag->lt(Carbon::today()) || ! $season->isOpenOn($tag)) {
-                $ergebnis[] = $zeile(false, 'kein Kantinentag der aktiven Saison (oder vorbei)');
-
-                continue;
-            }
-            if ($release->isWeekReleased($season, $tag)) {
-                $ergebnis[] = $zeile(false, 'Woche ist freigegeben – im Speiseplan erst „Zur Bearbeitung freigeben"');
+            // Der Import darf das ganze Schuljahr überschreiben – auch vergangene Tage
+            // und freigegebene Wochen (Menü&Serve ist bis zum Umstieg die Quelle).
+            if (! $season->isOpenOn($tag)) {
+                $ergebnis[] = $zeile(false, 'kein Kantinentag der aktiven Saison');
 
                 continue;
             }
@@ -73,7 +71,8 @@ class MenueServeSpeiseplan
             $menues = $this->menuesAm($season, $tag);
             $woche = $release->weekStart($tag)->toDateString();
             if ($menues->isEmpty() && ! isset($ausgerollt[$woche])) {
-                $rollout->pushWeek($season, $tag);
+                // „Heute" = Saisonbeginn, damit auch vergangene Tage ausgerollt werden.
+                $rollout->pushWeek($season, $tag, $season->start_date->copy());
                 $ausgerollt[$woche] = true;
                 $menues = $this->menuesAm($season, $tag);
             }

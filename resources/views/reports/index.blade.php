@@ -114,6 +114,9 @@
                         @unless ($linear['lesbar'])
                             <div class="text-xs font-medium text-amber-700">⚠️ Linear ist gerade nicht lesbar – Abrechnungsstand der gesendeten Zeilen fehlt.</div>
                         @endunless
+                        @if ($linear['altsystem'] ?? false)
+                            <div class="text-xs font-medium text-amber-700">Diesen Monat rechnet noch Menü&amp;Serve ab (Testphase) – aus dem Intranet geht nichts an Linear.</div>
+                        @endif
                         @unless ($linear['vertraegeStand'])
                             <div class="text-xs font-medium text-amber-700">⚠️ Noch keine Vertragsdaten aus Linear importiert.</div>
                         @endunless

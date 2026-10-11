@@ -76,6 +76,12 @@ class LinearExport
     public function vorschau(Season $season, int $year, int $month): array
     {
         $datum = Carbon::create($year, $month, 1)->endOfMonth()->startOfDay();
+        // Monate vor dem Abrechnungsbeginn des Intranets hat Menü&Serve abgerechnet –
+        // daraus darf nie etwas an Linear gehen (sonst doppelte Lastschrift).
+        if ($datum->lt(Carbon::parse(HaushaltsAbrechnung::intranetAb()))) {
+            return ['zeilen' => [], 'ausgeschlossen' => [], 'datum' => $datum, 'summe' => 0.0,
+                'vertraegeStand' => true, 'altsystem' => true];
+        }
         $lines = (new BillingService)->forMonth($season, $year, $month);
         $users = User::whereIn('id', $lines->keys())->get()->keyBy('id');
 
@@ -150,6 +156,7 @@ class LinearExport
             'datum' => $datum,
             'summe' => round(array_sum(array_column($zeilen, 'Betrag')), 2),
             'vertraegeStand' => $vertraegeStand,
+            'altsystem' => false,
         ];
     }
 

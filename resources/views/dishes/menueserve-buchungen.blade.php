@@ -11,7 +11,6 @@
         $bereit = collect($plan)->where('status', 'bereit')->count();
         $farbe = fn ($s) => match ($s) {
             'bereit' => 'text-sky-700',
-            'uebernommen', 'vorhanden' => 'text-green-700',
             'storniert', 'ogs' => 'text-gray-400',
             default => 'text-amber-700',
         };
@@ -36,7 +35,8 @@
         <p class="text-sm text-gray-500">
             Jede Buchung wird über die Linear-Nummer einer Person zugeordnet und als Bestellung für das Speiseplan-Menü
             des Tages angelegt (ohne Bestellfristen). Voraussetzung: das Menü ist zugeordnet und steht vollständig im Speiseplan.
-            OGS-Kinder laufen bei uns über das Abo und werden übersprungen; nichts wird doppelt angelegt.
+            <strong>Für jeden übernommenen Tag werden alle bisherigen Menü- und Gericht-Bestellungen bei uns ersetzt</strong>
+            (Menü&amp;Serve ist bis zum Umstieg die Quelle; ein zweiter Lauf ergibt dasselbe). OGS-Kinder laufen bei uns über das Abo – dafür der OGS-Abgleich unten.
         </p>
 
         @if ($fehler)
@@ -55,6 +55,7 @@
                                 @foreach ($statusText as $s => $text)
                                     <th class="px-3 py-2 text-right font-medium {{ $farbe($s) }}">{{ $text }}</th>
                                 @endforeach
+                                <th class="px-3 py-2 text-right font-medium text-red-700" title="Menü-/Gericht-Bestellzeilen, die bei uns an dem Tag schon stehen und ersetzt werden">wird ersetzt</th>
                                 <th class="px-3 py-2"></th>
                             </tr>
                         </thead>
@@ -70,11 +71,15 @@
                                         @php $n = $liste->where('status', $s)->count(); @endphp
                                         <td class="px-3 py-2 text-right tabular-nums {{ $n ? $farbe($s) : 'text-gray-300' }}">{{ $n ?: '–' }}</td>
                                     @endforeach
-                                    @php $tagBereit = $liste->where('status', 'bereit')->count(); @endphp
+                                    @php
+                                        $tagBereit = $liste->where('status', 'bereit')->count();
+                                        $ersetzt = $vorhanden[$tag] ?? 0;
+                                    @endphp
+                                    <td class="px-3 py-2 text-right tabular-nums {{ $ersetzt ? 'text-red-700' : 'text-gray-300' }}">{{ $ersetzt ?: '–' }}</td>
                                     <td class="px-3 py-2 text-right">
                                         @if ($tagBereit > 0)
                                             <form method="POST" action="{{ route('module.schulkantine.dishes.menueserve.buchungen.uebernehmen') }}"
-                                                  onsubmit="return confirm(@js($tagBereit.' Buchungen vom '.\Illuminate\Support\Carbon::parse($tag)->format('d.m.Y').' als Bestellung anlegen?'))">
+                                                  onsubmit="return confirm(@js($tagBereit.' Buchungen vom '.\Illuminate\Support\Carbon::parse($tag)->format('d.m.Y').' als Bestellung anlegen? '.$ersetzt.' bisherige Bestellzeilen dieses Tages werden ersetzt.'))">
                                                 @csrf
                                                 <input type="hidden" name="ab" value="{{ $ab->format('Y-m-d') }}">
                                                 <input type="hidden" name="tag" value="{{ $tag }}">
@@ -224,7 +229,7 @@
             @endif
 
             <form method="POST" action="{{ route('module.schulkantine.dishes.menueserve.buchungen.uebernehmen') }}" class="flex justify-end"
-                  onsubmit="return confirm(@js($bereit.' Buchungen als Bestellung anlegen?'))">
+                  onsubmit="return confirm(@js($bereit.' Buchungen als Bestellung anlegen? Alle bisherigen Menü-/Gericht-Bestellungen dieser Tage ('.array_sum($vorhanden).' Zeilen) werden ersetzt.'))">
                 @csrf
                 <input type="hidden" name="ab" value="{{ $ab->format('Y-m-d') }}">
                 <button type="submit" @disabled($bereit === 0)

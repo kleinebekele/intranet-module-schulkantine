@@ -20,9 +20,6 @@ use Intranet\Modules\Schulkantine\Support\MenueServeSpeiseplan;
  */
 class MenueServeImportController
 {
-    /** Erster Tag, an dem die Intranet-Kantine Menü&Serve ablöst. */
-    private const START = '2026-10-12';
-
     public function index(Request $request)
     {
         $this->authorize($request);
@@ -181,17 +178,20 @@ class MenueServeImportController
             $plan = $season ? $buchungen->plan($season, $ab) : [];
             $unbekannt = $buchungen->unbekannte($plan);
             $ogs = $season ? $buchungen->ogsAbgleich($season, $plan) : null;
+            $vorhanden = $season ? $buchungen->vorhandeneJeTag($season, $plan) : [];
             $fehler = $season ? null : 'Es ist keine Saison aktiv.';
         } catch (\Throwable $e) {
             report($e);
             $plan = [];
             $unbekannt = [];
             $ogs = null;
+            $vorhanden = [];
             $fehler = $e->getMessage();
         }
 
         return view('schulkantine::dishes.menueserve-buchungen', [
             'plan' => $plan, 'unbekannt' => $unbekannt, 'ogs' => $ogs, 'fehler' => $fehler, 'ab' => $ab,
+            'vorhanden' => $vorhanden,
             'statusText' => MenueServeBuchungen::STATUS,
         ]);
     }
@@ -207,7 +207,7 @@ class MenueServeImportController
         $e = (new MenueServeBuchungen)->uebernehmen($season, $ab, $request->user()->id, $tag);
 
         return redirect()->route('module.schulkantine.dishes.menueserve.buchungen', ['ab' => $ab->format('Y-m-d')])
-            ->with('status', "{$e['angelegt']} Buchungen aus Menü&Serve als Bestellung übernommen"
+            ->with('status', "{$e['angelegt']} Buchungen aus Menü&Serve als Bestellung übernommen, {$e['geloescht']} bisherige Bestellzeilen ersetzt"
                 .($tag ? ' ('.Carbon::parse($tag)->format('d.m.Y').').' : '.'));
     }
 
@@ -286,8 +286,10 @@ class MenueServeImportController
             return Carbon::parse($wert)->startOfDay();
         }
 
-        // Standard: ab dem Start der Intranet-Kantine, danach ab heute.
-        return Carbon::today()->max(Carbon::parse(self::START));
+        // Standard: das ganze aktuelle Schuljahr (ab Saisonbeginn).
+        $season = Season::where('is_active', true)->first();
+
+        return $season ? $season->start_date->copy()->startOfDay() : Carbon::today();
     }
 
     private function authorize(Request $request): void
