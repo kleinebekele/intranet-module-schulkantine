@@ -28,6 +28,12 @@ class MenueServeGerichte
     public const TYP_SNACK = 5;
 
     /** Unser Gericht für alle Menü&Serve-Snacks (Live-ID; per Config änderbar). */
+    /** Unser Gericht „Verschiedenes" – auf Wunsch jeden Tag als Snack auf den Tagesplan. */
+    public static function verschiedenes(): ?Dish
+    {
+        return Dish::whereRaw('LOWER(name) = ?', ['verschiedenes'])->orderBy('id')->first();
+    }
+
     public static function snackGericht(): int
     {
         return (int) config('schulkantine.menueserve_snack_gericht', 42);

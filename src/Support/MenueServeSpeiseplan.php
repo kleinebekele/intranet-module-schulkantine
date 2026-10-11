@@ -26,9 +26,11 @@ class MenueServeSpeiseplan
      * @param  Collection<int, object>  $zuordnungen  Zeilen aus kantine_menueserve_zuordnungen (+ linie)
      * @param  bool  $andereEntfernen  an jedem vollständig übernommenen Tag alle übrigen Speisen
      *                                 (andere Menüs, Einzelgerichte) samt ihren Bestellungen entfernen
+     * @param  Dish|null  $taeglich  dieses Gericht an jedem übernommenen Tag als Snack auf den Tagesplan
+     *                               (z. B. „Verschiedenes")
      * @return list<array{datum: string, titel: string, ok: bool, text: string}>
      */
-    public function uebernehmen(Season $season, Collection $zuordnungen, bool $andereEntfernen = false): array
+    public function uebernehmen(Season $season, Collection $zuordnungen, bool $andereEntfernen = false, ?Dish $taeglich = null): array
     {
         // Je Tag: was aus Menü&Serve kam (bleibt) und ob etwas schiefging (dann nichts entfernen).
         $behalten = [];
@@ -111,6 +113,20 @@ class MenueServeSpeiseplan
                 $menuDay->slots->firstWhere('id', $slotId)->update(['dish_id' => $dishId]);
             }
             $ergebnis[] = $zeile(true, '„'.$menuDay->name.'": '.collect([$haupt?->name, $nach?->name])->filter()->implode(' + '));
+        }
+
+        if ($taeglich) {
+            $neu = 0;
+            foreach ($behalten as $ds => $b) {
+                if (! $season->isOpenOn(Carbon::parse($ds))) {
+                    continue;
+                }
+                $neu += $this->aufTagesplan($season, Carbon::parse($ds), $taeglich) ? 1 : 0;
+                // Bleibt stehen, auch wenn die übrigen Speisen entfernt werden.
+                $behalten[$ds]['menus'][] = Menu::where('season_id', $season->id)->whereDate('date', $ds)->where('dish_id', $taeglich->id)->value('id');
+            }
+            $ergebnis[] = ['datum' => '', 'titel' => $taeglich->name, 'ok' => true,
+                'text' => 'an '.count($behalten).' Tagen als Snack auf dem Tagesplan ('.$neu.' neu)'];
         }
 
         if ($andereEntfernen) {

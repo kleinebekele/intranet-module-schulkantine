@@ -138,6 +138,16 @@
                                class="rounded border-gray-300 text-red-600 focus:ring-red-500">
                         übrige Speisen dieser Tage entfernen
                     </label>
+                    @if ($verschiedenes)
+                        <label class="flex items-center gap-2 text-sm text-gray-700"
+                               title="Das Gericht „{{ $verschiedenes->name }}“ an jedem übernommenen Tag als Snack (Einzelgericht) auf den Tagesplan setzen">
+                            <input type="checkbox" name="verschiedenes" value="1"
+                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            „{{ $verschiedenes->name }}" als Snack jeden Tag hinzufügen
+                        </label>
+                    @else
+                        <span class="text-xs text-gray-400" title="Lege unter Gerichte ein Gericht „Verschiedenes“ an, dann erscheint hier die Option.">kein Gericht „Verschiedenes"</span>
+                    @endif
                     <button type="submit" name="aktion" value="speichern" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Zuordnung speichern</button>
                     <button type="submit" name="aktion" value="speiseplan"
                             :data-bestaetigen="andere
