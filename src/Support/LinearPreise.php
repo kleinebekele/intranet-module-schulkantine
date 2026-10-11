@@ -5,6 +5,7 @@ namespace Intranet\Modules\Schulkantine\Support;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Intranet\Modules\Schulkantine\Models\MenuDay;
+use Intranet\Modules\Schulkantine\Models\MenuTemplate;
 use Intranet\Modules\Schulkantine\Models\Setting;
 
 /**
@@ -88,6 +89,26 @@ class LinearPreise
         }
 
         return $eigene ? min($eigene) : max($preise);
+    }
+
+    /**
+     * Preisangabe ohne bestimmten Esser (Speiseplan, Menü-Vorlagen): bei Linear-Preisen die
+     * Spanne über alle Vertragsarten („2,20–3,50 €"), sonst der feste Preis.
+     */
+    public static function anzeige(MenuDay|MenuTemplate $menu): string
+    {
+        $vorlage = $menu instanceof MenuTemplate ? $menu : $menu->template;
+        if (! $vorlage?->linear_price) {
+            return number_format((float) $menu->price, 2, ',', '.').' €';
+        }
+        $preise = self::aktuell();
+        if (! $preise) {
+            return 'noch kein Linear-Preis';
+        }
+        $min = number_format(min($preise), 2, ',', '.');
+        $max = number_format(max($preise), 2, ',', '.');
+
+        return ($min === $max ? $min : $min.'–'.$max).' €';
     }
 
     /** Was kostet dieser Menü-Tag für diesen Esser? */

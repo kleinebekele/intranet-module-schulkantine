@@ -175,7 +175,7 @@
                                                             <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">unvollständig</span>
                                                         @endif
                                                     </span>
-                                                    <span class="text-xs font-bold text-emerald-700">{{ number_format((float) $md->price, 2, ',', '.') }} €</span>
+                                                    <span class="text-xs font-bold text-emerald-700">{{ \Intranet\Modules\Schulkantine\Support\LinearPreise::anzeige($md) }}</span>
                                                 </div>
                                                 <div class="mt-1 space-y-0.5">
                                                     @foreach ($md->slots as $slot)
@@ -200,7 +200,7 @@
                                                         <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">unvollständig</span>
                                                     @endif
                                                 </span>
-                                                <span class="text-xs font-bold text-emerald-700">{{ number_format((float) $md->price, 2, ',', '.') }} €</span>
+                                                <span class="text-xs font-bold text-emerald-700">{{ \Intranet\Modules\Schulkantine\Support\LinearPreise::anzeige($md) }}</span>
                                             </div>
                                             @if ($menuIncomplete)
                                                 <p class="mt-1 text-[10px] leading-tight text-amber-600">⚠️ Kann nicht bestellt werden, solange nicht alle Plätze ein Gericht haben.</p>

@@ -220,6 +220,7 @@
                                     <div class="flex items-center gap-2">
                                         <span class="font-semibold text-gray-800">{{ $t->name }}</span>
                                         @if ($t->linear_price)
+                                            <span class="text-sm font-bold text-indigo-700">{{ \Intranet\Modules\Schulkantine\Support\LinearPreise::anzeige($t) }}</span>
                                             <span class="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">Preis aus Linear</span>
                                         @else
                                             <span class="text-sm font-bold text-indigo-700">{{ number_format((float) $t->price, 2, ',', '.') }} €</span>
