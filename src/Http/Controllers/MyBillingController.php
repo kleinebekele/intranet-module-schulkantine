@@ -9,6 +9,7 @@ use Intranet\Modules\Schulkantine\Models\CustomerGroup;
 use Intranet\Modules\Schulkantine\Models\Order;
 use Intranet\Modules\Schulkantine\Models\Season;
 use Intranet\Modules\Schulkantine\Support\BillingService;
+use Intranet\Modules\Schulkantine\Support\HaushaltsAbrechnung;
 
 /**
  * „Meine Abrechnung" – Selbstbedienung für jeden eingeloggten Nutzer: die Kosten
@@ -22,48 +23,49 @@ use Intranet\Modules\Schulkantine\Support\BillingService;
  */
 class MyBillingController
 {
-    /** Haushalts-Übersicht des Monats: je Person eine Zeile mit Teil- und Gesamtsumme. */
+    /**
+     * Übersicht: je Saison eine Tabelle Monat × Esser (Betrag) + Gesamt + Status +
+     * PDF. Die aktive Saison oben, frühere darunter (aufklappbar).
+     */
     public function index(Request $request)
     {
         $viewer = $request->user();
-
-        $season = Season::where('is_active', true)->first();
-        if (! $season) {
+        $aktiv = Season::where('is_active', true)->first();
+        if (! $aktiv) {
             return view('schulkantine::billing.index', ['season' => null]);
         }
 
-        [$year, $month] = $this->resolveMonth($request, $season, $viewer);
-
-        $billing = new BillingService;
-        $groups = CustomerGroup::all()->keyBy('role_id');
-
-        $members = [];
-        $total = 0.0;
-        foreach ($this->household($viewer) as $eater) {
-            $d = $billing->detailsForUser($season, $eater->id, $year, $month);
-            $members[] = [
-                'user' => $eater,
-                'group' => CustomerGroup::forUser($eater, $groups)?->name,
-                'menu_total' => $d['menu_total'],
-                'ogs_total' => $d['ogs']['total'],
-                'ogs_days' => $d['ogs']['days'],
-                'spontan_total' => $d['spontan_total'],
-                'pfand_net' => $d['pfand_net'],
-                'total' => $d['total'],
-            ];
-            $total += $d['total'];
-        }
+        $haushalt = $this->household($viewer);
+        $rechner = new HaushaltsAbrechnung;
+        $frueher = Season::where('id', '!=', $aktiv->id)->whereDate('start_date', '<', $aktiv->start_date)
+            ->orderByDesc('start_date')->get();
 
         return view('schulkantine::billing.index', [
-            'season' => $season,
-            'members' => $members,
-            'total' => round($total, 2),
-            'year' => $year,
-            'month' => $month,
-            'monthLabel' => $this->monthLabel($year, $month),
-            'monthValue' => sprintf('%04d-%02d', $year, $month),
-            'months' => $this->seasonMonths($season),
-        ] + $this->linearHistorie($viewer));
+            'season' => $aktiv,
+            'aktuell' => $rechner->saison($aktiv, $haushalt),
+            'frueher' => $frueher->map(fn (Season $s) => $rechner->saison($s, $haushalt))->all(),
+            'linearStand' => \Intranet\Modules\Schulkantine\Models\Setting::current()->linear_charges_at,
+        ]);
+    }
+
+    /** Monatsabrechnung des Haushalts als PDF zum Abheften. */
+    public function pdf(Request $request)
+    {
+        $viewer = $request->user();
+        $season = Season::findOrFail((int) $request->query('saison'));
+        abort_unless(preg_match('/^(\d{4})-(\d{2})$/', (string) $request->query('monat'), $mm), 404);
+        [$y, $m] = [(int) $mm[1], (int) $mm[2]];
+
+        $daten = (new HaushaltsAbrechnung)->saison($season, $this->household($viewer));
+        $monat = collect($daten['monate'])->first(fn ($mo) => $mo['jahr'] === $y && $mo['monat'] === $m);
+        abort_unless($monat, 404);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulkantine::billing.pdf', [
+            'season' => $season, 'esser' => $daten['esser'], 'monat' => $monat,
+            'viewer' => $viewer, 'erstellt' => Carbon::now(),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download('kantine-abrechnung-'.$monat['wert'].'.pdf');
     }
 
     /**

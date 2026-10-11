@@ -127,6 +127,7 @@ Route::middleware(['web', 'auth', AlsPerson::class])
         // Eigenes Präfix (abrechnung.*), damit die Sichtbarkeit unabhängig von der
         // Admin-„Auswertung" (reports.*) ist.
         Route::get('abrechnung', [MyBillingController::class, 'index'])->name('abrechnung.index');
+        Route::get('abrechnung/pdf', [MyBillingController::class, 'pdf'])->name('abrechnung.pdf');
         Route::get('abrechnung/{user}', [MyBillingController::class, 'show'])->name('abrechnung.show');
 
         // Ausgabe & Betrieb (Phase 4) – Küchen-/Ausgabepersonal (Zugriff im Controller geprüft).
