@@ -87,7 +87,7 @@
                             <label class="mt-2 flex items-center gap-2 text-sm text-gray-700">
                                 <input type="checkbox" name="am_ausgabeterminal" value="1" @checked($m['budgetAmTerminal'])
                                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                                Budget an der Ausgabe anzeigen
+                                Budget dem Ausgabe-Personal anzeigen
                             </label>
                         </div>
 

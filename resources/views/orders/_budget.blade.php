@@ -67,7 +67,7 @@
                 <input type="hidden" name="am_ausgabeterminal" value="0">
                 <input type="checkbox" name="am_ausgabeterminal" value="1" @checked($bud['amAusgabeterminal'] ?? false)
                        class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                <span>Budget an der Ausgabe anzeigen <span class="block text-[11px] text-gray-400">Das Ausgabe-Personal sieht dann, wie viel noch übrig ist.</span></span>
+                <span>Budget dem Ausgabe-Personal anzeigen</span>
             </label>
             <div class="mt-4 flex justify-end gap-2">
                 <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">Abbrechen</button>
