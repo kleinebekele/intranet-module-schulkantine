@@ -56,14 +56,10 @@ class OrderController
         $eaters = $this->eatersFor($user);
         $groups = CustomerGroup::all()->keyBy('role_id');
 
-        // OGS-Esser bekommen (falls noch nicht vorhanden) ihr Saison-Abo –
-        // „isst standardmäßig an allen Öffnungstagen".
-        foreach ($eaters as $eater) {
-            $group = CustomerGroup::forUser($eater, $groups);
-            if ($group && $group->ordering_mode === CustomerGroup::MODE_JA_NEIN && Essensvertrag::hat($eater)) {
-                Subscription::firstOrCreate(['season_id' => $season->id, 'user_id' => $eater->id]);
-            }
-        }
+        // Bewusst KEIN automatisches OGS-Abo beim Öffnen der Seite (bis 10/2026 legte
+        // sie „alle Tage" an – auch für Kinder, die nur unregelmäßig essen). Ohne Abo
+        // isst ein OGS-Kind nur an einzeln angemeldeten Tagen, bis das Abo gesetzt ist
+        // (Eltern hier, Verwaltung über „OGS-Abos aus Historie").
 
         // Woche bestimmen (wie im Speiseplan: heute → nächster Öffnungstag).
         $weekStart = $this->resolveWeekStart($request, $season);

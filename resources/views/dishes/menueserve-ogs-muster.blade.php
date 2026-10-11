@@ -44,8 +44,12 @@
         @if ($muster && $muster['kinder'])
             @php
                 $wt = $muster['wochentage'];
-                // Erledigt = Abo passt zum eindeutigen Muster, oder bei unklaren Kindern: es ist ein Abo gesetzt.
-                $erledigt = fn ($k) => $k['unklar'] ? $k['aktuell'] !== [] : $k['vorschlag'] === $k['aktuell'];
+                // Erledigt = Abo passt zum eindeutigen Muster, oder bei unklaren Kindern: es ist ein
+                // Abo gesetzt, das nicht „alle Tage" ist (das legte bis 10/2026 die Bestellseite
+                // automatisch an – es sagt also nichts darüber, ob jemand es bewusst gewählt hat).
+                $erledigt = fn ($k) => $k['unklar']
+                    ? $k['aktuell'] !== [] && array_diff($wt, $k['aktuell']) !== []
+                    : $k['vorschlag'] === $k['aktuell'];
                 $offen = collect($muster['kinder'])->reject($erledigt)->values();
                 $fertig = collect($muster['kinder'])->filter($erledigt)->values();
             @endphp
