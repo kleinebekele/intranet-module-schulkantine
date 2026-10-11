@@ -36,7 +36,7 @@
         </div>
     </x-slot>
 
-    <div class="max-w-5xl">
+    <div class="w-full">
         @if (session('error'))
             <div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 {{ session('error') }}

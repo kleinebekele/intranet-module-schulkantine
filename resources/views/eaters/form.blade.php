@@ -10,7 +10,7 @@
         $selDiets = old('diets', $selDiets);
     @endphp
 
-    <div class="max-w-2xl space-y-6">
+    <div class="w-full space-y-6">
         {{-- Stammdaten & abgeleitete Gruppe (read-only) --}}
         <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm">
             <div class="flex flex-wrap items-center gap-x-6 gap-y-1">
