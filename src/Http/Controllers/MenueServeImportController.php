@@ -211,6 +211,58 @@ class MenueServeImportController
                 .($tag ? ' ('.Carbon::parse($tag)->format('d.m.Y').').' : '.'));
     }
 
+    /** OGS-Abo-Muster aus der Menü&Serve-Historie (Standard: Saisonbeginn bis gestern). */
+    public function ogsMuster(Request $request)
+    {
+        $this->authorize($request);
+        $season = Season::where('is_active', true)->firstOrFail();
+        $von = $this->datum($request->input('von')) ?? $season->start_date->copy();
+        $bis = $this->datum($request->input('bis')) ?? Carbon::yesterday();
+
+        try {
+            $muster = (new MenueServeBuchungen)->ogsMuster($season, $von, $bis);
+            $fehler = null;
+        } catch (\Throwable $e) {
+            report($e);
+            $muster = null;
+            $fehler = $e->getMessage();
+        }
+
+        return view('schulkantine::dishes.menueserve-ogs-muster', [
+            'muster' => $muster, 'fehler' => $fehler, 'von' => $von, 'bis' => $bis,
+            'schwelle' => MenueServeBuchungen::MUSTER_SCHWELLE,
+        ]);
+    }
+
+    public function ogsMusterSetzen(Request $request)
+    {
+        $this->authorize($request);
+        $season = Season::where('is_active', true)->firstOrFail();
+        $data = $request->validate([
+            'auswahl' => ['required', 'array', 'min:1'],
+            'auswahl.*' => ['integer', 'exists:users,id'],
+            'tage' => ['array'],
+            'tage.*' => ['array'],
+            'tage.*.*' => ['integer', 'between:1,7'],
+            'alle' => ['required', 'array'],
+            'alle.*' => ['integer', 'between:1,7'],
+        ], ['auswahl.required' => 'Bitte mindestens ein Kind ankreuzen.']);
+
+        $muster = [];
+        foreach ($data['auswahl'] as $userId) {
+            $muster[(int) $userId] = $data['tage'][$userId] ?? [];
+        }
+        $n = (new MenueServeBuchungen)->abosSetzen($season, $muster, array_map('intval', $data['alle']));
+
+        return redirect()->route('module.schulkantine.dishes.menueserve.ogs-muster', $request->only('von', 'bis'))
+            ->with('status', "Abo für {$n} OGS-Kinder gesetzt.");
+    }
+
+    private function datum(mixed $wert): ?Carbon
+    {
+        return is_string($wert) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $wert) ? Carbon::parse($wert)->startOfDay() : null;
+    }
+
     /** OGS-Kinder an Menü&Serve angleichen (An-/Abmeldung je abweichendem Tag) – alle oder ein Tag. */
     public function ogsAngleichen(Request $request)
     {

@@ -26,7 +26,11 @@
                            class="mt-1 rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </div>
             </form>
-            <a href="{{ route('module.schulkantine.dishes.menueserve', ['ab' => $ab->format('Y-m-d')]) }}" class="text-sm text-gray-500 hover:text-gray-700">← zurück zur Menü-Zuordnung</a>
+            <div class="flex items-center gap-3">
+                <a href="{{ route('module.schulkantine.dishes.menueserve.ogs-muster') }}"
+                   class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">OGS-Abos aus Historie</a>
+                <a href="{{ route('module.schulkantine.dishes.menueserve', ['ab' => $ab->format('Y-m-d')]) }}" class="text-sm text-gray-500 hover:text-gray-700">← zurück zur Menü-Zuordnung</a>
+            </div>
         </div>
 
         <p class="text-sm text-gray-500">

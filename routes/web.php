@@ -88,6 +88,8 @@ Route::middleware(['web', 'auth'])
         Route::get('gerichte/menueserve/buchungen', [MenueServeImportController::class, 'buchungen'])->name('dishes.menueserve.buchungen');
         Route::post('gerichte/menueserve/buchungen', [MenueServeImportController::class, 'buchungenUebernehmen'])->name('dishes.menueserve.buchungen.uebernehmen');
         Route::post('gerichte/menueserve/buchungen/ogs', [MenueServeImportController::class, 'ogsAngleichen'])->name('dishes.menueserve.buchungen.ogs');
+        Route::get('gerichte/menueserve/ogs-muster', [MenueServeImportController::class, 'ogsMuster'])->name('dishes.menueserve.ogs-muster');
+        Route::post('gerichte/menueserve/ogs-muster', [MenueServeImportController::class, 'ogsMusterSetzen'])->name('dishes.menueserve.ogs-muster.setzen');
         Route::post('gerichte/menueserve/symbole', [MenueServeImportController::class, 'symbole'])->name('dishes.menueserve.symbole');
         Route::post('gerichte', [DishController::class, 'store'])->name('dishes.store');
         Route::get('gerichte/{dish}/bearbeiten', [DishController::class, 'edit'])->name('dishes.edit');

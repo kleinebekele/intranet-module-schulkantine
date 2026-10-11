@@ -29,6 +29,9 @@ use Intranet\Modules\Schulkantine\Models\Subscription;
  */
 class MenueServeBuchungen
 {
+    /** Ab diesem Anteil gebuchter Tage zählt ein Wochentag zum OGS-Abo-Muster. */
+    public const MUSTER_SCHWELLE = 0.6;
+
     public const STATUS = [
         'bereit' => 'wird übernommen',
         'uebernommen' => 'schon übernommen',
@@ -303,8 +306,9 @@ class MenueServeBuchungen
     }
 
     /** @return list<array{id: string, ms_id: string, konto: string, tag: string, adrnr: string, menge: int, recsts: string, snack: bool}> */
-    private function lesen(Carbon $ab): array
+    protected function lesen(Carbon $ab, ?Carbon $bis = null): array
     {
+        $bis ??= Carbon::create(2999, 12, 31);
         if (! Ekkon::mssqlKonfiguriert()) {
             throw new \RuntimeException('Keine Verbindung zum SQL-Server von Linear/Menü&Serve konfiguriert.');
         }
@@ -329,10 +333,84 @@ class MenueServeBuchungen
                JOIN {$mus}.dbo.MNUBAS b ON b.MNUBAS_ID = o.BOOBAS_FK_MNUBAS
                JOIN {$mus}.dbo.CALBAS k ON k.CALBAS_ID = b.MNUBAS_FK_CALBAS
                JOIN {$mus}.dbo.MNUPRP p ON p.MNUPRP_ID = b.MNUBAS_FK_MNUPRP
-              WHERE k.CALBAS_DT_DATE >= ?
+              WHERE k.CALBAS_DT_DATE >= ? AND k.CALBAS_DT_DATE <= ?
               ORDER BY k.CALBAS_DT_DATE",
-            [$ab->format('Y-m-d')],
+            [$ab->format('Y-m-d'), $bis->format('Y-m-d')],
         ));
+    }
+
+    /**
+     * Abo-Muster der OGS-Kinder aus der Menü&Serve-Historie: je Kind und Wochentag
+     * der Anteil der Kantinentage (= Tage mit irgendeiner Buchung), an denen es
+     * gebucht war. Vorschlag = Wochentage mit mindestens MUSTER_SCHWELLE;
+     * „unklar", wenn ein Wochentag zwischen 25 % und 75 % liegt.
+     *
+     * @return array{von: Carbon, bis: Carbon, wochentage: list<int>, kinder: list<array>}
+     */
+    public function ogsMuster(Season $season, Carbon $von, Carbon $bis): array
+    {
+        $buchungen = collect($this->lesen($von, $bis));
+        $tage = $buchungen->pluck('tag')->unique()->filter(fn ($t) => $season->isOpenOn(Carbon::parse($t)));
+        $jeWochentag = $tage->countBy(fn ($t) => Carbon::parse($t)->dayOfWeekIso)->sortKeys();
+        $wochentage = $jeWochentag->keys()->map(fn ($d) => (int) $d)->values()->all();
+
+        $gueltig = $buchungen->filter(fn ($b) => $b['menge'] > 0 && $b['recsts'] !== 'L' && $tage->contains($b['tag']));
+        $personen = User::whereIn('externe_id', $gueltig->pluck('adrnr')->unique()->filter())->get()->keyBy('externe_id');
+        $gruppen = CustomerGroup::all()->keyBy('role_id');
+        $subs = Subscription::where('season_id', $season->id)->get()->keyBy('user_id');
+
+        $kinder = [];
+        foreach ($gueltig->groupBy('adrnr') as $adrnr => $liste) {
+            $user = $personen->get($adrnr);
+            if (! $user || CustomerGroup::forUser($user, $gruppen)?->ordering_mode !== CustomerGroup::MODE_JA_NEIN) {
+                continue;
+            }
+            $gebucht = $liste->pluck('tag')->unique()->countBy(fn ($t) => Carbon::parse($t)->dayOfWeekIso);
+            $anteile = [];
+            foreach ($jeWochentag as $wd => $n) {
+                $anteile[$wd] = $n > 0 ? round(($gebucht[$wd] ?? 0) / $n, 2) : 0.0;
+            }
+            $vorschlag = array_keys(array_filter($anteile, fn ($a) => $a >= self::MUSTER_SCHWELLE));
+            $sub = $subs->get($user->id);
+            $aktuell = $sub && $sub->active ? ($sub->weekdays ?: $wochentage) : [];
+            sort($aktuell);
+
+            $kinder[] = [
+                'user' => $user,
+                'tage' => $liste->pluck('tag')->unique()->count(),
+                'anteile' => $anteile,
+                'vorschlag' => $vorschlag,
+                'unklar' => collect($anteile)->contains(fn ($a) => $a > 0.25 && $a < 0.75),
+                'aktuell' => array_values(array_map('intval', $aktuell)),
+                'abo' => $this->aboText($sub),
+            ];
+        }
+        usort($kinder, fn ($a, $b) => strcmp($a['user']->name, $b['user']->name));
+
+        return ['von' => $von, 'bis' => $bis, 'wochentage' => $wochentage, 'jeWochentag' => $jeWochentag->all(), 'kinder' => $kinder];
+    }
+
+    /**
+     * Abos setzen: je Kind die gewählten Wochentage. Alle Kantinen-Wochentage = Abo
+     * ohne Einschränkung, keiner = Abo aus.
+     *
+     * @param  array<int, list<int>>  $muster  user_id → Wochentage
+     * @param  list<int>  $alle  die Kantinen-Wochentage
+     */
+    public function abosSetzen(Season $season, array $muster, array $alle): int
+    {
+        $n = 0;
+        foreach ($muster as $userId => $tage) {
+            $tage = array_values(array_unique(array_map('intval', $tage)));
+            sort($tage);
+            Subscription::updateOrCreate(
+                ['season_id' => $season->id, 'user_id' => (int) $userId],
+                ['active' => $tage !== [], 'weekdays' => array_diff($alle, $tage) === [] ? [] : $tage],
+            );
+            $n++;
+        }
+
+        return $n;
     }
 
     /**
