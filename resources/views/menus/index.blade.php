@@ -7,6 +7,9 @@
         $darfGerichtHinzufuegen = $zugriff->darfRoute('module.schulkantine.menus.store');
         $darfGerichtEntfernen = $zugriff->darfRoute('module.schulkantine.menus.destroy');
         $darfBestellungLoeschen = $zugriff->darfRoute('module.schulkantine.menus.order-destroy');
+        // Vergangene Wochen sind gelaufen: wie festgeschrieben, ohne Freigabe-Knöpfe.
+        $weekPast = $weekPast ?? false;
+        $gesperrt = $weekReleased || $weekPast;
     @endphp
     <x-slot name="header">
         <div class="flex items-center gap-2">
@@ -50,6 +53,13 @@
                 </div>
             </div>
 
+            {{-- Vergangene Woche: gelaufen ist gelaufen – nichts mehr freizugeben oder zu bearbeiten. --}}
+            @if ($weekPast)
+                <div class="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
+                    <span class="font-semibold text-gray-700">🕓 Vergangene Woche</span>
+                    <span class="text-gray-500">– abgeschlossen, nicht mehr bearbeitbar.</span>
+                </div>
+            @else
             {{-- Wochen-Freigabe (hybrid): Status + manuelle Übersteuerung --}}
             <div class="mb-4 flex flex-col gap-2 rounded-lg border px-4 py-3 sm:flex-row sm:items-center sm:justify-between
                         {{ $weekReleased ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50' }}">
@@ -122,6 +132,7 @@
                     @endif
                 </div>
             </div>
+            @endif
 
             @if (empty($days))
                 <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
@@ -155,7 +166,7 @@
                                     @php $dayMenus = $menuDaysByDate[$d['date']->toDateString()] ?? collect(); @endphp
                                     @foreach ($dayMenus as $md)
                                         @php $menuIncomplete = $md->slots->isEmpty() || $md->slots->contains(fn ($s) => $s->dish_id === null); @endphp
-                                        @if ($weekReleased || ! $darfPlanen)
+                                        @if ($gesperrt || ! $darfPlanen)
                                             {{-- Festgeschriebene Woche oder nur Leserechte: Menü nur lesbar. --}}
                                             <div class="rounded-lg border {{ $menuIncomplete ? 'border-amber-300 bg-amber-50/50' : 'border-emerald-200 bg-emerald-50/40' }} px-2 py-2">
                                                 <div class="flex flex-wrap items-center justify-between gap-2">
@@ -248,7 +259,7 @@
                                             $addOptions = ($dishesByCategory[$category->id] ?? collect())->map(fn ($x) => ['id' => $x->id, 'name' => $x->name])->values();
                                         @endphp
                                         {{-- Freigegebene Woche: Kategorien ohne gesetztes Gericht komplett ausblenden. --}}
-                                        @if ($weekReleased && $catItems->isEmpty())
+                                        @if ($gesperrt && $catItems->isEmpty())
                                             @continue
                                         @endif
                                         <fieldset class="rounded-lg border px-2 pb-2 {{ $catColor ? '' : 'border-gray-200' }}"
@@ -259,7 +270,7 @@
                                                 @foreach ($catItems as $m)
                                                     <div class="flex items-center justify-between gap-2 rounded-md border border-gray-100 bg-white px-2 py-1 text-sm">
                                                         <span class="min-w-0 text-gray-800">{{ $m->dish->name }}</span>
-                                                        @if ($weekReleased)
+                                                        @if ($gesperrt)
                                                             <span title="Festgeschriebene Woche – nicht mehr änderbar" class="text-gray-300">🔒</span>
                                                         @elseif ($m->orders_count > 0)
                                                             <span title="Bereits bestellt – nicht mehr entfernbar" class="text-gray-300">🔒</span>
@@ -277,7 +288,7 @@
 
                                             {{-- + hinzufügen: Such-Dropdown der Gerichte dieser Kategorie; Klick fügt hinzu.
                                                  In festgeschriebenen Wochen komplett ausgeblendet. --}}
-                                            @if (! $weekReleased && $darfGerichtHinzufuegen)
+                                            @if (! $gesperrt && $darfGerichtHinzufuegen)
                                                 <form method="POST" action="{{ route('module.schulkantine.menus.store') }}" class="relative mt-1.5"
                                                       x-data="{ open: false, query: '', options: @js($addOptions),
                                                                 get filtered() { const t = this.query.trim().toLowerCase(); const o = t ? this.options.filter(d => d.name.toLowerCase().includes(t)) : this.options; return o.slice(0, 50); } }"

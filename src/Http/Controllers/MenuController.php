@@ -150,6 +150,7 @@ class MenuController
             'weekReleased' => $release->isWeekReleased($season, $weekStart),
             'weekOverride' => $release->override($season, $weekStart),
             'weekHasOrders' => $this->weekHasOrders($season, $weekStart),
+            'weekPast' => $this->weekPast($weekStart),
         ]);
     }
 
@@ -207,12 +208,18 @@ class MenuController
     /** Eine freigegebene (festgeschriebene) Woche ist im Speiseplan schreibgeschützt. */
     private function weekLocked(Season $season, Carbon $date): bool
     {
-        return (new ReleaseService)->isWeekReleased($season, $date);
+        return $this->weekPast($date) || (new ReleaseService)->isWeekReleased($season, $date);
+    }
+
+    /** Vergangene Woche (Sonntag liegt vor heute): gelaufen ist gelaufen – nicht mehr bearbeit- oder freigebbar. */
+    private function weekPast(Carbon $date): bool
+    {
+        return $date->copy()->endOfWeek(Carbon::SUNDAY)->lt(Carbon::today());
     }
 
     private function lockedMessage(): string
     {
-        return 'Diese Woche ist festgeschrieben (freigegeben) und kann nicht mehr bearbeitet werden – zum Bearbeiten oben „Zur Bearbeitung freigeben".';
+        return 'Diese Woche ist festgeschrieben (freigegeben oder vergangen) und kann nicht mehr bearbeitet werden.';
     }
 
     /**
@@ -342,6 +349,11 @@ class MenuController
         $season = Season::where('is_active', true)->firstOrFail();
         $week = Carbon::parse($data['week']);
         $release = new ReleaseService;
+
+        if ($this->weekPast($week)) {
+            return $this->redirectToWeek($week)
+                ->withErrors(['release' => 'Diese Woche ist vorbei – da gibt es nichts mehr freizugeben oder zu sperren.']);
+        }
 
         // Sperren nur erlauben, solange es für die Woche noch keine Bestellungen
         // gibt. „Sperren" = zurückhalten, oder zurück auf Automatik, wenn diese
