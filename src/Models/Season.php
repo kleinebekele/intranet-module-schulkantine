@@ -26,7 +26,18 @@ class Season extends Model
         'show_allergens',
         'show_diets',
         'ratings_enabled',
+        'hinweis_offen',
     ];
+
+    /** Standard-Hinweis zu offenen Beträgen (gilt, solange die Saison keinen eigenen hat). */
+    public const HINWEIS_OFFEN = 'Der Betrag wird wie gewohnt per Lastschrift vom hinterlegten Konto eingezogen. '
+        .'Bitte sorgen Sie für ausreichend Deckung. Vielen Dank!';
+
+    /** Hinweis zu offenen Beträgen – eigener Text der Saison oder der Standard. */
+    public function hinweisOffen(): string
+    {
+        return trim((string) $this->hinweis_offen) !== '' ? (string) $this->hinweis_offen : self::HINWEIS_OFFEN;
+    }
 
     protected function casts(): array
     {

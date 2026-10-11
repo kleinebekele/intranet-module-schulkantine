@@ -205,7 +205,10 @@ class SeasonController
             'ogs_price' => ['nullable', 'numeric', 'min:0', 'max:999.99'],
             'opening_weekdays' => ['array'],
             'opening_weekdays.*' => [Rule::in(['1', '2', '3', '4', '5', '6', '7'])],
+            'hinweis_offen' => ['nullable', 'string', 'max:1000'],
         ]);
+        // Unverändert der Standardtext → nichts speichern, damit eine spätere Änderung des Standards greift.
+        $hinweis = trim((string) $request->input('hinweis_offen', ''));
 
         return [
             'name' => $request->string('name')->toString(),
@@ -220,6 +223,7 @@ class SeasonController
             'show_allergens' => $request->boolean('show_allergens'),
             'show_diets' => $request->boolean('show_diets'),
             'ratings_enabled' => $request->boolean('ratings_enabled'),
+            'hinweis_offen' => $hinweis === '' || $hinweis === Season::HINWEIS_OFFEN ? null : $hinweis,
         ];
     }
 

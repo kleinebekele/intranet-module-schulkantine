@@ -134,6 +134,16 @@
         </label>
     </div>
 
+    <div class="border-t border-gray-100 pt-5">
+        <h2 class="text-sm font-semibold text-gray-700">Hinweis zu offenen Beträgen</h2>
+        <p class="mt-0.5 text-xs text-gray-400">
+            Erscheint unter „Meine Abrechnung" beim Fragezeichen neben offenen Beträgen. Leer = Standardtext.
+        </p>
+        <textarea name="hinweis_offen" rows="3"
+                  class="mt-2 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ old('hinweis_offen', $season->hinweisOffen()) }}</textarea>
+        <x-input-error :messages="$errors->get('hinweis_offen')" class="mt-2" />
+    </div>
+
     @if ($season->exists && isset($settings))
         {{-- Globale Bestell-Einstellungen. Gelten übergreifend (nicht je Saison),
              werden aber hier gepflegt, damit es kein eigenes Einstellungen-Menü braucht. --}}

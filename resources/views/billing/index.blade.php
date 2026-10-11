@@ -107,6 +107,8 @@
                                                 <td class="py-1.5 pl-3 text-right">
                                                     @if ($m['offen'] > 0)
                                                         <span class="whitespace-nowrap text-xs font-medium text-amber-700">offen {{ $euro($m['offen']) }}</span>
+                                                        <span class="ml-0.5 inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-amber-100 align-middle text-[10px] font-bold text-amber-700"
+                                                              title="{{ $season->hinweisOffen() }}">?</span>
                                                     @else
                                                         <span class="text-xs font-semibold text-green-700">bezahlt</span>
                                                     @endif
