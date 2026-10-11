@@ -1,12 +1,10 @@
-{{-- „Als Person handeln": unübersehbarer Balken unter der Kopfleiste + Rückfrage vor jeder Änderung auf Kantinenseiten. --}}
-@php $aufKantine = request()->routeIs('module.schulkantine.*'); @endphp
+{{-- „Als Person handeln": unübersehbarer Balken unter der Kopfleiste + Rückfrage vor jeder Änderung.
+     Nur auf Kantinenseiten (Provider) – außerhalb wirkt es nicht und wird nicht angezeigt. --}}
 <div id="kantine-als-person" class="fixed inset-x-0 top-16 z-40 border-b-4 border-red-900 bg-red-600 text-white shadow-lg">
     <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-2 sm:px-6 lg:pl-72">
         <div class="text-base font-extrabold uppercase tracking-wide sm:text-lg">
             ⚠️ Du handelst gerade als {{ $person->name }}
-            <span class="ml-2 text-sm font-semibold normal-case tracking-normal text-red-100">
-                {{ $aufKantine ? '– alles, was du hier einstellst, gilt für diese Person' : '– gilt nur auf den Kantinenseiten' }}
-            </span>
+            <span class="ml-2 text-sm font-semibold normal-case tracking-normal text-red-100">– alles, was du hier einstellst, gilt für diese Person</span>
         </div>
         <form method="POST" action="{{ route('module.schulkantine.als.ende') }}" data-als-person-ende>
             @csrf
@@ -20,8 +18,7 @@
     /* Die feste Seitenleiste des Cores beginnt sonst unter dem Balken. */
     .fixed.top-16.w-64 { top: 7rem !important; }
 </style>
-@if ($aufKantine)
-    <script>
+<script>
         (function () {
             const name = @js($person->name);
             const frage = 'Du änderst gerade für ' + name + ' – nicht für dich selbst.\n\nFortfahren?';
@@ -62,4 +59,3 @@
             }
         })();
     </script>
-@endif

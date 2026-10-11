@@ -39,8 +39,12 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
     {
         parent::boot();
 
-        // „Als Person handeln": roter Balken unter der Kopfleiste, solange aktiv.
+        // „Als Person handeln": roter Balken unter der Kopfleiste, solange aktiv – nur auf Kantinenseiten.
+        // Nur auf Kantinenseiten – außerhalb wirkt es nicht und wird auch nicht angezeigt.
         \App\Support\Kopfleiste::registrieren('kantine-als-person', function (User $user) {
+            if (! request()->routeIs('module.schulkantine.*')) {
+                return null;
+            }
             $person = \Intranet\Modules\Schulkantine\Http\Middleware\AlsPerson::person();
 
             return $person ? view('schulkantine::als-person-banner', ['person' => $person]) : null;
