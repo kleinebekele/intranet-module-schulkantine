@@ -39,31 +39,36 @@ class MyBillingController
         $rechner = new HaushaltsAbrechnung;
         $frueher = Season::where('id', '!=', $aktiv->id)->whereDate('start_date', '<', $aktiv->start_date)
             ->orderByDesc('start_date')->get();
+        // Was das Altsystem vor der ersten Saison abgerechnet hat (ab 2026) – je Schuljahr.
+        $ersteSaison = Season::orderBy('start_date')->value('start_date');
 
         return view('schulkantine::billing.index', [
             'season' => $aktiv,
             'aktuell' => $rechner->saison($aktiv, $haushalt),
-            'frueher' => $frueher->map(fn (Season $s) => $rechner->saison($s, $haushalt))->all(),
+            'frueher' => array_merge(
+                $frueher->map(fn (Season $s) => $rechner->saison($s, $haushalt))->all(),
+                $rechner->altZeitraeume($haushalt, $ersteSaison ? Carbon::parse($ersteSaison) : null),
+            ),
             'linearStand' => \Intranet\Modules\Schulkantine\Models\Setting::current()->linear_charges_at,
         ]);
     }
 
-    /** Monatsabrechnung des Haushalts als PDF zum Abheften. */
+    /** Monatsabrechnung des Haushalts als PDF zum Abheften – nur für abgeschlossene Monate. */
     public function pdf(Request $request)
     {
         $viewer = $request->user();
-        $season = Season::findOrFail((int) $request->query('saison'));
         abort_unless(preg_match('/^(\d{4})-(\d{2})$/', (string) $request->query('monat'), $mm), 404);
         [$y, $m] = [(int) $mm[1], (int) $mm[2]];
 
-        $daten = (new HaushaltsAbrechnung)->saison($season, $this->household($viewer));
-        $monat = collect($daten['monate'])->first(fn ($mo) => $mo['jahr'] === $y && $mo['monat'] === $m);
-        abort_unless($monat, 404);
+        $daten = (new HaushaltsAbrechnung)->monat($this->household($viewer), $y, $m);
+        abort_unless($daten && $daten['monat']['abgeschlossen'], 404, 'Für laufende Monate gibt es noch kein PDF.');
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulkantine::billing.pdf', [
-            'season' => $season, 'esser' => $daten['esser'], 'monat' => $monat,
+            'titel' => $daten['season']?->name ? 'Saison „'.$daten['season']->name.'"' : 'aus dem Altsystem',
+            'hinweis' => $daten['hinweis'], 'esser' => $daten['esser'], 'monat' => $daten['monat'],
             'viewer' => $viewer, 'erstellt' => Carbon::now(),
         ])->setPaper('a4', 'portrait');
+        $monat = $daten['monat'];
 
         return $pdf->download('kantine-abrechnung-'.$monat['wert'].'.pdf');
     }

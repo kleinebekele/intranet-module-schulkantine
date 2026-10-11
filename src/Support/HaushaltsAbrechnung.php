@@ -35,51 +35,126 @@ class HaushaltsAbrechnung
 
     /**
      * @param  Collection<int, User>  $haushalt
-     * @return array{season: Season, esser: list<User>, monate: list<array>}
+     * @return array Zeitraum (siehe zeitraum())
      */
     public function saison(Season $season, Collection $haushalt): array
     {
+        return $this->zeitraum($season, $season->start_date->copy(), $season->end_date->copy(),
+            'Saison „'.$season->name.'"', 's'.$season->id, $haushalt);
+    }
+
+    /**
+     * Monate VOR der ersten Saison, für die das Altsystem Abrechnungen geliefert hat –
+     * je Schuljahr (August–Juli) ein Zeitraum, neuestes zuerst.
+     *
+     * @return list<array>
+     */
+    public function altZeitraeume(Collection $haushalt, ?Carbon $vor): array
+    {
+        $monate = $this->linearCharges($haushalt)->keys()
+            ->map(fn ($k) => explode('|', $k))
+            ->map(fn ($t) => Carbon::create((int) $t[1], (int) $t[2], 1))
+            ->filter(fn (Carbon $c) => ! $vor || $c->lt($vor->copy()->startOfMonth()))
+            ->unique(fn (Carbon $c) => $c->format('Y-m'));
+
+        return $monate->groupBy(fn (Carbon $c) => $c->month >= 8 ? $c->year : $c->year - 1)
+            ->sortKeysDesc()
+            ->map(function ($liste, $jahr) use ($haushalt, $vor) {
+                $von = Carbon::create((int) $jahr, 8, 1);
+                $bis = Carbon::create((int) $jahr + 1, 7, 31);
+                if ($vor && $bis->gte($vor)) {
+                    $bis = $vor->copy()->subDay();
+                }
+
+                return $this->zeitraum(null, $von, $bis,
+                    'Schuljahr '.$jahr.'/'.substr((string) ($jahr + 1), 2).' (aus dem Altsystem)', 'a'.$jahr, $haushalt, nurMitDaten: true);
+            })->values()->all();
+    }
+
+    /** Der Zeitraum (Saison oder Altsystem-Schuljahr), in dem ein Monat liegt – für das PDF. */
+    public function monat(Collection $haushalt, int $y, int $m): ?array
+    {
+        $erster = Carbon::create($y, $m, 1);
+        $season = Season::whereDate('start_date', '<=', $erster->copy()->endOfMonth())->whereDate('end_date', '>=', $erster)
+            ->orderByDesc('start_date')->first();
+        $z = $season
+            ? $this->zeitraum($season, $erster, $erster->copy()->endOfMonth(), '', '', $haushalt)
+            : $this->zeitraum(null, $erster, $erster->copy()->endOfMonth(), '', '', $haushalt);
+
+        return ($z['monate'][0] ?? null) ? $z + ['monat' => $z['monate'][0]] : null;
+    }
+
+    /**
+     * Ein Zeitraum: je Monat (neuester zuerst) die Zellen je Esser + Summe/Status.
+     *
+     * @param  Collection<int, User>  $haushalt
+     * @return array{season: ?Season, titel: string, schluessel: string, hinweis: string, esser: list<User>, monate: list<array>}
+     */
+    private function zeitraum(?Season $season, Carbon $von, Carbon $bis, string $titel, string $schluessel, Collection $haushalt, bool $nurMitDaten = false): array
+    {
         $charges = $this->linearCharges($haushalt);
-        $heute = Carbon::today();
+        $diesMonat = Carbon::today()->startOfMonth();
 
         $monate = [];
-        $cursor = $season->start_date->copy()->startOfMonth();
-        while ($cursor->lte($season->end_date)) {
+        $cursor = $von->copy()->startOfMonth();
+        while ($cursor->lte($bis)) {
             [$y, $m] = [(int) $cursor->year, (int) $cursor->month];
             $zellen = [];
             foreach ($haushalt as $u) {
                 $zellen[$u->id] = $this->zelle($season, $u, $y, $m, $charges);
             }
-            $monate[] = [
-                'jahr' => $y, 'monat' => $m, 'wert' => sprintf('%04d-%02d', $y, $m),
-                'label' => self::monatLabel($y, $m),
-                'zukunft' => $cursor->gt($heute->copy()->startOfMonth()),
-                'zellen' => $zellen,
-            ] + $this->summe($zellen, $cursor->gte($heute->copy()->startOfMonth()));
+            $summe = $this->summe($zellen, $cursor->gte($diesMonat));
+            if (! $nurMitDaten || $summe['gesamt'] !== null) {
+                $monate[] = [
+                    'jahr' => $y, 'monat' => $m, 'wert' => sprintf('%04d-%02d', $y, $m),
+                    'label' => self::monatLabel($y, $m),
+                    'zukunft' => $cursor->gt($diesMonat),
+                    // Abgeschlossen = vorbei – nur dann gibt es das PDF.
+                    'abgeschlossen' => $cursor->lt($diesMonat),
+                    'zellen' => $zellen,
+                ] + $summe;
+            }
             $cursor->addMonth();
         }
+        $monate = array_reverse($monate); // neuester Monat oben
 
-        // Spalten nur für Esser, die in der Saison überhaupt etwas haben – sonst alle Kinder.
+        // Spalten nur für Esser, die im Zeitraum überhaupt etwas haben – sonst alle.
         $esser = $haushalt->filter(fn (User $u) => collect($monate)->contains(fn ($mo) => $mo['zellen'][$u->id]['betrag'] !== null))->values();
         if ($esser->isEmpty()) {
             $esser = $haushalt->values();
         }
 
-        return ['season' => $season, 'esser' => $esser->all(), 'monate' => $monate];
+        return [
+            'season' => $season, 'titel' => $titel, 'schluessel' => $schluessel,
+            'hinweis' => ($season ?? Season::where('is_active', true)->first() ?? new Season)->hinweisOffen(),
+            'esser' => $esser->all(), 'monate' => $monate,
+        ];
     }
 
     /** Eine Zelle: Betrag, Herkunft, Status und – falls vorhanden – die Einzelposten. */
-    private function zelle(Season $season, User $u, int $y, int $m, Collection $charges): array
+    private function zelle(?Season $season, User $u, int $y, int $m, Collection $charges): array
     {
-        $d = $this->billing->detailsForUser($season, $u->id, $y, $m);
-        $hatPosten = $d['menu'] || $d['ogs']['dates'] || $d['spontan'] || $d['chips'];
         $charge = $charges->get($u->externe_id.'|'.$y.'|'.$m);
-
+        $ab = Carbon::parse(self::intranetAb())->startOfDay();
         // Ab dem Start der Intranet-Kantine wissen wir alles: nichts gefunden = nichts angefallen.
-        $intranetWeiss = Carbon::create($y, $m, 1)->endOfMonth()->gte(Carbon::parse(self::intranetAb()));
+        // Davor zählt allein, was Linear (aus dem alten System) abgerechnet hat – Intranet-
+        // Posten von vorher wären geraten (z. B. OGS-Tage rückwirkend aus dem heutigen Abo).
+        $intranetWeiss = $season !== null && Carbon::create($y, $m, 1)->endOfMonth()->gte($ab);
 
-        if ($hatPosten || ($intranetWeiss && ! $charge)) {
-            $betrag = (float) $d['total'];
+        $d = null;
+        $alt = 0.0;
+        $gesendet = 0.0;
+        if ($intranetWeiss) {
+            $d = $this->nurAb($this->billing->detailsForUser($season, $u->id, $y, $m), $ab);
+            // Was Linear für den Monat darüber hinaus abgerechnet hat, kam aus dem alten
+            // System (z. B. Oktober bis zum Umstieg) – das vom Intranet Gesendete abziehen.
+            $gesendet = Schema::hasTable('kantine_linear_exports')
+                ? (float) DB::table('kantine_linear_exports')->where('user_id', $u->id)->where('year', $y)->where('month', $m)->sum('betrag')
+                : 0.0;
+            if ($charge) {
+                $alt = max(0.0, round($charge['betrag'] - $gesendet, 2));
+            }
+            $betrag = round($d['total'] + $alt, 2);
             $quelle = 'intranet';
         } elseif ($charge) {
             $betrag = (float) $charge['betrag'];
@@ -89,7 +164,14 @@ class HaushaltsAbrechnung
             $quelle = null;
         }
 
-        if ($charge) {
+        // Intranet-Posten, die noch nicht an Linear gingen: der Monat ist nicht fertig
+        // abgerechnet – auch wenn der Altsystem-Teil schon bezahlt ist.
+        $intranetOffen = $d !== null && abs($d['total']) > 0.005 && $gesendet < 0.005;
+
+        if ($intranetOffen) {
+            $status = 'nicht_abgerechnet';
+            $offen = 0.0;
+        } elseif ($charge) {
             $status = $charge['offen'] > 0.005 ? 'offen' : 'bezahlt';
             $offen = $charge['offen'];
         } elseif ($betrag !== null && Settlement::where('user_id', $u->id)->where('year', $y)->where('month', $m)->exists()) {
@@ -102,8 +184,26 @@ class HaushaltsAbrechnung
 
         return [
             'betrag' => $betrag, 'quelle' => $quelle, 'status' => $status, 'offen' => round($offen, 2),
-            'details' => $quelle === 'intranet' ? $d : null,
+            'details' => $d, 'alt' => $alt,
         ];
+    }
+
+    /** Einzelposten auf die Tage ab $ab beschränken und die Summen neu bilden. */
+    private function nurAb(array $d, Carbon $ab): array
+    {
+        $ok = fn ($datum) => Carbon::parse($datum)->gte($ab);
+        $d['menu'] = array_values(array_filter($d['menu'], fn ($r) => $ok($r['date'])));
+        $d['spontan'] = array_values(array_filter($d['spontan'], fn ($r) => $ok($r['date'])));
+        $d['chips'] = array_values(array_filter($d['chips'], fn ($r) => $ok($r['date'])));
+        $d['ogs']['dates'] = array_values(array_filter($d['ogs']['dates'], fn ($r) => $ok($r['date'])));
+        $d['ogs']['days'] = count($d['ogs']['dates']);
+        $d['ogs']['total'] = $d['ogs']['days'] * (float) $d['ogs']['price'];
+        $d['menu_total'] = round(array_sum(array_column($d['menu'], 'price')), 2);
+        $d['spontan_total'] = round(array_sum(array_column($d['spontan'], 'price')), 2);
+        $d['pfand_net'] = round(array_sum(array_column($d['chips'], 'amount')), 2);
+        $d['total'] = round($d['menu_total'] + $d['ogs']['total'] + $d['spontan_total'] + $d['pfand_net'], 2);
+
+        return $d;
     }
 
     /** Monatssumme und zusammengefasster Status. */
@@ -178,6 +278,13 @@ class HaushaltsAbrechnung
             $posten[] = ['datum' => Carbon::parse($c['date']), 'was' => 'Chip-Pfand '.($c['type'] === 'aus' ? 'Ausgabe' : 'Rückgabe'), 'hinweis' => null, 'betrag' => (float) $c['amount']];
         }
         usort($posten, fn ($a, $b) => $a['datum'] <=> $b['datum']);
+
+        // Teil des Monats, den noch das alte System abgerechnet hat (ohne Einzelposten).
+        if (($zelle['alt'] ?? 0) > 0.005) {
+            array_unshift($posten, ['datum' => Carbon::parse($posten[0]['datum'] ?? self::intranetAb())->startOfMonth(),
+                'was' => 'Abrechnung aus dem alten System (bis zum Umstieg)', 'hinweis' => 'Einzelposten liegen nicht vor',
+                'betrag' => (float) $zelle['alt']]);
+        }
 
         return $posten;
     }

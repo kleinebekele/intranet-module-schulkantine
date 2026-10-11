@@ -31,7 +31,7 @@
     @endif
 @elseif ($z['quelle'] === 'linear')
     <p class="py-3 text-sm text-gray-600">
-        Abgerechnet im alten System: <span class="font-semibold">{{ $euro($z['betrag']) }}</span>.<br>
+        <span class="font-semibold">{{ $euro($z['betrag']) }}</span> – Wert aus dem Altsystem übernommen.<br>
         <span class="text-gray-400">Einzelposten liegen für diesen Monat nicht vor – aus dem alten System haben wir nur die Abrechnungsbeträge übernommen.</span>
     </p>
 @else

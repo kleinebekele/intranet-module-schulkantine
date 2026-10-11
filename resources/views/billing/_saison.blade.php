@@ -2,8 +2,8 @@
 @php
     $esser = $daten['esser'];
     $mehrere = count($esser) > 1;
-    $sid = $daten['season']->id;
-    $hinweis = $daten['season']->hinweisOffen();
+    $sid = $daten['schluessel'];
+    $hinweis = $daten['hinweis'];
     $hatFolgende = collect($daten['monate'])->contains('zukunft', true);
 @endphp
 <div x-data="{ folgende: false, dialog: null }" class="space-y-3">
@@ -40,8 +40,9 @@
                                     @php $z = $mo['zellen'][$u->id]; @endphp
                                     <td class="px-3 py-2 text-right">
                                         <button type="button" @click="dialog = '{{ $key }}-{{ $u->id }}'"
+                                                @if ($z['quelle'] === 'linear') title="Wert aus dem Altsystem übernommen" @endif
                                                 class="tabular-nums hover:text-indigo-700 hover:underline {{ $z['betrag'] === null ? 'text-xs italic text-gray-400' : 'text-gray-700' }}">
-                                            {{ $z['betrag'] === null ? 'keine Daten' : $euro($z['betrag']) }}
+                                            {{ $z['betrag'] === null ? 'keine Daten' : $euro($z['betrag']) }}@if ($z['quelle'] === 'linear')<sup class="ml-0.5 text-gray-400">A</sup>@endif
                                         </button>
                                     </td>
                                 @endforeach
@@ -79,8 +80,8 @@
                                 @endswitch
                             </td>
                             <td class="px-3 py-2 text-center">
-                                @if ($mo['gesamt'] !== null && ! $mo['zukunft'])
-                                    <a href="{{ route('module.schulkantine.abrechnung.pdf', ['saison' => $sid, 'monat' => $mo['wert']]) }}"
+                                @if ($mo['gesamt'] !== null && $mo['abgeschlossen'])
+                                    <a href="{{ route('module.schulkantine.abrechnung.pdf', ['monat' => $mo['wert']]) }}"
                                        class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800" title="Abrechnung {{ $mo['label'] }} als PDF">
                                         <x-module-icon name="download" class="text-base" /> PDF
                                     </a>

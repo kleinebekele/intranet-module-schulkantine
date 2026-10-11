@@ -27,7 +27,7 @@
 <body>
     <div class="head">
         <h1>Abrechnung Schulkantine</h1>
-        <div class="sub">{{ $monat['label'] }} &nbsp;·&nbsp; Saison „{{ $season->name }}" &nbsp;·&nbsp; {{ $viewer->name }}</div>
+        <div class="sub">{{ $monat['label'] }} &nbsp;·&nbsp; {{ $titel }} &nbsp;·&nbsp; {{ $viewer->name }}</div>
     </div>
 
     @foreach ($esser as $u)
@@ -53,7 +53,7 @@
         @elseif ($z['details'])
             <div class="leer">In diesem Monat ist nichts angefallen.</div>
         @elseif ($z['quelle'] === 'linear')
-            <div class="leer">Abgerechnet im alten System: {{ $euro($z['betrag']) }} – Einzelposten liegen nicht vor.</div>
+            <div class="leer">{{ $euro($z['betrag']) }} – Wert aus dem Altsystem übernommen, Einzelposten liegen nicht vor.</div>
         @else
             <div class="leer">Für diesen Monat liegen keine Daten vor.</div>
         @endif
@@ -64,7 +64,7 @@
     </table>
 
     <div class="foot">
-        {{ $season->hinweisOffen() }}<br>
+        {{ $hinweis }}<br>
         Erstellt am {{ $erstellt->format('d.m.Y H:i') }} · Intranet der Schulkantine
     </div>
 </body>

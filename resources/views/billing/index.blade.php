@@ -24,7 +24,7 @@
                 </div>
                 <p class="text-xs text-gray-500">
                     Seit Oktober 2026 rechnet die Kantine über das Intranet ab. Aus dem alten System liegen nur die
-                    Abrechnungsbeträge ab 2026 vor (ohne Einzelposten); wo wir nichts wissen, steht „keine Daten".
+                    Abrechnungsbeträge ab 2026 vor (ohne Einzelposten, mit <sup>A</sup> markiert); wo wir nichts wissen, steht „keine Daten".
                 </p>
                 @include('schulkantine::billing._saison', ['daten' => $aktuell])
             </div>
@@ -32,7 +32,7 @@
             @foreach ($frueher as $daten)
                 <details class="rounded-xl border border-gray-200 bg-white">
                     <summary class="cursor-pointer select-none px-4 py-3 text-sm font-semibold text-gray-700">
-                        Frühere Saison „{{ $daten['season']->name }}"
+                        {{ $daten['season'] ? 'Frühere ' : '' }}{{ $daten['titel'] }}
                     </summary>
                     <div class="border-t border-gray-100 p-4">
                         @include('schulkantine::billing._saison', ['daten' => $daten])
