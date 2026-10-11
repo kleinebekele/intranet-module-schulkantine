@@ -120,28 +120,30 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                         @if ($isSubscribed)
                                             @php $aboTage = collect($openingWeekdays)->sort()->filter(fn ($d) => in_array($d, $e['aboWeekdays']))->map(fn ($d) => $wdKurz[$d])->join(', '); @endphp
                                             <span class="text-xs text-gray-500">🔁 Abo aktiv – isst {{ $aboTage ?: 'nichts' }}</span>
-                                            <button type="button" @click="open = true" class="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Tage ändern</button>
+                                            <button type="button" @click="open = true" class="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Abo ändern</button>
                                             <form method="POST" action="{{ route($routen['abo']) }}" class="inline">
                                                 @csrf
                                                 <input type="hidden" name="eater_id" value="{{ $eater->id }}">
                                                 <input type="hidden" name="active" value="0">
-                                                <button type="submit" class="rounded-md border border-red-200 bg-white px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50">Abo abbestellen</button>
+                                                <button type="submit" class="rounded-md border border-red-200 bg-white px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50">Abo kündigen</button>
                                             </form>
                                         @else
-                                            <span class="text-xs text-amber-600">Abo aus – nur angehakte Tage</span>
-                                            <button type="button" @click="open = true" class="rounded-md border border-green-200 bg-white px-2 py-0.5 text-xs font-medium text-green-700 hover:bg-green-50">Abo aktivieren</button>
+                                            <span class="text-xs text-amber-600">Kein Abo – isst nur an angehakten Tagen</span>
+                                            <button type="button" @click="open = true" class="rounded-md border border-green-200 bg-white px-2 py-0.5 text-xs font-medium text-green-700 hover:bg-green-50">Abo erstellen</button>
                                         @endif
 
-                                        {{-- Modal: Standardtage des Kindes wählen (Abo aktivieren/anpassen) --}}
+                                        {{-- Modal: Abo-Tage des Kindes wählen (erstellen/ändern). Kein Tag angehakt = kündigen. --}}
                                         <div x-show="open" x-cloak @keydown.escape.window="open = false"
                                              class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display:none;">
                                             <div class="absolute inset-0 bg-black/40" @click="open = false"></div>
                                             <form method="POST" action="{{ route($routen['abo']) }}"
+                                                  x-data="{ n: {{ collect($openingWeekdays)->filter(fn ($d) => in_array($d, $e['aboWeekdays']))->count() }} }"
+                                                  @change="n = $el.querySelectorAll('input[type=checkbox]:checked').length"
                                                   class="relative z-10 w-full max-w-sm rounded-2xl bg-white p-5 text-left shadow-xl">
                                                 @csrf
                                                 <input type="hidden" name="eater_id" value="{{ $eater->id }}">
-                                                <input type="hidden" name="active" value="1">
-                                                <h3 class="text-base font-semibold text-gray-800">Standardtage – {{ $eater->name }}</h3>
+                                                <input type="hidden" name="active" :value="n > 0 ? 1 : 0" value="1">
+                                                <h3 class="text-base font-semibold text-gray-800">{{ $isSubscribed ? 'Abo ändern' : 'Abo erstellen' }} – {{ $eater->name }}</h3>
                                                 <p class="mt-1 text-xs text-gray-500">An welchen Wochentagen isst {{ $eater->name }} standardmäßig? Einzelne Tage lassen sich weiter an- und abhaken; an Schließtagen wird ohnehin nichts bestellt.</p>
                                                 <div class="mt-3 flex flex-wrap gap-2">
                                                     @foreach (collect($openingWeekdays)->sort() as $wd)
@@ -151,10 +153,16 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                         </label>
                                                     @endforeach
                                                 </div>
-                                                <p class="mt-2 text-[11px] text-gray-400">Nichts angehakt = isst an allen Öffnungstagen.</p>
                                                 <div class="mt-4 flex justify-end gap-2">
                                                     <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">Abbrechen</button>
-                                                    <button type="submit" class="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700">Speichern</button>
+                                                    @if ($isSubscribed)
+                                                        <button type="submit" class="rounded-lg px-3 py-1.5 text-sm font-medium text-white"
+                                                                :class="n > 0 ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'"
+                                                                x-text="n > 0 ? 'Speichern' : 'Abo kündigen'">Speichern</button>
+                                                    @else
+                                                        <button type="submit" :disabled="n === 0"
+                                                                class="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50">Abo erstellen</button>
+                                                    @endif
                                                 </div>
                                             </form>
                                         </div>

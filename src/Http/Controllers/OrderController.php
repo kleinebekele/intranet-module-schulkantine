@@ -498,14 +498,14 @@ class OrderController
         );
 
         if (! $active) {
-            return back()->with('status', $eater->name.': Abo abbestellt – isst nur noch an einzeln angehakten Tagen.');
+            return back()->with('status', $eater->name.': Abo gekündigt – isst nur noch an einzeln angehakten Tagen.');
         }
 
         $tage = $weekdays === []
             ? 'an allen Öffnungstagen'
             : 'nur '.collect($weekdays)->map(fn ($d) => self::WEEKDAY_KURZ[$d] ?? $d)->join(', ');
 
-        return back()->with('status', $eater->name.': Abo aktiviert – isst '.$tage.' (außer abbestellten Tagen).');
+        return back()->with('status', $eater->name.': Abo gespeichert – isst '.$tage.' (außer abbestellten Tagen).');
     }
 
     // ------------------------------------------------------------- Menü-Modus

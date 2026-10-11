@@ -279,7 +279,7 @@ php artisan kantine:seed-ogs-testkinder --remove</pre>
     <h4>Szenario 4 – OGS-Abo</h4>
     <p><strong>Als:</strong> eltern@kantine.test (für kind-ogs, mit Testvertrag 27)</p>
     <ol>
-        <li>Abo aktivieren, Standardtage auf Mo–Do setzen.</li>
+        <li>„Abo erstellen", Wochentage anhaken (z. B. Mo–Do).</li>
         <li>Einen Tag zusätzlich abmelden.</li>
     </ol>
     <p class="exp"><strong>Erwartet:</strong> Das Kind isst Mo–Do außer dem abgemeldeten Tag; die Kosten
