@@ -187,9 +187,14 @@ class ReportController
             $out = fopen('php://output', 'w');
             // UTF-8-BOM, damit Excel Umlaute korrekt anzeigt.
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, $kopf, ';', '"', '');
+            fputcsv($out, array_map(self::csvText(...), $kopf), ';', '"', '');
             foreach ($zeilen as $z) {
-                fputcsv($out, array_map(fn ($v) => is_float($v) ? $this->num($v) : $v, $z), ';', '"', '');
+                // Beträge/Anzahlen bleiben Zahlen (auch negative); nur Texte werden entschärft.
+                fputcsv($out, array_map(fn ($v) => match (true) {
+                    is_float($v) => $this->num($v),
+                    is_int($v) => $v,
+                    default => self::csvText((string) $v),
+                }, $z), ';', '"', '');
             }
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
@@ -394,6 +399,16 @@ class ReportController
         return ($names[$month] ?? (string) $month).' '.$year;
     }
 
+    /**
+     * Text-Zelle für CSV entschärfen (Formel-Injection): Beginnt sie mit = + - @,
+     * Tab oder CR, würde Excel sie als Formel ausführen – ein vorangestelltes '
+     * macht daraus reinen Text. Namen/E-Mails stammen aus Benutzereingaben.
+     */
+    public static function csvText(string $v): string
+    {
+        return $v !== '' && str_contains("=+-@\t\r", $v[0]) ? "'".$v : $v;
+    }
+
     private function num(float $v): string
     {
         return number_format($v, 2, ',', '.');
@@ -401,7 +416,7 @@ class ReportController
 
     private function authorizeAdmin(Request $request): void
     {
-        abort_unless($request->user()?->isAdmin(), 403, 'Nur Administratoren dürfen die Auswertung sehen.');
+        abort_unless(\Intranet\Modules\Schulkantine\Support\Access::istAdmin($request->user()), 403, 'Nur Administratoren dürfen die Auswertung sehen.');
     }
 
     /** IDs, die ein normaler Nutzer sehen darf: er selbst + seine Kinder. */

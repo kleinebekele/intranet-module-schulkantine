@@ -127,6 +127,8 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
             // Bereiche, die auf der Seite eines anderen Menüpunkts gepflegt werden –
             // sonst gälte die höchste Stufe im ganzen Modul (bei Eltern „verwalten").
             ->gehoertZu('seasons', 'menu-templates')  // Menü-Vorlagen: Saison-Seite
-            ->gehoertZu('sonderkost', 'chips');       // eigene Chips: „Meine Daten"
+            ->gehoertZu('sonderkost', 'chips')        // eigene Chips: „Meine Daten"
+            ->gehoertZu('eaters', 'als')              // „Als Person handeln" beenden: Teilnehmer-Seite
+            ->lesend('als.ende');                     // Beenden ändert keine Daten – wer die Teilnehmer sieht, darf aussteigen
     }
 }

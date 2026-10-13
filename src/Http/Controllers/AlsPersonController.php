@@ -14,6 +14,7 @@ class AlsPersonController
     {
         abort_unless(AlsPerson::darf($request->user()), 403, 'Nur die Kantinen-Verwaltung darf als andere Person handeln.');
         abort_if($user->is($request->user()), 422, 'Das bist du selbst.');
+        abort_unless(AlsPerson::zielErlaubt($user), 403, 'Als Administratoren oder Kantinen-Personal (Verwaltungsrechte) kann man nicht handeln.');
 
         $request->session()->put(AlsPerson::SITZUNG, $user->id);
         Audit::schreiben('kantine.als_person_start', "Handelt in der Kantine als {$user->name}", betroffener: $user);

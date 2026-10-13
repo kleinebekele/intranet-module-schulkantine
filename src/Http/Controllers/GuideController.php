@@ -16,7 +16,7 @@ class GuideController
     /** Online-Ansicht der Anleitung (nur Admin). */
     public function index(): Renderable
     {
-        abort_unless((bool) auth()->user()?->isAdmin(), 403);
+        abort_unless(\Intranet\Modules\Schulkantine\Support\Access::istAdmin(auth()->user()), 403);
 
         return view('schulkantine::guide.index');
     }
@@ -24,7 +24,7 @@ class GuideController
     /** Dieselbe Anleitung als PDF zum Herunterladen (nur Admin). */
     public function pdf(): Response
     {
-        abort_unless((bool) auth()->user()?->isAdmin(), 403);
+        abort_unless(\Intranet\Modules\Schulkantine\Support\Access::istAdmin(auth()->user()), 403);
 
         $pdf = Pdf::loadView('schulkantine::guide.pdf')->setPaper('a4');
 

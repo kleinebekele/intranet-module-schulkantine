@@ -553,25 +553,35 @@ class ServingController
 
         // Wochenbudget für Spontankäufe (Kinder: ohne Eintrag 0 €). Überschreiten nur,
         // wenn die Ausgabe es ausdrücklich erlaubt und keine ältere offen ist.
-        $pruefung = $this->budgetPruefen($eater, $date, $dish->preisFuer($eater), $request->boolean('budget_ueberschreiten'));
-        if (! $pruefung['ok']) {
-            return $request->wantsJson()
-                ? response()->json(['ok' => false, 'error' => $pruefung['fehler'], 'budget_frage' => $pruefung['frage'] ?? false], 200)
-                : back()->withErrors(['ausgabe' => $pruefung['fehler']]);
-        }
-        $this->ueberschreitungMerken($pruefung['ueber'] ?? null, $user->id);
+        // Prüfung und Buchung in EINER Transaktion unter Sperre des Essers – sonst
+        // könnten zwei Ausgabe-Geräte gleichzeitig dasselbe Restbudget verbuchen.
+        $ergebnis = DB::transaction(function () use ($request, $season, $eater, $date, $dish, $user) {
+            $this->esserSperren($eater);
 
-        $serving = Serving::create([
-            'season_id' => $season->id,
-            'user_id' => $eater->id,
-            'date' => $date->toDateString(),
-            'order_id' => null,
-            'dish_id' => $dish->id,
-            'category_id' => $dish->category_id,
-            'price_snapshot' => $dish->preisFuer($eater),
-            'spontaneous' => true,
-            'served_by' => $user->id,
-        ]);
+            $pruefung = $this->budgetPruefen($eater, $date, $dish->preisFuer($eater), $request->boolean('budget_ueberschreiten'));
+            if (! $pruefung['ok']) {
+                return $pruefung;
+            }
+            $this->ueberschreitungMerken($pruefung['ueber'] ?? null, $user->id);
+
+            return ['ok' => true, 'serving' => Serving::create([
+                'season_id' => $season->id,
+                'user_id' => $eater->id,
+                'date' => $date->toDateString(),
+                'order_id' => null,
+                'dish_id' => $dish->id,
+                'category_id' => $dish->category_id,
+                'price_snapshot' => $dish->preisFuer($eater),
+                'spontaneous' => true,
+                'served_by' => $user->id,
+            ])];
+        });
+        if (! $ergebnis['ok']) {
+            return $request->wantsJson()
+                ? response()->json(['ok' => false, 'error' => $ergebnis['fehler'], 'budget_frage' => $ergebnis['frage'] ?? false], 200)
+                : back()->withErrors(['ausgabe' => $ergebnis['fehler']]);
+        }
+        $serving = $ergebnis['serving'];
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -641,6 +651,18 @@ class ServingController
 
         return ['betrag' => $betrag, 'genutzt' => $genutzt, 'rest' => round($betrag - $genutzt, 2),
             'offen' => Budget::offeneUeberschreitungen($eater->id)->isNotEmpty()];
+    }
+
+    /**
+     * Sperrt den Benutzer-Datensatz des Essers bis zum Ende der laufenden
+     * Transaktion. Muss die ERSTE Abfrage der Transaktion sein: Erst danach
+     * gelesene Budget-/Ausgabe-Stände sehen die Buchungen, die ein paralleler
+     * Aufruf gerade abgeschlossen hat. Gesperrt wird der Esser statt der
+     * Budget-Zeile, weil es die (Kinder ohne Eintrag: 0 €) nicht immer gibt.
+     */
+    private function esserSperren(User $eater): void
+    {
+        User::query()->whereKey($eater->getKey())->lockForUpdate()->first();
     }
 
     /** Eine erlaubte Überschreitung festhalten (wartet dann auf die Eltern). */
@@ -1366,15 +1388,18 @@ class ServingController
         foreach ($nachschlag as $n) {
             $extraSum += (float) $n['amount'] * (int) $n['qty'];
         }
-        // Die Buchung ersetzt die Extras dieses Tages (s. u.) – die zählen hier also nicht mit.
-        $pruefung = $this->budgetPruefen($eater, $date, $extraSum, $request->boolean('budget_ueberschreiten'), tagErsetzt: true);
-        if (! $pruefung['ok']) {
-            return response()->json(['ok' => false, 'error' => $pruefung['fehler'], 'budget_frage' => $pruefung['frage'] ?? false], 200);
-        }
-        $ueber = $pruefung['ueber'] ?? null;
+        // Prüfung und Buchung laufen in EINER Transaktion unter Sperre des Essers
+        // (siehe esserSperren) – parallele Terminals können das Budget so nicht
+        // gemeinsam überziehen.
+        $pruefung = DB::transaction(function () use ($request, $season, $eater, $date, $user, $menu, $walkinDishes, $nachschlag, $extraSum) {
+            $this->esserSperren($eater);
 
-        DB::transaction(function () use ($season, $eater, $date, $user, $menu, $walkinDishes, $nachschlag, $ueber) {
-            $this->ueberschreitungMerken($ueber, $user->id);
+            // Die Buchung ersetzt die Extras dieses Tages (s. u.) – die zählen hier also nicht mit.
+            $pruefung = $this->budgetPruefen($eater, $date, $extraSum, $request->boolean('budget_ueberschreiten'), tagErsetzt: true);
+            if (! $pruefung['ok']) {
+                return $pruefung;
+            }
+            $this->ueberschreitungMerken($pruefung['ueber'] ?? null, $user->id);
             // 1) Menü-Ausgabe – ersetzt die bisherigen nicht-spontanen Zeilen (wie serveConfirm).
             if ($menu) {
                 $orders = Order::where('season_id', $season->id)->where('user_id', $eater->id)
@@ -1431,7 +1456,12 @@ class ServingController
                     ]);
                 }
             }
+
+            return $pruefung;
         });
+        if (! $pruefung['ok']) {
+            return response()->json(['ok' => false, 'error' => $pruefung['fehler'], 'budget_frage' => $pruefung['frage'] ?? false], 200);
+        }
 
         return response()->json([
             'ok' => true,

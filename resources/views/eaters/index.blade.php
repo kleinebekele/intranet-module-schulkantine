@@ -167,7 +167,7 @@
                                     </td>
                                     <td class="whitespace-nowrap px-3 py-2 text-right">
                                         @darfRoute('module.schulkantine.eaters.als')
-                                        @unless ($user->is(auth()->user()))
+                                        @unless ($user->is(auth()->user()) || ! \Intranet\Modules\Schulkantine\Http\Middleware\AlsPerson::zielErlaubt($user))
                                         <form method="POST" action="{{ route('module.schulkantine.eaters.als', $user) }}" class="inline"
                                               onsubmit="return confirm(@js('Als '.$user->name.' handeln? Bis du es beendest, gilt alles, was du in der Kantine einstellst, für diese Person.'))">
                                             @csrf
