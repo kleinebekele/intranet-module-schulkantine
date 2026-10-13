@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Intranet\Modules\Schulkantine\Models\CustomerGroup;
 use Intranet\Modules\Schulkantine\Models\NfcChip;
+use Intranet\Modules\Schulkantine\Support\Access;
 
 /**
  * Self-Service für NFC-Chips: JEDER eingeloggte Nutzer verwaltet die Chips seines
@@ -15,6 +16,10 @@ use Intranet\Modules\Schulkantine\Models\NfcChip;
  * Ein von der Schule ausgegebener Chip (mit Pfand) erscheint hier nur LESBAR –
  * zurücknehmen kann ihn ausschließlich die Schule (EaterController).
  *
+ * Wer Erziehungsberechtigte hat (Kind mit eigenem Konto), sieht seine Chips nur –
+ * anlegen und entfernen dürfen dann nur die Eltern (bzw. die Kantinen-Verwaltung),
+ * damit kein Kind einen fremden Chip auf die Elternrechnung registriert.
+ *
  * OGS-Kinder bekommen bewusst KEINEN Chip.
  */
 class ChipController
@@ -23,7 +28,7 @@ class ChipController
     public function register(Request $request, User $user)
     {
         $actor = $request->user();
-        abort_unless($this->mayManage($actor, $user), 403, 'Du darfst für diese Person keinen Chip registrieren.');
+        abort_unless(self::mayManage($actor, $user), 403, 'Du darfst für diese Person keinen Chip registrieren. Chips von Kindern verwalten die Eltern.');
         $this->abortIfOgs($user);
 
         $data = $request->validate([
@@ -55,7 +60,7 @@ class ChipController
     public function remove(Request $request, NfcChip $chip)
     {
         $actor = $request->user();
-        abort_unless($chip->user && $this->mayManage($actor, $chip->user), 403, 'Du darfst diesen Chip nicht entfernen.');
+        abort_unless($chip->user && self::mayManage($actor, $chip->user), 403, 'Du darfst diesen Chip nicht entfernen.');
         abort_if($chip->isSchool(), 403, 'Ein Schul-Chip kann nur von der Schule zurückgenommen werden.');
 
         $name = $chip->user?->name;
@@ -64,10 +69,20 @@ class ChipController
         return back()->with('status', 'Chip von „'.$name.'" entfernt.');
     }
 
-    /** Nur für sich selbst oder ein eigenes Kind. */
-    private function mayManage(User $actor, User $target): bool
+    /**
+     * Für ein eigenes Kind; für sich selbst nur ohne Erziehungsberechtigte. Die
+     * Kantinen-Verwaltung (bei „Als Person handeln": das echte Konto) immer.
+     */
+    public static function mayManage(User $actor, User $target): bool
     {
-        return $actor->id === $target->id || $actor->children()->whereKey($target->id)->exists();
+        if (Access::darfMenuepunkt($actor, 'eaters')) {
+            return true;
+        }
+        if ($actor->id === $target->id) {
+            return ! $target->parents()->exists();
+        }
+
+        return $actor->children()->whereKey($target->id)->exists();
     }
 
     private function abortIfOgs(User $user): void

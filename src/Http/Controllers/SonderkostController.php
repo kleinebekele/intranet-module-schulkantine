@@ -54,6 +54,8 @@ class SonderkostController
                 'selDiets' => $m->kantineDiets->pluck('id')->all(),
                 'ownChips' => $mine->where('source', NfcChip::SOURCE_ELTERN)->values(),
                 'schoolChips' => $mine->where('source', NfcChip::SOURCE_SCHULE)->values(),
+                // Kinder mit eigenem Konto sehen ihre Chips nur – verwalten tun sie die Eltern.
+                'canChips' => ChipController::mayManage($user, $m),
             ];
         });
 

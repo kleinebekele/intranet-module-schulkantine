@@ -162,21 +162,26 @@
                             </div>
                         @endforeach
 
-                        {{-- Eigene Chips: entfernbar --}}
+                        {{-- Eigene Chips: entfernbar (nur wer sie verwalten darf) --}}
                         @foreach ($m['ownChips'] as $chip)
                             <div class="mt-2 flex items-center justify-between gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2">
                                 <div class="text-sm">
                                     <span class="font-medium text-green-800">✓ Eigener Chip</span>
                                     <span class="font-mono text-green-700">{{ $chip->uid }}</span>
                                 </div>
-                                <form method="POST" action="{{ route('module.schulkantine.chips.remove', $chip) }}"
-                                      onsubmit="return confirm('Chip entfernen?')">
-                                    @csrf @method('DELETE')
-                                    <button type="submit" class="text-xs font-medium text-gray-400 hover:text-red-600">entfernen</button>
-                                </form>
+                                @if ($m['canChips'])
+                                    <form method="POST" action="{{ route('module.schulkantine.chips.remove', $chip) }}"
+                                          data-bestaetigen="Chip {{ $chip->uid }} von „{{ $person->name }}“ entfernen?" data-titel="Chip entfernen" data-knopf="Entfernen">
+                                        @csrf @method('DELETE')
+                                        <button type="submit" class="text-xs font-medium text-gray-400 hover:text-red-600">entfernen</button>
+                                    </form>
+                                @endif
                             </div>
                         @endforeach
 
+                        @if (! $m['canChips'])
+                            <p class="mt-2 text-xs text-gray-500">Chips verwalten deine Eltern – hier nur zur Ansicht.</p>
+                        @else
                         {{-- Weiteren eigenen Chip hinzufügen --}}
                         <div x-data="{
                                 msg: '', ok: false,
@@ -208,6 +213,7 @@
                             </form>
                             <p class="mt-1 text-xs" :class="ok ? 'text-green-600' : 'text-gray-500'" x-text="msg"></p>
                         </div>
+                        @endif
                     @endif
                 </div>
             </div>
