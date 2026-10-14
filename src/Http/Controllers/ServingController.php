@@ -1217,6 +1217,8 @@ class ServingController
             'ogsEaters' => $open ? $this->terminalOgsEaters($season, $date) : collect(),
             'week' => $this->terminalWeek($season, $date),
             'simChips' => $simChips,
+            // Link auf die Auswertung je Person nur zeigen, wenn er auch aufginge.
+            'darfAuswertung' => app(\App\Modules\Support\Modulzugriff::class)->darfRoute('module.schulkantine.reports.show', $user),
             'openDates' => $this->seasonOpenDates($season),
             'today' => Carbon::today()->toDateString(),
         ]);

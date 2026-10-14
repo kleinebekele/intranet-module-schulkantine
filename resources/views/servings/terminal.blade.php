@@ -394,6 +394,12 @@
                     this.ogsBusy = false;
                     return;
                 }
+                await this.zeigePerson(id);
+            },
+
+            // Person laden und anzeigen – wie nach dem Auflegen des Chips (Suche,
+            // Klick auf einen Namen in der Übersicht).
+            async zeigePerson(id) {
                 if (this.busy) return;
                 if (! await this.guardPending()) return;
                 this.busy = true;
@@ -711,6 +717,14 @@
             // gleich breite Spalte – bündig zu den Header-Tagen.
             get ovGridStyle() { return 'grid-template-columns: 16rem repeat(' + this.ovDays.length + ', minmax(0, 1fr))'; },
             reportUrl(id) { return this.urls.reportPerson + '/' + id; },
+            // Name in der Übersicht angeklickt: zurück in die Ausgabe-Ansicht und die
+            // Person zeigen, als hätte sie den Chip aufgelegt. Immer die Vorbesteller-
+            // Ansicht – in der OGS-Ansicht würde ein Treffer sofort als abgeholt gebucht.
+            async ovPick(p) {
+                this.ovSearchOpen = false;
+                this.mode = 'vorbesteller';
+                await this.zeigePerson(p.user_id);
+            },
 
             // ---- Touch-Kalender ----
             get openSet() { return new Set(this.openDates); },
@@ -942,6 +956,14 @@
          passen: Namensspalte = 16rem (wie KW-Box), Tage gleich breit, rechter
          Abstand = Männchen-Button (pr-20). Name verlinkt auf die Personen-Auswertung. --}}
     <main x-show="mode === 'overview'" x-cloak class="flex min-h-0 flex-1 flex-col bg-gray-50">
+        {{-- Aktiver Filter: dicker Knopf zum Zurücksetzen, ohne die Tastatur
+             unten erst wieder öffnen zu müssen. --}}
+        <div x-show="ovQuery.trim() !== ''" x-cloak
+             class="flex items-center justify-between gap-4 border-b border-indigo-200 bg-indigo-50 px-4 py-2">
+            <span class="truncate text-lg text-indigo-800">Gefiltert nach: <strong x-text="ovQuery"></strong></span>
+            <button type="button" @click="ovClear()"
+                    class="shrink-0 rounded-xl bg-indigo-600 px-6 py-3 text-lg font-bold text-white shadow hover:bg-indigo-700">✕ Suche zurücksetzen</button>
+        </div>
         <div class="min-h-0 flex-1 overflow-y-scroll overflow-x-hidden pb-20" :style="'padding-right:' + rcw + 'px'">
             <div x-show="ovLoading" x-cloak class="py-10 text-center text-gray-400">Lädt …</div>
             <div x-show="!ovLoading && !ovDays.length" x-cloak class="py-10 text-center text-gray-400">In dieser Woche sind keine Öffnungstage.</div>
@@ -952,9 +974,14 @@
                         <div class="grid border-b border-gray-100" :style="ovGridStyle">
                             {{-- Name (Spalte = KW-Box-Breite) --}}
                             <div class="border-r border-gray-200 px-3 py-2" :class="p.mode === 'ogs' ? 'bg-indigo-50/50' : ''">
-                                <a :href="reportUrl(p.user_id)" target="_blank" rel="noopener"
-                                   class="font-semibold text-indigo-700 hover:underline" x-text="p.name"></a>
+                                <button type="button" @click="ovPick(p)" title="In der Ausgabe anzeigen"
+                                        class="text-left font-semibold text-indigo-700 hover:underline" x-text="p.name"></button>
                                 <span class="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-gray-500" x-text="p.group"></span>
+                                {{-- Auswertung nur, wenn der Aufruf auch durchginge. --}}
+                                @if ($darfAuswertung)
+                                    <a :href="reportUrl(p.user_id)" target="_blank" rel="noopener" title="Auswertung öffnen"
+                                       class="ml-1 text-xs text-gray-400 hover:text-indigo-600">📊</a>
+                                @endif
                             </div>
                             {{-- Tages-Spalten (bündig unter den Header-Tagen) --}}
                             <template x-for="d in ovDays" :key="d.date">
