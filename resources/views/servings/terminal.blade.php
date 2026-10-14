@@ -711,7 +711,8 @@
             get ovFiltered() {
                 const q = this.ovQuery.trim().toLowerCase();
                 if (q.length < 3) return this.ovPeople;
-                return this.ovPeople.filter(p => (p.name || '').toLowerCase().includes(q));
+                // Auch nach Klasse filterbar ("5a").
+                return this.ovPeople.filter(p => (p.name || '').toLowerCase().includes(q) || (p.klasse || '').toLowerCase() === q);
             },
             // Raster: Namensspalte 16rem (wie die KW-Box), dann je Öffnungstag eine
             // gleich breite Spalte – bündig zu den Header-Tagen.
@@ -977,6 +978,7 @@
                                 <button type="button" @click="ovPick(p)" title="In der Ausgabe anzeigen"
                                         class="text-left font-semibold text-indigo-700 hover:underline" x-text="p.name"></button>
                                 <span class="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-gray-500" x-text="p.group"></span>
+                                <span x-show="p.klasse" class="ml-1 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700" x-text="'Kl. ' + p.klasse"></span>
                                 {{-- Auswertung nur, wenn der Aufruf auch durchginge. --}}
                                 @if ($darfAuswertung)
                                     <a :href="reportUrl(p.user_id)" target="_blank" rel="noopener" title="Auswertung öffnen"

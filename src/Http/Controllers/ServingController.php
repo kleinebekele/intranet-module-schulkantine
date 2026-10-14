@@ -1714,11 +1714,28 @@ class ServingController
                 'first' => \Illuminate\Support\Str::of($u->name)->trim()->explode(' ')->first(),
                 'mode' => $isOgs ? 'ogs' : 'menue',
                 'group' => $group?->name,
+                'klasse' => self::klasse($u),
                 'days' => $daysData,
             ];
         })->values();
 
         return response()->json(['days' => $days, 'people' => $people]);
+    }
+
+    /**
+     * Klasse eines Schülers aus seiner Klassen-Rolle (vom Linear-Gruppenabgleich
+     * angelegt: role_id `linear-klasse-…-schueler`, Name „Schüler Klasse 5a").
+     * Null, wenn er keine hat.
+     */
+    public static function klasse(User $user): ?string
+    {
+        $rolle = $user->roles->first(fn ($r) => str_starts_with($r->role_id, 'linear-klasse-') && str_ends_with($r->role_id, '-schueler'));
+
+        if ($rolle === null) {
+            return null;
+        }
+
+        return trim(preg_replace('/^Schüler\s+Klasse\s+/u', '', (string) $rolle->name)) ?: null;
     }
 
     /**
