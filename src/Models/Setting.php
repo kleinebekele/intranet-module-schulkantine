@@ -5,7 +5,7 @@ namespace Intranet\Modules\Schulkantine\Models;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Globale Kantinen-Einstellungen (Singleton). Über Setting::current() abrufen –
+ * Globale Mensa-Einstellungen (Singleton). Über Setting::current() abrufen –
  * legt die Zeile beim ersten Zugriff mit den Standardwerten an.
  */
 class Setting extends Model

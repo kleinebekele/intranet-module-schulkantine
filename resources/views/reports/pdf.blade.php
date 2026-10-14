@@ -34,7 +34,7 @@
 </head>
 <body>
     <div class="head">
-        <h1>Abrechnung Schulkantine</h1>
+        <h1>Abrechnung Mensa</h1>
         <div class="sub">{{ $monthLabel }} &nbsp;·&nbsp; Saison „{{ $season->name }}"</div>
     </div>
 
@@ -95,7 +95,7 @@
     @endif
 
     <div class="foot">
-        Erzeugt am {{ $generatedAt->format('d.m.Y H:i') }} Uhr · Schulkantine · Intranet.
+        Erzeugt am {{ $generatedAt->format('d.m.Y H:i') }} Uhr · Mensa · Intranet.
         Basis: verbindliche Vorbestellungen (No-Shows zahlen), spontane Abholungen, Chip-Pfand (Ausgabe +, Rückgabe −).
         Rechtzeitig stornierte Bestellungen sind nicht enthalten.
     </div>

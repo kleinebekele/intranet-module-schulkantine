@@ -83,7 +83,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             @endif
         @elseif (empty($days))
             <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
-                Für diese Saison sind keine Kantinen-Wochentage hinterlegt.
+                Für diese Saison sind keine Mensa-Wochentage hinterlegt.
             </div>
         @else
             @php

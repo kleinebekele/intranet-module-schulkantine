@@ -35,7 +35,7 @@ class Access
             : $user;
     }
 
-    /** Admin im Sinne der Kantinen-Verwaltung (bei „Als Person handeln": das echte Konto). */
+    /** Admin im Sinne der Mensa-Verwaltung (bei „Als Person handeln": das echte Konto). */
     public static function istAdmin(?User $user): bool
     {
         return (bool) self::verwalter($user)?->isAdmin();

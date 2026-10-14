@@ -531,7 +531,7 @@ class ServingController
             ? response()->json(['ok' => false, 'error' => $msg], 200)
             : back()->withErrors(['ausgabe' => $msg]);
 
-        abort_unless($season->isOpenOn($date), 422, 'An diesem Tag hat die Kantine nicht geöffnet.');
+        abort_unless($season->isOpenOn($date), 422, 'An diesem Tag hat die Mensa nicht geöffnet.');
 
         // OGS-Kinder (ja/nein) sind vom Spontankauf ausgeschlossen: Sie bekommen ihr
         // OGS-Essen über das Abo, nicht spontan am Tresen. (UI blendet sie ohnehin aus;
@@ -730,7 +730,7 @@ class ServingController
 
         $season = Season::where('is_active', true)->firstOrFail();
         $date = $this->resolveDate($request, $season);
-        abort_unless($season->isOpenOn($date), 422, 'An diesem Tag hat die Kantine nicht geöffnet.');
+        abort_unless($season->isOpenOn($date), 422, 'An diesem Tag hat die Mensa nicht geöffnet.');
 
         $data = $this->quantitiesData($season, $date);
 
@@ -935,7 +935,7 @@ class ServingController
 
         $season = Season::where('is_active', true)->firstOrFail();
         $date = $this->resolveDate($request, $season);
-        abort_unless($season->isOpenOn($date), 422, 'An diesem Tag hat die Kantine nicht geöffnet.');
+        abort_unless($season->isOpenOn($date), 422, 'An diesem Tag hat die Mensa nicht geöffnet.');
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulkantine::servings.ogs_pdf', [
             'season' => $season,
@@ -1353,7 +1353,7 @@ class ServingController
         $fail = fn (string $msg) => response()->json(['ok' => false, 'error' => $msg], 200);
 
         if (! $season->isOpenOn($date)) {
-            return $fail('An diesem Tag hat die Kantine nicht geöffnet.');
+            return $fail('An diesem Tag hat die Mensa nicht geöffnet.');
         }
 
         $menu = $data['menu'] ?? [];
@@ -1531,7 +1531,7 @@ class ServingController
         $fail = fn (string $msg) => response()->json(['ok' => false, 'error' => $msg], 200);
 
         if (! $season->isOpenOn($date)) {
-            return $fail('An diesem Tag hat die Kantine nicht geöffnet.');
+            return $fail('An diesem Tag hat die Mensa nicht geöffnet.');
         }
         if (CustomerGroup::forUser($eater)?->ordering_mode !== CustomerGroup::MODE_JA_NEIN) {
             return $fail($eater->name.' gehört nicht zur OGS-Gruppe (ja/nein).');

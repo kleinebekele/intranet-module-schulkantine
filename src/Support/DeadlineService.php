@@ -31,7 +31,7 @@ class DeadlineService
      *
      * Sonderfall: Gibt es keinen vorigen Öffnungstag innerhalb der Saison
      * (typisch der ALLERERSTE Öffnungstag nach den Sommerferien), fällt die
-     * Frist auf den Kalendertag davor zurück – sonst wäre der erste Kantinentag
+     * Frist auf den Kalendertag davor zurück – sonst wäre der erste Mensatag
      * nie bestellbar.
      */
     public function orderDeadline(Season $season, Carbon $servingDate): Carbon

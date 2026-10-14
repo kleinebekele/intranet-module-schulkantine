@@ -1,7 +1,7 @@
 ---
 titel: Auswertung und Abrechnung
 route: module.schulkantine.reports.index
-kategorie: Schulkantine – Verwaltung
+kategorie: Mensa – Verwaltung
 position: 26
 ---
 

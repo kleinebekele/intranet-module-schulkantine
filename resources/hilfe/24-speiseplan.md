@@ -1,7 +1,7 @@
 ---
 titel: Speiseplan und Wochenfreigabe
 route: module.schulkantine.menus.index
-kategorie: Schulkantine – Verwaltung
+kategorie: Mensa – Verwaltung
 position: 24
 ---
 

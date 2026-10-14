@@ -1,7 +1,7 @@
 ---
 titel: Teilnehmer und Schul-Chips
 route: module.schulkantine.eaters.index
-kategorie: Schulkantine – Verwaltung
+kategorie: Mensa – Verwaltung
 position: 25
 ---
 
@@ -9,7 +9,7 @@ rollen: admin
 
 Teilnehmer sind die Benutzer des Intranets. Angelegt werden sie **nicht hier**, sondern über
 die Benutzerverwaltung beziehungsweise den nächtlichen Linear-Import. Auf dieser Seite pflegen
-Sie nur die Kantinen-Zusatzdaten.
+Sie nur die Mensa-Zusatzdaten.
 
 Suchen Sie jemanden über das Suchfeld, bleibt der Filter erhalten, wenn Sie die Person
 bearbeiten und danach zurückkehren.

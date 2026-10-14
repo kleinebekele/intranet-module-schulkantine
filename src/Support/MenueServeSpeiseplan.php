@@ -71,7 +71,7 @@ class MenueServeSpeiseplan
             // Der Import darf das ganze Schuljahr überschreiben – auch vergangene Tage
             // und freigegebene Wochen (Menü&Serve ist bis zum Umstieg die Quelle).
             if (! $season->isOpenOn($tag)) {
-                $ergebnis[] = $zeile(false, 'kein Kantinentag der aktiven Saison');
+                $ergebnis[] = $zeile(false, 'kein Mensatag der aktiven Saison');
 
                 continue;
             }

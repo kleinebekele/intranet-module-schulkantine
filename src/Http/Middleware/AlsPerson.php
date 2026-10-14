@@ -14,8 +14,8 @@ use Intranet\Modules\Schulkantine\Models\CustomerGroup;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * „Als Person handeln" (Kantinen-Administration): Ist in der Sitzung eine Person
- * gewählt, laufen die Kantinenseiten so, als wäre sie angemeldet – Bestellen,
+ * „Als Person handeln" (Mensa-Administration): Ist in der Sitzung eine Person
+ * gewählt, laufen die Mensa-Seiten so, als wäre sie angemeldet – Bestellen,
  * Abbestellen, Meine Daten … sehen und tun genau das, was sie sähe und täte.
  *
  * - Nur auf den Routen dieses Moduls (die Modul-Zugriffsprüfung des Cores lief
@@ -33,7 +33,7 @@ class AlsPerson
 
     /**
      * Menüpunkte zur Selbstbedienung. Rechte auf jedem ANDEREN Menüpunkt gelten
-     * als Kantinen-Verwaltung – auch auf künftigen, solange sie hier fehlen.
+     * als Mensa-Verwaltung – auch auf künftigen, solange sie hier fehlen.
      */
     private const SELBSTBEDIENUNG = ['orders', 'abrechnung', 'sonderkost', 'ratings', 'reports'];
 
@@ -99,7 +99,7 @@ class AlsPerson
 
     /**
      * Darf man als diese Person handeln? Nur als „normale" Teilnehmer: nicht als
-     * Admin und nicht als jemand mit Kantinen-Verwaltungsrechten – sonst ließe
+     * Admin und nicht als jemand mit Mensa-Verwaltungsrechten – sonst ließe
      * sich über die Person mehr tun als mit dem eigenen Konto. Verwaltung heißt:
      * eine Rolle aus dem Modul-Manifest, die keine Kundengruppe ist (Koch,
      * Kellner, OGS-Betreuer …), oder irgendeine Stufe auf einem Menüpunkt

@@ -127,7 +127,7 @@ class SeedOgsTestkinder extends Command
         if (! DB::table('roles')->where('role_id', 'kantine_ogs')->exists()) {
             DB::table('roles')->insert([
                 'role_id' => 'kantine_ogs',
-                'name' => 'Kantine: OGS-Kind',
+                'name' => 'Mensa: OGS-Kind',
                 'is_system' => true,
                 'created_at' => now(),
                 'updated_at' => now(),

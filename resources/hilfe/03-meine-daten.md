@@ -1,7 +1,7 @@
 ---
 titel: Meine Daten (Verträglichkeiten, Budget, Chips)
 route: module.schulkantine.sonderkost.index
-kategorie: Schulkantine
+kategorie: Mensa
 position: 3
 ---
 

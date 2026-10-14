@@ -1,17 +1,17 @@
 ---
-titel: Die Schulkantine im Überblick
-kategorie: Schulkantine
+titel: Die Mensa im Überblick
+kategorie: Mensa
 position: 1
 ---
 
-Die Kantine ist kein reiner Speiseplan, sondern ein Bestell-, Ausgabe- und
+Die Mensa ist kein reiner Speiseplan, sondern ein Bestell-, Ausgabe- und
 Abrechnungssystem. Diese Seite erklärt die Begriffe, die überall wieder auftauchen –
 sie hängt an keiner bestimmten Seite, sondern ist zum Einlesen gedacht.
 
 ## Saison, Öffnungstage, Schließtage
 
 Alles hängt an einer **Saison** – in der Regel ein Schuljahr. Sie legt Anfang und Ende fest,
-und in ihr steht der Kalender: An welchen Wochentagen die Kantine öffnet und welche Tage
+und in ihr steht der Kalender: An welchen Wochentagen die Mensa öffnet und welche Tage
 wegen Ferien oder Feiertagen ausfallen.
 
 Ein **Öffnungstag** ist damit ein Tag, an dem tatsächlich gekocht wird. Das ist nicht
@@ -28,8 +28,8 @@ bestellt wird:
   Gericht am Tag.
 
 Die Gruppe wird nicht eigens eingetragen, sondern aus den **Rollen** des Essers abgeleitet.
-Wer die Rolle „Kantine: OGS" hat, ist in der OGS-Gruppe; wer „Kantine: Schüler" hat, ist
-Schüler; alle übrigen Benutzer fallen in „Sonstige". Die beiden Kantinen-Rollen vergibt der
+Wer die Rolle „Mensa: OGS" hat, ist in der OGS-Gruppe; wer „Mensa: Schüler" hat, ist
+Schüler; alle übrigen Benutzer fallen in „Sonstige". Die beiden Mensa-Rollen vergibt der
 nächtliche Import aus **Linear**, der Schulverwaltung, anhand der Klasse.
 
 ## Essensvertrag
@@ -59,9 +59,9 @@ dafür nicht. Darüber hinaus gibt es drei Betriebs-Rollen:
 
 | Rolle | sieht / darf |
 |---|---|
-| Kantine: Koch | Ausgabe-Übersicht und Mengen ansehen |
-| Kantine: Ausgabe (Kellner) | zusätzlich am Ausgabe-Terminal abhaken und Spontankäufe erfassen |
-| Kantine: OGS-Betreuer | die OGS-Sammelliste des Tages (Ausgabe → Details, als PDF druckbar) |
+| Mensa: Koch | Ausgabe-Übersicht und Mengen ansehen |
+| Mensa: Ausgabe (Kellner) | zusätzlich am Ausgabe-Terminal abhaken und Spontankäufe erfassen |
+| Mensa: OGS-Betreuer | die OGS-Sammelliste des Tages (Ausgabe → Details, als PDF druckbar) |
 
 Wer welche Seite sieht, legen die Rollen am jeweiligen Menüpunkt fest (Verwaltung →
 Module), jeweils mit einer Stufe: lesen, bearbeiten oder verwalten. Administratoren dürfen

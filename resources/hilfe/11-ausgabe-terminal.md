@@ -1,7 +1,7 @@
 ---
 titel: Ausgabe-Terminal
 route: module.schulkantine.servings.terminal
-kategorie: Schulkantine – Betrieb
+kategorie: Mensa – Betrieb
 position: 11
 ---
 

@@ -1,7 +1,7 @@
 ---
 titel: Kundengruppen
 route: module.schulkantine.customer-groups.index
-kategorie: Schulkantine – Verwaltung
+kategorie: Mensa – Verwaltung
 position: 21
 ---
 
@@ -18,8 +18,8 @@ Jede Gruppe hängt fest an einer Rolle:
 
 | Gruppe | Rolle | Modus |
 |---|---|---|
-| OGS | Kantine: OGS | Essen ja / nein |
-| Schüler | Kantine: Schüler | Menü-Auswahl |
+| OGS | Mensa: OGS | Essen ja / nein |
+| Schüler | Mensa: Schüler | Menü-Auswahl |
 | Sonstige | Benutzer (`user`) | Menü-Auswahl |
 
 Weil jeder Benutzer die Rolle `user` hat, fällt jeder irgendwo hinein – niemand steht ohne
@@ -31,7 +31,7 @@ unten: Wer OGS ist, ist OGS, auch wenn er zusätzlich `user` hat.
 rollen: admin
 
 Nicht hier: Die Gruppe ist keine eigene Angabe, sondern folgt der Rolle – und die Rollen
-„Kantine: OGS" und „Kantine: Schüler" vergibt der **nächtliche Linear-Import** anhand der
+„Mensa: OGS" und „Mensa: Schüler" vergibt der **nächtliche Linear-Import** anhand der
 Klasse. Welche Klassen als OGS gelten, steht in der Einstellung „OGS-Klassen" am Task
 Linear/BenutzerImport (Standard 1–4). Ein Kind, das nach der vierten Klasse aus der OGS
 herauswächst, wird damit beim nächsten Import automatisch Schüler.

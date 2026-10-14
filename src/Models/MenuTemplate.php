@@ -51,7 +51,7 @@ class MenuTemplate extends Model
 
     /**
      * Wird das Menü an diesem Datum (Wochentag) angeboten? Leere Wochentagsliste
-     * = an allen Öffnungstagen. (Ob die Kantine an dem Tag überhaupt offen hat,
+     * = an allen Öffnungstagen. (Ob die Mensa an dem Tag überhaupt offen hat,
      * prüft der Aufrufer separat über Season::isOpenOn().)
      */
     public function availableOn(Carbon $date): bool

@@ -42,7 +42,7 @@
                     @endif
                 </div>
                 <div class="text-center">
-                    <div class="text-sm font-semibold text-gray-800">{{ $weekStart->format('d.m.') }} – {{ $weekEnd->format('d.m.Y') }}</div>
+                    <div class="text-sm font-semibold text-gray-800">KW {{ $weekStart->isoWeek() }} · {{ $weekStart->format('d.m.') }} – {{ $weekEnd->format('d.m.Y') }}</div>
                     <div class="text-xs text-gray-400">Saison „{{ $season->name }}"</div>
                 </div>
                 <div>
@@ -136,7 +136,7 @@
 
             @if (empty($days))
                 <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
-                    Für diese Saison sind keine Kantinen-Wochentage hinterlegt.
+                    Für diese Saison sind keine Mensa-Wochentage hinterlegt.
                 </div>
             @else
                 {{-- Tage als umbrechendes Raster: jede Karte will mindestens 15rem, teilt sich die

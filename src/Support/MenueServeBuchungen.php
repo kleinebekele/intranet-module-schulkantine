@@ -364,7 +364,7 @@ class MenueServeBuchungen
 
     /**
      * Abo-Muster der OGS-Kinder aus der Menü&Serve-Historie: je Kind und Wochentag
-     * der Anteil der Kantinentage (= Tage mit irgendeiner Buchung), an denen es
+     * der Anteil der Mensatage (= Tage mit irgendeiner Buchung), an denen es
      * gebucht war. Vorschlag = Wochentage mit mindestens MUSTER_SCHWELLE;
      * „unklar", wenn ein Wochentag zwischen 25 % und 75 % liegt.
      *
@@ -414,11 +414,11 @@ class MenueServeBuchungen
     }
 
     /**
-     * Abos setzen: je Kind die gewählten Wochentage. Alle Kantinen-Wochentage = Abo
+     * Abos setzen: je Kind die gewählten Wochentage. Alle Mensa-Wochentage = Abo
      * ohne Einschränkung, keiner = Abo aus.
      *
      * @param  array<int, list<int>>  $muster  user_id → Wochentage
-     * @param  list<int>  $alle  die Kantinen-Wochentage
+     * @param  list<int>  $alle  die Mensa-Wochentage
      */
     public function abosSetzen(Season $season, array $muster, array $alle): int
     {

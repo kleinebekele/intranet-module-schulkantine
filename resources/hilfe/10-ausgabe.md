@@ -1,7 +1,7 @@
 ---
 titel: Ausgabe – Übersicht
 route: module.schulkantine.servings.index
-kategorie: Schulkantine – Betrieb
+kategorie: Mensa – Betrieb
 position: 10
 ---
 

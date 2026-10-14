@@ -24,7 +24,7 @@ use Intranet\Modules\Schulkantine\Http\Middleware\AlsPerson;
 use Intranet\Modules\Schulkantine\Http\Middleware\NurSchulnetz;
 
 /*
- | Routen des Schulkantine-Moduls.
+ | Routen des Mensa-Moduls.
  |
  | Konvention (wie bei allen Modulen):
  |  - URL-Präfix:  modules/schulkantine
@@ -187,9 +187,9 @@ Route::middleware(['web', 'auth', AlsPerson::class])
         Route::delete('meine-chips/chip/{chip}', [ChipController::class, 'remove'])->name('chips.remove');
 
         // Teilnehmer (= Benutzer). Angelegt werden Benutzer über den Benutzer-Import;
-        // hier pflegt man nur die Kantinen-Zusatzdaten (Gruppe je Saison, Sonderkost).
+        // hier pflegt man nur die Mensa-Zusatzdaten (Gruppe je Saison, Sonderkost).
         Route::get('teilnehmer', [EaterController::class, 'index'])->name('eaters.index');
-        // „Als Person handeln" (Kantinen-Verwaltung) – beginnen und beenden.
+        // „Als Person handeln" (Mensa-Verwaltung) – beginnen und beenden.
         Route::post('teilnehmer/{user}/als', [AlsPersonController::class, 'start'])->name('eaters.als');
         Route::post('als-person/ende', [AlsPersonController::class, 'ende'])->name('als.ende');
         Route::get('teilnehmer/{user}/bearbeiten', [EaterController::class, 'edit'])->name('eaters.edit');

@@ -1,7 +1,7 @@
 ---
 titel: Meine Abrechnung
 route: module.schulkantine.abrechnung.index
-kategorie: Schulkantine
+kategorie: Mensa
 position: 5
 ---
 

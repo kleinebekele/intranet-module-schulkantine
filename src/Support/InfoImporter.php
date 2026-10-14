@@ -59,7 +59,7 @@ class InfoImporter
                 $zeilen = $this->zeilenLesen($pfad);
             } catch (\Throwable $e) {
                 $this->fehler[] = $datei.': '.$e->getMessage();
-                Log::warning('Kantine-Info-Import: '.$datei.' konnte nicht gelesen werden.', ['fehler' => $e->getMessage()]);
+                Log::warning('Mensa-Info-Import: '.$datei.' konnte nicht gelesen werden.', ['fehler' => $e->getMessage()]);
 
                 continue; // Datei liegen lassen – sie soll auffallen, nicht verschwinden.
             }
@@ -73,7 +73,7 @@ class InfoImporter
 
             @unlink($pfad);
 
-            Log::info('Kantine-Info-Import: '.$datei.' verarbeitet.', $stand);
+            Log::info('Mensa-Info-Import: '.$datei.' verarbeitet.', $stand);
         }
 
         $ergebnis['fehler'] = $this->fehler;

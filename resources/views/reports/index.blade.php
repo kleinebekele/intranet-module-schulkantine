@@ -102,13 +102,13 @@
                         </div>
                         <div class="text-xs text-sky-700">
                             @if (! $zp)
-                                In {{ $monthLabel }} gibt es keinen Kantinentag – nichts zu senden.
+                                In {{ $monthLabel }} gibt es keinen Mensatag – nichts zu senden.
                             @elseif (! $faellig)
-                                Wird automatisch am {{ $zp->format('d.m.Y') }} um {{ $zp->format('H:i') }} Uhr abgeschlossen und übertragen (letzter Kantinentag, nach Abbestellschluss).
+                                Wird automatisch am {{ $zp->format('d.m.Y') }} um {{ $zp->format('H:i') }} Uhr abgeschlossen und übertragen (letzter Mensatag, nach Abbestellschluss).
                             @elseif ($linear['bereit'] > 0)
                                 Abschluss seit {{ $zp->format('d.m.Y H:i') }} fällig – der Task Linear/KantineAbrechnung überträgt alles Bereite zusammen.
                             @else
-                                Letzter Kantinentag war der {{ $zp->format('d.m.Y') }}.
+                                Letzter Mensatag war der {{ $zp->format('d.m.Y') }}.
                             @endif
                         </div>
                         @unless ($linear['lesbar'])

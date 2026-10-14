@@ -1,7 +1,7 @@
 ---
 titel: Kategorien
 route: module.schulkantine.categories.index
-kategorie: Schulkantine – Verwaltung
+kategorie: Mensa – Verwaltung
 position: 22
 ---
 

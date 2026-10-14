@@ -1,7 +1,7 @@
 ---
 titel: Bestell-Terminal
 route: module.schulkantine.bestellterminal.index
-kategorie: Schulkantine – Betrieb
+kategorie: Mensa – Betrieb
 position: 13
 ---
 
@@ -15,7 +15,7 @@ Chip-Anmeldung – Chip auflegen, bestellen, „Abmelden".
 
 rollen: admin
 
-Unter **Schulkantine → Bestell-Terminal** stehen die Adresse des Terminals und die
+Unter **Mensa → Bestell-Terminal** stehen die Adresse des Terminals und die
 **freigegebenen Netze**. Nur von dort ist das Terminal erreichbar; ohne Eintrag ist es
 nirgends erreichbar. Die Seite zeigt auch, mit welcher Adresse der Server Sie gerade sieht –
 am besten einmal an einem Schul-Terminal nachsehen und von außerhalb gegenprüfen.

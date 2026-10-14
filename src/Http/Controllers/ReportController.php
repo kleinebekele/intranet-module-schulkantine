@@ -143,7 +143,7 @@ class ReportController
         $zeitpunkt = $export->sendezeitpunkt($season, $year, $month);
         if (! $zeitpunkt || Carbon::now()->lt($zeitpunkt)) {
             return back()->withErrors(['linear' => 'Der Monat ist noch nicht abgeschlossen – gesendet wird frühestens '
-                .($zeitpunkt ? 'am '.$zeitpunkt->format('d.m.Y \u\m H:i') : 'nach dem letzten Kantinentag').'.']);
+                .($zeitpunkt ? 'am '.$zeitpunkt->format('d.m.Y \u\m H:i') : 'nach dem letzten Mensatag').'.']);
         }
 
         try {

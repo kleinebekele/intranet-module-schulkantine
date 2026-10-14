@@ -169,7 +169,7 @@
                                         @darfRoute('module.schulkantine.eaters.als')
                                         @unless ($user->is(auth()->user()) || ! \Intranet\Modules\Schulkantine\Http\Middleware\AlsPerson::zielErlaubt($user))
                                         <form method="POST" action="{{ route('module.schulkantine.eaters.als', $user) }}" class="inline"
-                                              onsubmit="return confirm(@js('Als '.$user->name.' handeln? Bis du es beendest, gilt alles, was du in der Kantine einstellst, für diese Person.'))">
+                                              onsubmit="return confirm(@js('Als '.$user->name.' handeln? Bis du es beendest, gilt alles, was du in der Mensa einstellst, für diese Person.'))">
                                             @csrf
                                             <button type="submit" title="Als {{ $user->name }} handeln"
                                                     class="inline-flex items-center rounded-md px-1.5 py-1 text-xs font-medium text-gray-400 hover:bg-red-50 hover:text-red-700">als …</button>

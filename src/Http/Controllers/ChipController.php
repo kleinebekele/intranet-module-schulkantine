@@ -17,7 +17,7 @@ use Intranet\Modules\Schulkantine\Support\Access;
  * zurücknehmen kann ihn ausschließlich die Schule (EaterController).
  *
  * Wer Erziehungsberechtigte hat (Kind mit eigenem Konto), sieht seine Chips nur –
- * anlegen und entfernen dürfen dann nur die Eltern (bzw. die Kantinen-Verwaltung),
+ * anlegen und entfernen dürfen dann nur die Eltern (bzw. die Mensa-Verwaltung),
  * damit kein Kind einen fremden Chip auf die Elternrechnung registriert.
  *
  * OGS-Kinder bekommen bewusst KEINEN Chip.
@@ -71,7 +71,7 @@ class ChipController
 
     /**
      * Für ein eigenes Kind; für sich selbst nur ohne Erziehungsberechtigte. Die
-     * Kantinen-Verwaltung (bei „Als Person handeln": das echte Konto) immer.
+     * Mensa-Verwaltung (bei „Als Person handeln": das echte Konto) immer.
      */
     public static function mayManage(User $actor, User $target): bool
     {

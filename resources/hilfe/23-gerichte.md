@@ -1,7 +1,7 @@
 ---
 titel: Gerichte pflegen
 route: module.schulkantine.dishes.index
-kategorie: Schulkantine – Verwaltung
+kategorie: Mensa – Verwaltung
 position: 23
 ---
 

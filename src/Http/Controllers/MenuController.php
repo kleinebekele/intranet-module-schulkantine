@@ -55,7 +55,7 @@ class MenuController
         $weekStart = $base->copy()->startOfWeek(Carbon::MONDAY);
         $weekEnd = $weekStart->copy()->addDays(6);
 
-        // Alle Kantinen-Wochentage der Woche (auch geschlossene → markiert).
+        // Alle Mensa-Wochentage der Woche (auch geschlossene → markiert).
         $openingWeekdays = $season->opening_weekdays ?: [1, 2, 3, 4, 5];
         $closedByDate = $season->closedDays()
             ->whereBetween('date', [$weekStart->toDateString(), $weekEnd->toDateString()])
@@ -167,7 +167,7 @@ class MenuController
         $date = Carbon::parse($data['date']);
 
         if (! $season->isOpenOn($date)) {
-            return back()->withErrors(['date' => 'Die Kantine hat an diesem Tag nicht geöffnet.']);
+            return back()->withErrors(['date' => 'Die Mensa hat an diesem Tag nicht geöffnet.']);
         }
         if ($this->weekLocked($season, $date)) {
             return $this->redirectToWeek($date)->withErrors(['menu' => $this->lockedMessage()]);
@@ -405,6 +405,6 @@ class MenuController
 
     private function authorizeAdmin(Request $request): void
     {
-        abort_unless(Access::darfMenuepunkt($request->user(), 'menus'), 403, 'Kein Zugriff auf diese Kantinen-Seite. Freigabe über die Rollen am Menüpunkt (Verwaltung → Module).');
+        abort_unless(Access::darfMenuepunkt($request->user(), 'menus'), 403, 'Kein Zugriff auf diese Mensa-Seite. Freigabe über die Rollen am Menüpunkt (Verwaltung → Module).');
     }
 }

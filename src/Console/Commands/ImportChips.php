@@ -32,7 +32,7 @@ class ImportChips extends Command
         {--quelle=schule : schule oder eltern}
         {--pfand : Schul-Chips mit Pfand (5,00 €) und heutigem Ausgabedatum anlegen}';
 
-    protected $description = 'Übernimmt Chip-Codes aus dem Altsystem (CSV: AdrNr;Code) in die Kantine.';
+    protected $description = 'Übernimmt Chip-Codes aus dem Altsystem (CSV: AdrNr;Code) in die Mensa.';
 
     public function handle(): int
     {

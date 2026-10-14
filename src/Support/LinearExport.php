@@ -18,25 +18,28 @@ use Intranet\Modules\Schulkantine\Models\Season;
  * Betrag = Gesamt = Monatssumme, Datum = DatumU = letzter Tag des Monats. Die
  * Spalten Soll/DatumSoll/ZeitSoll füllt Linear selbst beim Sollstellungslauf.
  * Der Betrag umfasst Menüs, OGS, spontane Abholungen UND Chip-Pfand (Ausgabe +,
- * Rückgabe −). Beschreibung „Kantine Intranet" – bewusst anders als Menü&Serve.
+ * Rückgabe −). Beschreibung „Mensa Intranet" – bewusst anders als Menü&Serve.
  *
  * Gesendet wird immer der ganze Monat auf einmal ({@see sendenAlle()}): automatisch
- * durch den Task Linear/KantineAbrechnung am letzten Kantinentag nach Abbestellschluss,
+ * durch den Task Linear/KantineAbrechnung am letzten Mensatag nach Abbestellschluss,
  * im Notfall per Knopf in der Auswertung. Jeder Esser höchstens einmal je Monat.
  * Nicht übertragbar (getrennt aufgeführt): Testkonten ohne Linear-Herkunft, Esser
  * ohne laufenden Vertrag, Beträge ≤ 0 (Gutschriften bitte von Hand in Linear).
  */
 class LinearExport
 {
-    public const BESCHREIBUNG = 'Kantine Intranet';
+    public const BESCHREIBUNG = 'Mensa Intranet';
 
-    /** Frühester Sendezeitpunkt am letzten Kantinentag, falls der Abbestellschluss früher liegt. */
+    /** Bis 10/2026 hieß die Zeile so – beim Wiedererkennen gesendeter Zeilen mitzählen. */
+    public const BESCHREIBUNG_ALT = 'Kantine Intranet';
+
+    /** Frühester Sendezeitpunkt am letzten Mensatag, falls der Abbestellschluss früher liegt. */
     public const SENDEZEIT = '16:00';
 
     /**
      * Ab wann darf der Monat an Linear? Am letzten Öffnungstag des Monats, sobald der
      * Abbestellschluss vorbei ist – frühestens zur $uhrzeit, damit spontane Abholungen
-     * und Pfand des letzten Tages noch mitgehen. null = der Monat hat keinen Kantinentag.
+     * und Pfand des letzten Tages noch mitgehen. null = der Monat hat keinen Mensatag.
      */
     public function sendezeitpunkt(Season $season, int $year, int $month, string $uhrzeit = self::SENDEZEIT): ?Carbon
     {
@@ -57,7 +60,7 @@ class LinearExport
     }
 
     /**
-     * Ist der Monat abgeschlossen? Sendezeitpunkt vorbei (oder gar kein Kantinentag)
+     * Ist der Monat abgeschlossen? Sendezeitpunkt vorbei (oder gar kein Mensatag)
      * und keine übertragbare Zeile mehr offen – erst dann gibt es die Exporte.
      */
     public function abgeschlossen(Season $season, int $year, int $month): bool
@@ -197,8 +200,8 @@ class LinearExport
             // Noch nicht abgerechnet? Dann muss die gesendete Zeile wenigstens in MgEsGeld stehen.
             $esgeld = (string) config('schulkantine.linear_esgeld_tabelle', 'Linear2.dbo.MgEsGeld');
             $uebermittelt = collect(DB::connection(Ekkon::mssqlConnection())->select(
-                "SELECT AbwAdrNr FROM {$esgeld} WHERE Beschreibung = ? AND CONVERT(date, Datum) = ?",
-                [self::BESCHREIBUNG, $vorschau['datum']->format('Y-m-d')],
+                "SELECT AbwAdrNr FROM {$esgeld} WHERE Beschreibung IN (?, ?) AND CONVERT(date, Datum) = ?",
+                [self::BESCHREIBUNG, self::BESCHREIBUNG_ALT, $vorschau['datum']->format('Y-m-d')],
             ))->map(fn ($r) => (int) $r->AbwAdrNr)->flip();
         } catch (\Throwable $e) {
             report($e);
@@ -289,8 +292,8 @@ class LinearExport
 
                 try {
                     $schon = (int) ($linear->selectOne(
-                        "SELECT COUNT(*) AS n FROM {$tabelle} WHERE AbwAdrNr = ? AND Beschreibung = ? AND CONVERT(date, Datum) = ?",
-                        [(int) $zeile['AbwAdrNr'], self::BESCHREIBUNG, $datum],
+                        "SELECT COUNT(*) AS n FROM {$tabelle} WHERE AbwAdrNr = ? AND Beschreibung IN (?, ?) AND CONVERT(date, Datum) = ?",
+                        [(int) $zeile['AbwAdrNr'], self::BESCHREIBUNG, self::BESCHREIBUNG_ALT, $datum],
                     )->n ?? 0);
 
                     if ($schon > 0) {

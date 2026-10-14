@@ -4,7 +4,7 @@
      orangefarbenen .cmd-Kasten mit dem Hinweis, dass sie der Administrator ausführt. --}}
 
 <p class="lead">
-    Diese Anleitung richtet sich an <strong>Administratoren</strong> der Schulkantine. Sie erklärt, woher
+    Diese Anleitung richtet sich an <strong>Administratoren</strong> der Mensa. Sie erklärt, woher
     die Daten kommen (Linear), die Einrichtung einer Saison, die tägliche Bedienung und enthält
     Testszenarien, mit denen sich prüfen lässt, ob alles funktioniert. Befehle für die
     <strong>Server-Konsole</strong> sind orange hervorgehoben.
@@ -22,18 +22,18 @@
 <h2>1. Woher die Daten kommen: Linear</h2>
 <p>
     Der Task <strong>Linear/BenutzerImport</strong> (Modul Verwaltung, täglich 03:30) liest Linear und
-    gleicht das Intranet ab. Für die Kantine liefert er:
+    gleicht das Intranet ab. Für die Mensa liefert er:
 </p>
 <table>
     <thead>
-        <tr><th>Was</th><th>Woher in Linear</th><th>Wirkung in der Kantine</th></tr>
+        <tr><th>Was</th><th>Woher in Linear</th><th>Wirkung in der Mensa</th></tr>
     </thead>
     <tbody>
         <tr><td>Personen</td><td>Adresse (Schüler/Lehrer/Eltern/Mitarbeiter = J)</td><td>Benutzerkonten; Einladungen werden nur <em>vorgemerkt</em> und erst nach Freigabe in der Verwaltung verschickt.</td></tr>
         <tr><td>Eltern ↔ Kind</td><td>Verknüpfungen</td><td>Eltern bestellen für ihre Kinder.</td></tr>
         <tr><td>Kundengruppe</td><td>Klasse (neuester Zeitraum)</td><td>Rolle <code>kantine_ogs</code> für die OGS-Klassen (Einstellung „OGS-Klassen" am Task, Standard 1–4), sonst <code>kantine_student</code>.</td></tr>
         <tr><td>Essensvertrag</td><td><code>Linear2.dbo.MgVert</code>, Art 27/28/29/50, laufend</td><td>Rolle <code>kantine_vertrag_&lt;Art&gt;</code> am <strong>Esser</strong> (<code>AbwAdrNr</code>). Nur wer einen Vertrag hat, darf bestellen.</td></tr>
-        <tr><td>Essenspreis</td><td><code>Linear2.dbo.MgArtDat</code> (gilt ab Jahr/Monat)</td><td>Preis je Vertragsart, abgelegt in der Kantine (Menüs „Preis aus Linear", OGS-Preis).</td></tr>
+        <tr><td>Essenspreis</td><td><code>Linear2.dbo.MgArtDat</code> (gilt ab Jahr/Monat)</td><td>Preis je Vertragsart, abgelegt in der Mensa (Menüs „Preis aus Linear", OGS-Preis).</td></tr>
     </tbody>
 </table>
 <table>
@@ -52,12 +52,12 @@
     dann berichtet er nur, was er tun würde. Die <strong>Bestellsperre ohne Vertrag greift erst</strong>,
     wenn der Import einmal scharf gelaufen ist und Vertragsrollen vergeben hat; vorher darf jeder
     bestellen. Ist Linear nicht lesbar oder liefert keine Verträge/Preise, bleibt der bisherige Stand
-    unverändert. <strong>Nach Linear wird nichts geschrieben</strong> – die Kantine liest nur.
+    unverändert. <strong>Nach Linear wird nichts geschrieben</strong> – die Mensa liest nur.
 </div>
 
 <h2>2. Rollen und Zugriff</h2>
 <p>
-    Wer welche Kantinen-Seite sieht, legen die <strong>Rollen am Menüpunkt</strong> fest
+    Wer welche Mensa-Seite sieht, legen die <strong>Rollen am Menüpunkt</strong> fest
     (Verwaltung → Module), jeweils mit einer <strong>Zugriffsstufe</strong>: <em>lesen</em>,
     <em>bearbeiten</em> oder <em>verwalten</em> (anlegen/löschen). Admins dürfen alles; diese Anleitung
     sehen nur Admins.

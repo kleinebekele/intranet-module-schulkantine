@@ -8,10 +8,10 @@ use Intranet\Modules\Schulkantine\Models\Season;
 use Intranet\Modules\Schulkantine\Support\LinearExport;
 
 /**
- * Sendet die Kantinenabrechnung eines Monats gesammelt an Linear (`MgEsGeld`) und
+ * Sendet die Mensa-Abrechnung eines Monats gesammelt an Linear (`MgEsGeld`) und
  * prüft danach laufend gegen, ob Linear die Zeilen abgerechnet hat.
  *
- * Senden: am letzten Kantinentag des Monats, sobald Abbestellschluss und Sendezeit
+ * Senden: am letzten Mensatag des Monats, sobald Abbestellschluss und Sendezeit
  * vorbei sind ({@see LinearExport::sendezeitpunkt()}). Betrachtet werden der laufende
  * und der Vormonat – fällt der Server am Monatsende aus, holt der nächste Lauf nach.
  * Je Esser und Monat höchstens eine Zeile; Nachzügler (Zeilen, die nach dem Versand
@@ -29,12 +29,12 @@ class KantineAbrechnung extends EkkonTask
     /** Schreibt in die Linear-Datenbank: bei Ausfall nicht starten, sondern nachholen. */
     public bool $brauchtWawi = true;
 
-    public string $description = 'Kantinenabrechnung am letzten Kantinentag des Monats gesammelt an Linear senden '
+    public string $description = 'Mensa-Abrechnung am letzten Mensatag des Monats gesammelt an Linear senden '
         .'und prüfen, ob Linear sie abgerechnet hat.';
 
     public array $meldungsarten = [
-        'kantine-linear-gesendet' => 'Kantine: Abrechnung an Linear gesendet',
-        'kantine-linear-abweichung' => 'Kantine: Abweichung zu Linear',
+        'kantine-linear-gesendet' => 'Mensa: Abrechnung an Linear gesendet',
+        'kantine-linear-abweichung' => 'Mensa: Abweichung zu Linear',
     ];
 
     public array $einstellungen = [
@@ -46,7 +46,7 @@ class KantineAbrechnung extends EkkonTask
         ],
         'sendezeit' => [
             'typ' => 'text',
-            'label' => 'Frühestens um (HH:MM) am letzten Kantinentag',
+            'label' => 'Frühestens um (HH:MM) am letzten Mensatag',
             'standard' => LinearExport::SENDEZEIT,
             'hilfe' => 'Gesendet wird nach dem Abbestellschluss, aber nicht vor dieser Uhrzeit – damit spontane '
                 .'Abholungen und Chip-Pfand des letzten Tages noch in der Abrechnung sind.',
@@ -126,7 +126,7 @@ class KantineAbrechnung extends EkkonTask
                 .($e['fehler'] !== [] ? ' Fehler: '.implode(' · ', $e['fehler']) : '');
             $this->msg($text);
             if ($e['gesendet'] > 0 || $e['fehler'] !== []) {
-                $this->benachrichtige('kantine-linear-gesendet', "Kantine {$label} an Linear gesendet", $text, $e);
+                $this->benachrichtige('kantine-linear-gesendet', "Mensa {$label} an Linear gesendet", $text, $e);
             }
         }
 
@@ -162,7 +162,7 @@ class KantineAbrechnung extends EkkonTask
                     $ergebnis['abweichungen']++;
                     $this->benachrichtige(
                         'kantine-linear-abweichung',
-                        "Kantine {$label}: Abweichung zu Linear",
+                        "Mensa {$label}: Abweichung zu Linear",
                         "{$z['user']->name} (AdrNr {$z['AbwAdrNr']}): {$abweichung}.",
                         ['user_id' => $z['user']->id, 'monat' => $label],
                         "kantine-linear-abweichung-{$z['user']->id}-{$year}-{$month}-".md5($abweichung),

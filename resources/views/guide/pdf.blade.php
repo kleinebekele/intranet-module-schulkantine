@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="utf-8">
-    <title>Schulkantine – Anleitung</title>
+    <title>Mensa – Anleitung</title>
     @include('schulkantine::guide._styles')
     <style>
         @page { margin: 24mm 16mm 20mm; }
@@ -18,7 +18,7 @@
 <body>
     <div class="kantine-doc">
         <div class="pdf-title">
-            <h1>Schulkantine – Bedienungsanleitung</h1>
+            <h1>Mensa – Bedienungsanleitung</h1>
             <div class="sub">Admin-Dokumentation &nbsp;·&nbsp; Stand {{ now()->format('d.m.Y') }}</div>
         </div>
         @include('schulkantine::guide._content')

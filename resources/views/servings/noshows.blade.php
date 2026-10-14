@@ -43,7 +43,7 @@
 
             @if (! $open)
                 <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-6 text-center text-sm text-amber-700">
-                    🔒 Die Kantine hat an diesem Tag nicht geöffnet ({{ $closedReason }}).
+                    🔒 Die Mensa hat an diesem Tag nicht geöffnet ({{ $closedReason }}).
                 </div>
             @else
                 @php $ogsNoShows = $ogs['noShows']; $total = count($noShows) + $ogsNoShows->count(); @endphp

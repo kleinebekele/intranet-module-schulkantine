@@ -1,7 +1,7 @@
 ---
 titel: Saisons und Öffnungskalender
 route: module.schulkantine.seasons.index
-kategorie: Schulkantine – Verwaltung
+kategorie: Mensa – Verwaltung
 position: 20
 ---
 
@@ -20,7 +20,7 @@ nicht mehr).
 rollen: admin
 
 Nötig sind Start, Ende, das **Bundesland** (für den Ferien-Import) und die Wochentage, an
-denen die Kantine grundsätzlich öffnet.
+denen die Mensa grundsätzlich öffnet.
 
 Für OGS gehört hier auch der **OGS-Preis** hin: OGS-Essen werden nicht je Gericht
 abgerechnet, sondern mit einem Preis je Teilnahmetag. Standardmäßig ist **„Preis aus Linear
@@ -79,6 +79,6 @@ Ein falsch gesetzter Schließtag verschiebt also stillschweigend Bestellfristen.
 
 rollen: admin
 
-Für den ersten Kantinentag einer Saison gibt es keinen vorherigen Öffnungstag – die Frist
+Für den ersten Mensatag einer Saison gibt es keinen vorherigen Öffnungstag – die Frist
 fällt dann auf den Kalendertag davor zurück. Ohne diese Ausnahme wäre der erste Tag nach den
 Sommerferien nie bestellbar.

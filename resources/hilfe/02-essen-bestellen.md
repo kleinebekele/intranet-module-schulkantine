@@ -1,7 +1,7 @@
 ---
 titel: Essen bestellen
 route: module.schulkantine.orders.index
-kategorie: Schulkantine
+kategorie: Mensa
 position: 2
 ---
 

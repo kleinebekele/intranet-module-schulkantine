@@ -1,7 +1,7 @@
 ---
 titel: Essen bewerten
 route: module.schulkantine.ratings.index
-kategorie: Schulkantine
+kategorie: Mensa
 position: 4
 ---
 

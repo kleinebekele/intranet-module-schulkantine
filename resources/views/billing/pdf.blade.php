@@ -26,7 +26,7 @@
 </head>
 <body>
     <div class="head">
-        <h1>Abrechnung Schulkantine</h1>
+        <h1>Abrechnung Mensa</h1>
         <div class="sub">{{ $monat['label'] }} &nbsp;·&nbsp; {{ $titel }} &nbsp;·&nbsp; {{ $viewer->name }}</div>
     </div>
 
@@ -65,7 +65,7 @@
 
     <div class="foot">
         {{ $hinweis }}<br>
-        Erstellt am {{ $erstellt->format('d.m.Y H:i') }} · Intranet der Schulkantine
+        Erstellt am {{ $erstellt->format('d.m.Y H:i') }} · Intranet der Mensa
     </div>
 </body>
 </html>

@@ -1,5 +1,5 @@
 {{-- „Als Person handeln": unübersehbarer Balken unter der Kopfleiste + Rückfrage vor jeder Änderung.
-     Nur auf Kantinenseiten (Provider) – außerhalb wirkt es nicht und wird nicht angezeigt. --}}
+     Nur auf Mensa-Seiten (Provider) – außerhalb wirkt es nicht und wird nicht angezeigt. --}}
 <div id="kantine-als-person" class="fixed inset-x-0 top-16 z-40 border-b-4 border-red-900 bg-red-600 text-white shadow-lg">
     <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-2 sm:px-6 lg:pl-72">
         <div class="text-base font-extrabold uppercase tracking-wide sm:text-lg">

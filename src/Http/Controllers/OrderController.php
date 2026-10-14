@@ -95,7 +95,7 @@ class OrderController
         $deadline = new DeadlineService;
         $weekReleased = $release->isWeekReleased($season, $weekStart);
 
-        // GANZE Woche darstellen: alle Kantinen-Wochentage (auch geschlossene →
+        // GANZE Woche darstellen: alle Mensa-Wochentage (auch geschlossene →
         // markiert, mit Grund). Für offene Tage zusätzlich die Fristen.
         $openingWeekdays = $season->opening_weekdays ?: [1, 2, 3, 4, 5];
         $closedByDate = $season->closedDays()
@@ -352,7 +352,7 @@ class OrderController
         }
 
         $date = Carbon::parse($data['date'])->startOfDay();
-        abort_unless($season->isOpenOn($date), 422, 'An diesem Tag hat die Kantine nicht geöffnet.');
+        abort_unless($season->isOpenOn($date), 422, 'An diesem Tag hat die Mensa nicht geöffnet.');
 
         $release = new ReleaseService;
         if (! $release->isWeekReleased($season, $date)) {

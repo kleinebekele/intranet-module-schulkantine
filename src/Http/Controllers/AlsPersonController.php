@@ -12,15 +12,15 @@ class AlsPersonController
 {
     public function start(Request $request, User $user)
     {
-        abort_unless(AlsPerson::darf($request->user()), 403, 'Nur die Kantinen-Verwaltung darf als andere Person handeln.');
+        abort_unless(AlsPerson::darf($request->user()), 403, 'Nur die Mensa-Verwaltung darf als andere Person handeln.');
         abort_if($user->is($request->user()), 422, 'Das bist du selbst.');
-        abort_unless(AlsPerson::zielErlaubt($user), 403, 'Als Administratoren oder Kantinen-Personal (Verwaltungsrechte) kann man nicht handeln.');
+        abort_unless(AlsPerson::zielErlaubt($user), 403, 'Als Administratoren oder Mensa-Personal (Verwaltungsrechte) kann man nicht handeln.');
 
         $request->session()->put(AlsPerson::SITZUNG, $user->id);
-        Audit::schreiben('kantine.als_person_start', "Handelt in der Kantine als {$user->name}", betroffener: $user);
+        Audit::schreiben('kantine.als_person_start', "Handelt in der Mensa als {$user->name}", betroffener: $user);
 
         return redirect()->route('module.schulkantine.orders.index')
-            ->with('status', "Du handelst jetzt als {$user->name}. Alles, was du in der Kantine einstellst, gilt für diese Person.");
+            ->with('status', "Du handelst jetzt als {$user->name}. Alles, was du in der Mensa einstellst, gilt für diese Person.");
     }
 
     public function ende(Request $request)

@@ -66,7 +66,7 @@
     @endif
 
     <div class="foot">
-        Erzeugt am {{ $generatedAt->format('d.m.Y H:i') }} Uhr · Schulkantine · Intranet.
+        Erzeugt am {{ $generatedAt->format('d.m.Y H:i') }} Uhr · Mensa · Intranet.
         Bis zur Abbestell-Frist am Morgen kann sich die Liste noch ändern.
     </div>
 </body>

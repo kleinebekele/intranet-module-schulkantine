@@ -88,7 +88,7 @@ class SeasonController
         $season->update($this->validated($request));
         $this->syncActiveFlag($season);
 
-        // Globale Kantinen-Einstellungen (Fristen, Freigabe-Vorlauf) werden auf der
+        // Globale Mensa-Einstellungen (Fristen, Freigabe-Vorlauf) werden auf der
         // Saison-Bearbeiten-Seite mitgepflegt – sie gelten übergreifend, nicht je Saison.
         Setting::current()->update($request->validate([
             'order_deadline_time' => ['required', 'date_format:H:i'],
@@ -239,6 +239,6 @@ class SeasonController
 
     private function authorizeAdmin(Request $request): void
     {
-        abort_unless(Access::darfMenuepunkt($request->user(), 'seasons'), 403, 'Kein Zugriff auf diese Kantinen-Seite. Freigabe über die Rollen am Menüpunkt (Verwaltung → Module).');
+        abort_unless(Access::darfMenuepunkt($request->user(), 'seasons'), 403, 'Kein Zugriff auf diese Mensa-Seite. Freigabe über die Rollen am Menüpunkt (Verwaltung → Module).');
     }
 }

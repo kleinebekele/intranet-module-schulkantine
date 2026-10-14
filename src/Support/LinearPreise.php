@@ -11,7 +11,7 @@ use Intranet\Modules\Schulkantine\Models\Setting;
 /**
  * Essenspreise je Vertragsgruppe aus Linear. Der nächtliche Linear-Import
  * (Modul Verwaltung, `MgArtDat`) legt sie in `kantine_settings.linear_prices` ab;
- * die Kantine liest Linear nicht selbst.
+ * die Mensa liest Linear nicht selbst.
  *
  * Menüs mit „Preis aus Linear" kosten je Esser den Preis seines Vertrags
  * (Rolle `kantine_vertrag_<art>`, s. Essensvertrag), bei mehreren den günstigsten.

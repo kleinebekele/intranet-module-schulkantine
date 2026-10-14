@@ -161,6 +161,6 @@ class MenuTemplateController
 
     private function authorizeAdmin(Request $request): void
     {
-        abort_unless(Access::darfMenuepunkt($request->user(), 'menus'), 403, 'Kein Zugriff auf diese Kantinen-Seite. Freigabe über die Rollen am Menüpunkt (Verwaltung → Module).');
+        abort_unless(Access::darfMenuepunkt($request->user(), 'menus'), 403, 'Kein Zugriff auf diese Mensa-Seite. Freigabe über die Rollen am Menüpunkt (Verwaltung → Module).');
     }
 }

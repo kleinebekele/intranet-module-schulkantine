@@ -12,11 +12,11 @@ use Intranet\Modules\Schulkantine\Models\Diet;
 use Intranet\Modules\Schulkantine\Models\UserInfo;
 
 /**
- * Anmelde-Klasse des Schulkantine-Moduls.
+ * Anmelde-Klasse des Mensa-Moduls.
  *
  * Routen, Views und Migrationen lädt die Basisklasse automatisch anhand der
  * Ordnerstruktur – hier beschreiben wir nur das Manifest (Schlüssel, Name,
- * Icon und die Unterpunkte des linken Menüs) sowie die Kantine-Beziehungen,
+ * Icon und die Unterpunkte des linken Menüs) sowie die Mensa-Beziehungen,
  * die dem Core-Benutzer angehängt werden.
  */
 class SchulkantineServiceProvider extends ModuleServiceProvider
@@ -39,8 +39,8 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
     {
         parent::boot();
 
-        // „Als Person handeln": roter Balken unter der Kopfleiste, solange aktiv – nur auf Kantinenseiten.
-        // Nur auf Kantinenseiten – außerhalb wirkt es nicht und wird auch nicht angezeigt.
+        // „Als Person handeln": roter Balken unter der Kopfleiste, solange aktiv – nur auf Mensa-Seiten.
+        // Nur auf Mensa-Seiten – außerhalb wirkt es nicht und wird auch nicht angezeigt.
         \App\Support\Kopfleiste::registrieren('kantine-als-person', function (User $user) {
             if (! request()->routeIs('module.schulkantine.*')) {
                 return null;
@@ -50,10 +50,10 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
             return $person ? view('schulkantine::als-person-banner', ['person' => $person]) : null;
         });
         \App\Support\Audit::benennen([
-            'kantine.als_person_start' => 'Kantine: als Person handeln – Beginn',
-            'kantine.als_person_ende' => 'Kantine: als Person handeln – Ende',
-            'kantine.als_person_aenderung' => 'Kantine: Änderung als andere Person',
-            'kantine.budget_ueberschreitung_bestaetigt' => 'Kantine: Budget-Überschreitung bestätigt',
+            'kantine.als_person_start' => 'Mensa: als Person handeln – Beginn',
+            'kantine.als_person_ende' => 'Mensa: als Person handeln – Ende',
+            'kantine.als_person_aenderung' => 'Mensa: Änderung als andere Person',
+            'kantine.budget_ueberschreitung_bestaetigt' => 'Mensa: Budget-Überschreitung bestätigt',
         ]);
 
         // Jeder Esser IST ein Benutzer (eigener Account). Die Sonderkost hängt
@@ -68,7 +68,7 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
             ->belongsToMany(Diet::class, 'kantine_user_diet', 'user_id', 'diet_id'));
 
         // Freie Zusatz-Info (z. B. „Klasse 5") – kommt ausschließlich aus dem
-        // CSV-Import und hängt an der Kantine, nicht am Core-Benutzer.
+        // CSV-Import und hängt an der Mensa, nicht am Core-Benutzer.
         User::resolveRelationUsing('kantineInfo', fn (User $user) => $user
             ->hasOne(UserInfo::class, 'user_id'));
 
@@ -97,12 +97,12 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
 
     public function manifest(): ModuleManifest
     {
-        return ModuleManifest::make('schulkantine', 'Schulkantine', icon: 'restaurant')
-            ->rolle('kantine_koch', 'Kantine: Koch')
-            ->rolle('kantine_kellner', 'Kantine: Ausgabe (Kellner)')
-            ->rolle('kantine_ogs_betreuer', 'Kantine: OGS-Betreuer')
-            ->rolle('kantine_ogs', 'Kantine: OGS')
-            ->rolle('kantine_student', 'Kantine: Schüler')
+        return ModuleManifest::make('schulkantine', 'Mensa', icon: 'restaurant')
+            ->rolle('kantine_koch', 'Mensa: Koch')
+            ->rolle('kantine_kellner', 'Mensa: Ausgabe (Kellner)')
+            ->rolle('kantine_ogs_betreuer', 'Mensa: OGS-Betreuer')
+            ->rolle('kantine_ogs', 'Mensa: OGS')
+            ->rolle('kantine_student', 'Mensa: Schüler')
             ->item('orders', 'Essen bestellen', 'module.schulkantine.orders.index', icon: 'cart')
             ->item('abrechnung', 'Meine Abrechnung', 'module.schulkantine.abrechnung.index', icon: 'tag')
             ->item('sonderkost', 'Meine Daten', 'module.schulkantine.sonderkost.index', icon: 'diet')

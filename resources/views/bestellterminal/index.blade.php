@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Bestell-Terminal · Schulkantine</title>
+    <title>Bestell-Terminal · Mensa</title>
     {{-- Favicon aus den Core-Einstellungen (eigenes Layout, deshalb von Hand). --}}
     @includeIf('layouts.favicon')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -31,7 +31,7 @@
                 @if ($besteller)
                     <div class="text-sm text-gray-500">Angemeldet: <span class="font-semibold text-gray-800">{{ $besteller->name }}</span></div>
                 @else
-                    <div class="text-sm text-gray-500">Bestell-Terminal der Schulkantine</div>
+                    <div class="text-sm text-gray-500">Bestell-Terminal der Mensa</div>
                 @endif
             </div>
         </div>

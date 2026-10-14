@@ -28,7 +28,7 @@
         </div>
 
         <p class="text-sm text-gray-500">
-            Je OGS-Kind und Wochentag: an wie viel Prozent der Kantinentage es in Menü&amp;Serve gebucht war.
+            Je OGS-Kind und Wochentag: an wie viel Prozent der Mensatage es in Menü&amp;Serve gebucht war.
             Vorgeschlagen sind die Wochentage ab {{ (int) ($schwelle * 100) }} %; <span class="text-amber-700">unklar</span> heißt,
             mindestens ein Wochentag liegt zwischen 25 % und 75 %. Die Kästchen lassen sich ändern; gesetzt wird nur bei angehakten Kindern.
         </p>
@@ -61,7 +61,7 @@
 
                 <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
                     <div class="border-b border-gray-100 px-4 py-2 text-sm font-semibold text-gray-700">
-                        Offen – {{ $offen->count() }} von {{ count($muster['kinder']) }} OGS-Kindern · Kantinentage:
+                        Offen – {{ $offen->count() }} von {{ count($muster['kinder']) }} OGS-Kindern · Mensatage:
                         {{ collect($muster['jeWochentag'])->map(fn ($n, $d) => $namen[$d].' '.$n)->implode(', ') }}
                     </div>
                     @if ($offen->isNotEmpty())

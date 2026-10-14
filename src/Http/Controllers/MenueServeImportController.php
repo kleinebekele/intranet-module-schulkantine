@@ -295,7 +295,7 @@ class MenueServeImportController
      */
     private function authorize(Request $request, Season $season): void
     {
-        abort_unless(Access::darfMenuepunkt($request->user(), 'seasons'), 403, 'Kein Zugriff auf diese Kantinen-Seite.');
+        abort_unless(Access::darfMenuepunkt($request->user(), 'seasons'), 403, 'Kein Zugriff auf diese Mensa-Seite.');
         abort_unless(self::fuerSaison($season), 404);
         \Illuminate\Support\Facades\URL::defaults(['season' => $season->id]);
         view()->share('season', $season);

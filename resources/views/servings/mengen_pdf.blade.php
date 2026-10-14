@@ -70,7 +70,7 @@
     </div>
 
     <div class="foot">
-        Erzeugt am {{ $generatedAt->format('d.m.Y H:i') }} Uhr · Schulkantine · Intranet.
+        Erzeugt am {{ $generatedAt->format('d.m.Y H:i') }} Uhr · Mensa · Intranet.
         Spontane Abholungen sind nicht eingerechnet (Vorrat bleibt küchenintern).
     </div>
 </body>

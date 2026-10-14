@@ -103,7 +103,7 @@ class Season extends Model
     }
 
     /**
-     * Hat die Kantine an diesem Datum geöffnet?
+     * Hat die Mensa an diesem Datum geöffnet?
      *
      * Regel: innerhalb des Saison-Zeitraums, an einem Öffnungs-Wochentag,
      * und kein Schließtag. Fällt die Öffnungs-Wochentage-Liste leer aus,

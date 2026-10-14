@@ -86,7 +86,7 @@
                 </label>
             @endforeach
         </div>
-        <p class="mt-1 text-xs text-gray-400">Tage, an denen die Kantine grundsätzlich geöffnet hat.</p>
+        <p class="mt-1 text-xs text-gray-400">Tage, an denen die Mensa grundsätzlich geöffnet hat.</p>
     </div>
 
     <label class="inline-flex items-center gap-2 text-sm text-gray-700">
@@ -150,7 +150,7 @@
         <div class="border-t border-gray-100 pt-5">
             <h2 class="text-sm font-semibold text-gray-700">Bestell-Fristen &amp; Freigabe</h2>
             <p class="mt-0.5 text-xs text-gray-400">
-                Diese Werte gelten <strong>übergreifend</strong> für die gesamte Kantine, nicht nur für diese Saison.
+                Diese Werte gelten <strong>übergreifend</strong> für die gesamte Mensa, nicht nur für diese Saison.
                 Beide Fristen werden gegen den Öffnungskalender gerechnet (geschlossene Tage werden übersprungen).
             </p>
 

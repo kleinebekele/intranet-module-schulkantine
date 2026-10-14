@@ -1,13 +1,13 @@
 ---
 titel: OGS-Sammelliste
-kategorie: Schulkantine – Betrieb
+kategorie: Mensa – Betrieb
 position: 12
 ---
 
 rollen: kantine_ogs_betreuer, admin
 
 Die Liste der OGS-Kinder, die **heute** essen – dafür gedacht, die Kinder einzusammeln und
-gemeinsam zur Kantine zu bringen.
+gemeinsam zur Mensa zu bringen.
 
 Sie hat keinen eigenen Menüpunkt mehr, sondern steckt in **Ausgabe – Übersicht** im Tab
 **Details** (Abschnitt „OGS-Sammelliste"). Zum Mitnehmen und Abhaken auf Papier laden Sie

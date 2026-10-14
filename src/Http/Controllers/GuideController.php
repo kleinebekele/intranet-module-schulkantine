@@ -7,7 +7,7 @@ use Illuminate\Contracts\Support\Renderable;
 use Illuminate\Http\Response;
 
 /**
- * Admin-Anleitung zum Schulkantine-Modul: Bedienung, Testszenarien, Seeder,
+ * Admin-Anleitung zum Mensa-Modul: Bedienung, Testszenarien, Seeder,
  * Konsolen-Befehle und Test-Benutzer. Online lesbar und als PDF ladbar.
  * Inhalt liegt in resources/views/guide/_content.blade.php (für beide Ausgaben).
  */

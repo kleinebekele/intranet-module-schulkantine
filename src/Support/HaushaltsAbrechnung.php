@@ -138,7 +138,7 @@ class HaushaltsAbrechnung
     {
         $charge = $charges->get($u->externe_id.'|'.$y.'|'.$m);
         $ab = Carbon::parse(self::intranetAb())->startOfDay();
-        // Ab dem Start der Intranet-Kantine wissen wir alles: nichts gefunden = nichts angefallen.
+        // Ab dem Start der Intranet-Mensa wissen wir alles: nichts gefunden = nichts angefallen.
         // Davor zählt allein, was Linear (aus dem alten System) abgerechnet hat – Intranet-
         // Posten von vorher wären geraten (z. B. OGS-Tage rückwirkend aus dem heutigen Abo).
         $intranetWeiss = $season !== null && Carbon::create($y, $m, 1)->endOfMonth()->gte($ab);

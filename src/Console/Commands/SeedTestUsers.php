@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * Legt Test-Benutzer für ALLE Rollen an, die das Schulkantine-Modul kennt –
+ * Legt Test-Benutzer für ALLE Rollen an, die das Mensa-Modul kennt –
  * Betrieb (Koch, Kellner, OGS-Betreuer), Esser (Schüler, OGS, Sonstige),
  * ein Elternteil mit zwei Kindern sowie einen Admin.
  *
@@ -19,16 +19,16 @@ class SeedTestUsers extends Command
 {
     protected $signature = 'kantine:seed-testusers {--password=test1234 : Passwort für alle Test-Konten}';
 
-    protected $description = 'Legt Test-Benutzer für alle Kantine-Rollen an (Betrieb, Esser, Eltern, Admin).';
+    protected $description = 'Legt Test-Benutzer für alle Mensa-Rollen an (Betrieb, Esser, Eltern, Admin).';
 
     /**
      * Betriebs-Rollen, die das Modul zwar in Access.php kennt, aber (anders als
      * kantine_ogs / kantine_student) nicht per Migration anlegt. Hier absichern.
      */
     private const OPERATOR_ROLES = [
-        'kantine_koch' => 'Kantine: Koch',
-        'kantine_kellner' => 'Kantine: Kellner',
-        'kantine_ogs_betreuer' => 'Kantine: OGS-Betreuer',
+        'kantine_koch' => 'Mensa: Koch',
+        'kantine_kellner' => 'Mensa: Kellner',
+        'kantine_ogs_betreuer' => 'Mensa: OGS-Betreuer',
     ];
 
     public function handle(): int
