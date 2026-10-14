@@ -12,6 +12,7 @@ use Intranet\Modules\Schulkantine\Models\ChildCategoryPermission;
 use Intranet\Modules\Schulkantine\Models\CustomerGroup;
 use Intranet\Modules\Schulkantine\Models\Dish;
 use Intranet\Modules\Schulkantine\Models\Menu;
+use Intranet\Modules\Schulkantine\Models\MenuDay;
 use Intranet\Modules\Schulkantine\Models\NfcChip;
 use Intranet\Modules\Schulkantine\Models\Order;
 use Intranet\Modules\Schulkantine\Models\Season;
@@ -1451,7 +1452,7 @@ class ServingController
                 for ($i = 0; $i < (int) $n['qty']; $i++) {
                     Serving::create([
                         'season_id' => $season->id, 'user_id' => $eater->id, 'date' => $date->toDateString(),
-                        'order_id' => null, 'dish_id' => null, 'category_id' => null, 'label' => 'Nachschlag',
+                        'order_id' => null, 'dish_id' => null, 'category_id' => null, 'label' => 'Extras/Sonstiges',
                         'price_snapshot' => (float) $n['amount'], 'spontaneous' => true, 'served_by' => $user->id,
                     ]);
                 }
@@ -1728,13 +1729,28 @@ class ServingController
     {
         $dateStr = $date->toDateString();
 
-        $menus = Menu::where('season_id', $season->id)
+        // Zwei Quellen: Einzelgerichte des Tagesplans (vorbestellbare Kategorien)
+        // und die Gerichte der Menüs des Tages. Seit der Menü-Logik stehen
+        // vorbestellte Gerichte oft NUR in einem Menü – ohne die zweite Quelle
+        // blieb die Spalte leer, solange niemand gestempelt hatte.
+        $planGerichte = Menu::where('season_id', $season->id)
             ->whereDate('date', $dateStr)
             ->with($this->terminalDishRelations())
             ->orderBy('sort_order')->orderBy('id')
             ->get()
             ->filter(fn (Menu $m) => $m->dish && $m->dish->category && $m->dish->category->allows_preorder)
-            ->unique(fn (Menu $m) => $m->dish_id)
+            ->map(fn (Menu $m) => $m->dish);
+
+        $menueGerichte = MenuDay::where('season_id', $season->id)
+            ->whereDate('date', $dateStr)
+            ->with(collect($this->terminalDishRelations())->map(fn ($r) => 'slots.'.$r)->all())
+            ->orderBy('id')
+            ->get()
+            ->flatMap(fn (MenuDay $md) => $md->slots->sortBy('position')->map(fn ($s) => $s->dish))
+            ->filter(fn (?Dish $d) => $d && $d->category);
+
+        $menus = $planGerichte->concat($menueGerichte)
+            ->unique('id')
             ->values();
 
         // Zähler je Gericht: bestellt = aktive Vorbestellungen; ausgegeben =
@@ -1746,16 +1762,16 @@ class ServingController
             ->where('spontaneous', false)->where('declined', false)->whereNotNull('dish_id')
             ->selectRaw('dish_id, COUNT(*) as c')->groupBy('dish_id')->pluck('c', 'dish_id');
 
-        return $menus->groupBy(fn (Menu $m) => $m->dish->category?->name ?? 'Ohne Kategorie')
+        return $menus->groupBy(fn (Dish $d) => $d->category?->name ?? 'Ohne Kategorie')
             ->map(fn (Collection $group, string $cat) => [
                 'category' => $cat,
-                'category_id' => $group->first()->dish->category_id,
-                'color' => $group->first()->dish->category?->color,
-                'dishes' => $group->map(function (Menu $m) use ($ordered, $served) {
-                    $o = (int) ($ordered[$m->dish_id] ?? 0);
-                    $s = (int) ($served[$m->dish_id] ?? 0);
+                'category_id' => $group->first()->category_id,
+                'color' => $group->first()->category?->color,
+                'dishes' => $group->map(function (Dish $d) use ($ordered, $served) {
+                    $o = (int) ($ordered[$d->id] ?? 0);
+                    $s = (int) ($served[$d->id] ?? 0);
 
-                    return $this->terminalDishPayload($m->dish) + [
+                    return $this->terminalDishPayload($d) + [
                         'ordered' => $o,
                         'served' => $s,
                         'open' => max(0, $o - $s),

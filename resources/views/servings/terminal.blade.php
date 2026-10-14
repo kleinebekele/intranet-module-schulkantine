@@ -452,7 +452,8 @@
                 }
                 (data.walkin || []).forEach(w => {
                     this.servedOnLoad = true;
-                    if (w.label === 'Nachschlag') {
+                    // Freier Betrag (früher Label "Nachschlag", jetzt "Extras/Sonstiges"): Zeile ohne Gericht mit Label.
+                    if (w.label && w.dish_id == null) {
                         this.nachschlagTotal = Math.round((this.nachschlagTotal + w.price) * 100) / 100;
                     } else if (w.dish_id != null) {
                         this.walkinQty[w.dish_id] = (this.walkinQty[w.dish_id] || 0) + 1;
@@ -1157,7 +1158,7 @@
                      gleiche −/+-Buttons, Münze über die Artikel-Breite zentriert, Preis in
                      der Preis-Spalte. Der Preis ist klickbar (öffnet die Zahlen-Tastatur). --}}
                 <div class="border-t border-gray-200 bg-white p-3">
-                    <div class="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">Nachschlag</div>
+                    <div class="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">Extras/Sonstiges</div>
                     <div class="flex items-center justify-center gap-8">
                         <button type="button" @click="nachschlagMinus()" :disabled="nachschlagTotal <= 0"
                                 class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-4xl font-bold text-gray-700 shadow-sm disabled:opacity-30">−</button>
@@ -1344,7 +1345,7 @@
          @click.self="padCancel()" @keydown.escape.window="padCancel()">
         <div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
             <div class="mb-3 flex items-center justify-between">
-                <h3 class="text-lg font-bold text-gray-800">Nachschlag-Betrag</h3>
+                <h3 class="text-lg font-bold text-gray-800">Extras/Sonstiges – Betrag</h3>
                 <button @click="padCancel()" class="rounded-lg px-3 py-1 text-xl text-gray-400 hover:bg-gray-100">✕</button>
             </div>
             <div class="mb-4 rounded-xl border-2 border-amber-200 bg-amber-50 px-4 py-3 text-right text-3xl font-extrabold text-amber-900">

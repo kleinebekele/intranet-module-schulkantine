@@ -220,7 +220,7 @@ php artisan kantine:seed-ogs-testkinder --remove</pre>
     <li>Vollbild für den Touch-Tresen. Chip am NFC-, USB- oder COM-Leser – oder Person über die Suche.</li>
     <li>Umschalter <strong>Vorbesteller / OGS</strong>, Wochenübersicht, Kalender für andere Tage.</li>
     <li>Ausgabe je Position: <em>genommen</em>, <em>Alternative</em> oder <em>abgelehnt</em>; dazu
-        <strong>Nachschlag</strong> und <strong>spontane Mitnahme</strong> (nur spontan erlaubte
+        <strong>Extras/Sonstiges</strong> (freier Betrag) und <strong>spontane Mitnahme</strong> (nur spontan erlaubte
         Kategorien, nicht für OGS).</li>
     <li>Allergie-/Diät-Warnungen sperren nichts, sie weisen nur hin.</li>
 </ul>
@@ -291,7 +291,7 @@ php artisan kantine:seed-ogs-testkinder --remove</pre>
     <p><strong>Als:</strong> kellner@kantine.test</p>
     <ol>
         <li>Terminal für den Bestelltag öffnen, kind-schueler per Chip oder Suche aufrufen.</li>
-        <li>Ausgabe bestätigen, einen Nachschlag buchen.</li>
+        <li>Ausgabe bestätigen, einen Betrag unter „Extras/Sonstiges" buchen.</li>
     </ol>
     <p class="exp"><strong>Erwartet:</strong> Die Ausgabe ist gebucht; in „Ausgabe" erscheint sie, die No-Shows
         sinken.</p>

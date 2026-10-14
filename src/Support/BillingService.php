@@ -334,8 +334,8 @@ class BillingService
         foreach ($nachschlagByDate as $n) {
             $spontan[] = [
                 'date' => $n['date'],
-                'dish' => 'Nachschlag',
-                'category' => 'Nachschlag',
+                'dish' => 'Extras/Sonstiges',
+                'category' => 'Extras/Sonstiges',
                 'price' => round($n['sum'], 2),
             ];
         }
