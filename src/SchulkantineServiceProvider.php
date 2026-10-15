@@ -105,7 +105,8 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
             ->rolle('kantine_student', 'Mensa: Schüler')
             ->item('orders', 'Essen bestellen', 'module.schulkantine.orders.index', icon: 'cart')
             ->item('abrechnung', 'Meine Abrechnung', 'module.schulkantine.abrechnung.index', icon: 'tag')
-            ->item('sonderkost', 'Meine Daten', 'module.schulkantine.sonderkost.index', icon: 'diet')
+            ->item('sonderkost', 'Meine Daten', 'module.schulkantine.sonderkost.index', icon: 'diet',
+                visibleWhen: fn () => \Intranet\Modules\Schulkantine\Models\Season::datenSelbstForActive())
             ->item('ratings', 'Essen bewerten', 'module.schulkantine.ratings.index', icon: 'like',
                 visibleWhen: fn () => \Intranet\Modules\Schulkantine\Models\Season::ratingsEnabledForActive())
             ->item('servings', 'Ausgabe', 'module.schulkantine.servings.index', icon: 'serving')

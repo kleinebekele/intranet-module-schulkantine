@@ -22,6 +22,8 @@ class SonderkostController
 {
     public function index(Request $request)
     {
+        abort_unless(\Intranet\Modules\Schulkantine\Models\Season::datenSelbstForActive(), 403,
+            'Die Daten pflegt in dieser Saison die Verwaltung.');
         $user = $request->user();
 
         // Haushalt: KINDER ZUERST, der Nutzer selbst zuletzt.
@@ -71,6 +73,8 @@ class SonderkostController
 
     public function update(Request $request, User $user)
     {
+        abort_unless(\Intranet\Modules\Schulkantine\Models\Season::datenSelbstForActive(), 403,
+            'Die Daten pflegt in dieser Saison die Verwaltung.');
         abort_unless($this->mayEditFor($request->user(), $user), 403,
             'Du darfst die Sonderkost dieser Person nicht bearbeiten.');
 
@@ -95,6 +99,8 @@ class SonderkostController
      */
     public function saveLimits(Request $request, User $user)
     {
+        abort_unless(\Intranet\Modules\Schulkantine\Models\Season::datenSelbstForActive(), 403,
+            'Die Daten pflegt in dieser Saison die Verwaltung.');
         $actor = $request->user();
         abort_if($actor->id === $user->id, 403, 'Budget & Freigaben legen die Eltern fest, nicht man selbst.');
         abort_unless($this->mayEditFor($actor, $user), 403, 'Du darfst das für diese Person nicht festlegen.');

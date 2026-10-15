@@ -162,6 +162,7 @@
                             </div>
                         @endforeach
 
+                        @if (\Intranet\Modules\Schulkantine\Http\Controllers\ChipController::eigeneChips())
                         {{-- Eigene Chips: entfernbar (nur wer sie verwalten darf) --}}
                         @foreach ($m['ownChips'] as $chip)
                             <div class="mt-2 flex items-center justify-between gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2">
@@ -213,6 +214,9 @@
                             </form>
                             <p class="mt-1 text-xs" :class="ok ? 'text-green-600' : 'text-gray-500'" x-text="msg"></p>
                         </div>
+                        @endif
+                        @elseif ($m['schoolChips']->isEmpty())
+                            <p class="mt-2 text-sm text-gray-400">Noch kein Chip – Chips gibt die Schule aus.</p>
                         @endif
                     @endif
                 </div>

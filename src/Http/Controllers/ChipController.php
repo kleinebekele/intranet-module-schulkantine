@@ -27,6 +27,7 @@ class ChipController
     /** Einen weiteren EIGENEN Chip registrieren (kein Pfand). */
     public function register(Request $request, User $user)
     {
+        abort_unless(self::eigeneChips(), 403, 'Eigene Chips sind abgeschaltet – Chips gibt die Schule aus.');
         $actor = $request->user();
         abort_unless(self::mayManage($actor, $user), 403, 'Du darfst für diese Person keinen Chip registrieren. Chips von Kindern verwalten die Eltern.');
         $this->abortIfOgs($user);
@@ -59,6 +60,7 @@ class ChipController
     /** Einen EIGENEN Chip entfernen. Schul-Chips kann nur die Schule zurücknehmen. */
     public function remove(Request $request, NfcChip $chip)
     {
+        abort_unless(self::eigeneChips(), 403, 'Eigene Chips sind abgeschaltet – Chips gibt die Schule aus.');
         $actor = $request->user();
         abort_unless($chip->user && self::mayManage($actor, $chip->user), 403, 'Du darfst diesen Chip nicht entfernen.');
         abort_if($chip->isSchool(), 403, 'Ein Schul-Chip kann nur von der Schule zurückgenommen werden.');
@@ -67,6 +69,16 @@ class ChipController
         $chip->delete();
 
         return back()->with('status', 'Chip von „'.$name.'" entfernt.');
+    }
+
+    /**
+     * Dürfen Esser/Eltern eigene Chips anlegen? Aus, solange die Schule nur
+     * 125-kHz-Chips ausgibt, die privat niemand lesen kann. Für eine Schule mit
+     * NFC-Chips (13,56 MHz) per config('schulkantine.eigene_chips') = true wieder einschalten.
+     */
+    public static function eigeneChips(): bool
+    {
+        return (bool) config('schulkantine.eigene_chips', false);
     }
 
     /**

@@ -26,6 +26,7 @@ class Season extends Model
         'show_allergens',
         'show_diets',
         'ratings_enabled',
+        'daten_selbst',
         'hinweis_offen',
     ];
 
@@ -52,6 +53,7 @@ class Season extends Model
             'show_allergens' => 'boolean',
             'show_diets' => 'boolean',
             'ratings_enabled' => 'boolean',
+            'daten_selbst' => 'boolean',
         ];
     }
 
@@ -87,6 +89,21 @@ class Season extends Model
         }
 
         // Keine aktive Saison ODER Spalte fehlt (null) → Standard: erlaubt.
+        return $value === null ? true : (bool) $value;
+    }
+
+    /**
+     * Pflegen die Esser (bzw. Eltern) ihre Daten in der aktiven Saison selbst?
+     * Steuert Menüpunkt und Zugriff auf „Meine Daten". Fehlertolerant wie oben.
+     */
+    public static function datenSelbstForActive(): bool
+    {
+        try {
+            $value = static::where('is_active', true)->value('daten_selbst');
+        } catch (\Throwable $e) {
+            return true;
+        }
+
         return $value === null ? true : (bool) $value;
     }
 

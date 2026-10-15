@@ -223,6 +223,7 @@ class SeasonController
             'show_allergens' => $request->boolean('show_allergens'),
             'show_diets' => $request->boolean('show_diets'),
             'ratings_enabled' => $request->boolean('ratings_enabled'),
+            'daten_selbst' => $request->boolean('daten_selbst'),
             'hinweis_offen' => $hinweis === '' || $hinweis === Season::HINWEIS_OFFEN ? null : $hinweis,
         ];
     }

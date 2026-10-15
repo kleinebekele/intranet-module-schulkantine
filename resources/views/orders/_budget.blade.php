@@ -59,7 +59,7 @@
                 </label>
             </div>
             <p class="mt-2 text-[11px] text-gray-400">
-                Dauerhaft jetzt: {{ $bud['allgemein'] !== null ? $money($bud['allgemein']) : 'kein Limit' }} – auch unter „Meine Daten" einstellbar.
+                Dauerhaft jetzt: {{ $bud['allgemein'] !== null ? $money($bud['allgemein']) : 'kein Limit' }}@if (\Intranet\Modules\Schulkantine\Models\Season::datenSelbstForActive()) – auch unter „Meine Daten" einstellbar.@endif
                 <span x-show="geltung === 'woche'">Leer lassen = in dieser Woche wieder das dauerhafte Budget.</span>
                 <span x-show="geltung === 'dauerhaft'">Leer = 0 € (keine spontanen Käufe).</span>
             </p>
