@@ -977,7 +977,7 @@
                         <div class="border-r border-gray-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Name</div>
                         <template x-for="d in ovDays" :key="'kopf' + d.date">
                             <div class="border-r border-gray-100 px-3 py-2 font-bold"
-                                 :class="d.date === date ? 'bg-indigo-600 text-white' : 'text-gray-700'"
+                                 :class="d.date === date ? 'border-x-4 border-t-4 border-x-indigo-500 border-t-indigo-500 text-indigo-700' : 'text-gray-700'"
                                  x-text="d.weekday + ' ' + d.dayLabel"></div>
                         </template>
                     </div>
@@ -1004,7 +1004,7 @@
                             </div>
                             {{-- Tages-Spalten (bündig unter dem Kopf) --}}
                             <template x-for="d in ovDays" :key="d.date">
-                                <div class="border-r border-gray-100 px-3 py-2" :class="[p.mode === 'ogs' ? 'bg-indigo-50/20' : '', d.date === date ? 'bg-indigo-50' : '']">
+                                <div class="border-r border-gray-100 px-3 py-2" :class="[p.mode === 'ogs' ? 'bg-indigo-50/20' : '', d.date === date ? 'border-x-4 border-x-indigo-500' : '']">
                                     {{-- OGS: teilgenommen ja/nein --}}
                                     <template x-if="p.mode === 'ogs'">
                                         <span class="text-sm font-bold" :class="p.days[d.date] && p.days[d.date].ogs ? 'text-green-600' : 'text-gray-300'"
