@@ -53,13 +53,6 @@
                 </form>
             </div>
         @else
-            {{-- Mitte: unübersehbarer Hinweis in Signalfarbe --}}
-            <div class="flex flex-1 justify-center">
-                <div class="flex items-center gap-3 rounded-2xl border-4 border-amber-500 bg-amber-300 px-8 py-3 text-3xl font-extrabold text-gray-900 shadow-lg">
-                    <svg class="h-10 w-10 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/></svg>
-                    Bitte Chip auflegen, um zu bestellen
-                </div>
-            </div>
             <div x-show="chipUi" x-cloak class="flex items-center gap-3 rounded-xl bg-indigo-600 px-5 py-3 text-white shadow" :class="busy ? 'animate-pulse' : ''">
                 <svg class="h-8 w-8 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/></svg>
                 <div>
@@ -103,6 +96,14 @@
                 'terminal' => true,
                 'gast' => true,
             ])
+
+            {{-- Unter dem Speiseplan, mittig: unübersehbarer Hinweis in Signalfarbe --}}
+            <div class="mt-6 flex justify-center">
+                <div class="flex items-center gap-3 rounded-2xl border-4 border-amber-500 bg-amber-300 px-8 py-3 text-3xl font-extrabold text-gray-900 shadow-lg">
+                    <svg class="h-10 w-10 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/></svg>
+                    Bitte Chip auflegen, um zu bestellen
+                </div>
+            </div>
 
             @if ($simChips->isNotEmpty())
                 {{-- Nur lokal (APP_ENV=local): Chip-Auswahl zum Testen ohne Leser. --}}
