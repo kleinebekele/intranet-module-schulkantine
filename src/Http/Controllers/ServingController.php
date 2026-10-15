@@ -1672,7 +1672,7 @@ class ServingController
         $ordersByUser = Order::where('season_id', $season->id)
             ->whereBetween('date', [$weekStart, $weekEnd])
             ->whereNotNull('category_id')->where('status', Order::STATUS_ORDERED)
-            ->with('dish')->get()->groupBy('user_id');
+            ->with('dish', 'menuDay')->get()->groupBy('user_id');
 
         // OGS-Teilnahme je Öffnungstag (Set der user_ids).
         $attendingByDay = [];
@@ -1702,9 +1702,14 @@ class ServingController
                 if ($isOgs) {
                     $daysData[$ds] = ['ogs' => $attendingByDay[$ds]->has($u->id)];
                 } else {
-                    $daysData[$ds] = ['dishes' => $userOrders
+                    // Je bestelltem Menü ein Posten mit Menünamen, Einzelgerichte ohne.
+                    $daysData[$ds] = ['posten' => $userOrders
                         ->filter(fn (Order $o) => $o->date->toDateString() === $ds)
-                        ->map(fn (Order $o) => $o->dish?->name)->filter()->values()->all()];
+                        ->groupBy(fn (Order $o) => $o->menu_day_id ?? 'einzeln')
+                        ->map(fn ($gruppe) => [
+                            'menu' => $gruppe->first()->menuDay?->name,
+                            'dishes' => $gruppe->map(fn (Order $o) => $o->dish?->name)->filter()->values()->all(),
+                        ])->sortBy(fn ($po) => $po['menu'] === null)->values()->all()];
                 }
             }
 

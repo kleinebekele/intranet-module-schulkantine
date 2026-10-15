@@ -972,42 +972,60 @@
 
             <template x-if="!ovLoading && ovDays.length">
                 <div class="text-sm">
-                    <template x-for="p in ovFiltered" :key="p.user_id">
-                        <div class="grid border-b border-gray-100" :style="ovGridStyle">
-                            {{-- Name (Spalte = KW-Box-Breite) --}}
+                    {{-- Kopf: Tage der Woche, bleibt beim Scrollen stehen; der gewählte Tag ist hervorgehoben. --}}
+                    <div class="sticky top-0 z-10 grid border-b-2 border-gray-300 bg-white shadow-sm" :style="ovGridStyle">
+                        <div class="border-r border-gray-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Name</div>
+                        <template x-for="d in ovDays" :key="'kopf' + d.date">
+                            <div class="border-r border-gray-100 px-3 py-2 font-bold"
+                                 :class="d.date === date ? 'bg-indigo-600 text-white' : 'text-gray-700'"
+                                 x-text="d.weekday + ' ' + d.dayLabel"></div>
+                        </template>
+                    </div>
+                    <template x-for="(p, i) in ovFiltered" :key="p.user_id">
+                        <div class="grid border-b border-gray-100" :class="i % 2 ? 'bg-gray-100/70' : 'bg-white'" :style="ovGridStyle">
+                            {{-- Name, darunter Gruppe/Klasse/Auswertung --}}
                             <div class="border-r border-gray-200 px-3 py-2" :class="p.mode === 'ogs' ? 'bg-indigo-50/50' : ''">
-                                {{-- Ohne Essensvertrag kein Sprung in die Ausgabe – die Person darf nicht bestellen. --}}
-                                <button type="button" x-show="p.vertrag" @click="ovPick(p)" title="In der Ausgabe anzeigen"
-                                        class="text-left font-semibold text-indigo-700 hover:underline" x-text="p.name"></button>
-                                <span x-show="!p.vertrag" class="font-semibold text-gray-500" x-text="p.name"></span>
-                                <span x-show="!p.vertrag" class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">kein Essensvertrag</span>
-                                <span class="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-gray-500" x-text="p.group"></span>
-                                <span x-show="p.klasse" class="ml-1 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700" x-text="'Kl. ' + p.klasse"></span>
-                                {{-- Auswertung nur, wenn der Aufruf auch durchginge. --}}
-                                @if ($darfAuswertung)
-                                    <a :href="reportUrl(p.user_id)" target="_blank" rel="noopener" title="Auswertung öffnen"
-                                       class="ml-1 text-xs text-gray-400 hover:text-indigo-600">📊</a>
-                                @endif
+                                <div>
+                                    {{-- Ohne Essensvertrag kein Sprung in die Ausgabe – die Person darf nicht bestellen. --}}
+                                    <button type="button" x-show="p.vertrag" @click="ovPick(p)" title="In der Ausgabe anzeigen"
+                                            class="text-left font-semibold text-indigo-700 hover:underline" x-text="p.name"></button>
+                                    <span x-show="!p.vertrag" class="font-semibold text-gray-500" x-text="p.name"></span>
+                                </div>
+                                <div class="mt-0.5 flex flex-wrap items-center gap-1">
+                                    <span x-show="!p.vertrag" class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">kein Essensvertrag</span>
+                                    <span class="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-gray-500" x-text="p.group"></span>
+                                    <span x-show="p.klasse" class="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700" x-text="'Kl. ' + p.klasse"></span>
+                                    {{-- Auswertung nur, wenn der Aufruf auch durchginge. --}}
+                                    @if ($darfAuswertung)
+                                        <a :href="reportUrl(p.user_id)" target="_blank" rel="noopener" title="Auswertung öffnen"
+                                           class="text-xs text-gray-400 hover:text-indigo-600">📊</a>
+                                    @endif
+                                </div>
                             </div>
-                            {{-- Tages-Spalten (bündig unter den Header-Tagen) --}}
+                            {{-- Tages-Spalten (bündig unter dem Kopf) --}}
                             <template x-for="d in ovDays" :key="d.date">
-                                <div class="border-r border-gray-100 px-3 py-2" :class="p.mode === 'ogs' ? 'bg-indigo-50/20' : ''">
+                                <div class="border-r border-gray-100 px-3 py-2" :class="[p.mode === 'ogs' ? 'bg-indigo-50/20' : '', d.date === date ? 'bg-indigo-50' : '']">
                                     {{-- OGS: teilgenommen ja/nein --}}
                                     <template x-if="p.mode === 'ogs'">
                                         <span class="text-sm font-bold" :class="p.days[d.date] && p.days[d.date].ogs ? 'text-green-600' : 'text-gray-300'"
                                               x-text="p.days[d.date] && p.days[d.date].ogs ? '✓ isst' : '–'"></span>
                                     </template>
-                                    {{-- Vorbesteller: die vorbestellten Gerichte --}}
+                                    {{-- Vorbesteller: je Menü der Menüname, darunter die Gerichte --}}
                                     <template x-if="p.mode !== 'ogs'">
                                         <div>
-                                            <template x-if="p.days[d.date] && p.days[d.date].dishes.length">
-                                                <div class="space-y-0.5">
-                                                    <template x-for="name in p.days[d.date].dishes" :key="name">
-                                                        <div class="text-gray-700" x-text="name"></div>
+                                            <template x-if="p.days[d.date] && p.days[d.date].posten.length">
+                                                <div class="space-y-1">
+                                                    <template x-for="(po, k) in p.days[d.date].posten" :key="k">
+                                                        <div>
+                                                            <div x-show="po.menu" class="text-[11px] font-bold uppercase tracking-wide text-emerald-700" x-text="po.menu"></div>
+                                                            <template x-for="name in po.dishes" :key="name">
+                                                                <div class="text-gray-700" x-text="name"></div>
+                                                            </template>
+                                                        </div>
                                                     </template>
                                                 </div>
                                             </template>
-                                            <span x-show="!p.days[d.date] || !p.days[d.date].dishes.length" x-cloak class="text-gray-300">–</span>
+                                            <span x-show="!p.days[d.date] || !p.days[d.date].posten.length" x-cloak class="text-gray-300">–</span>
                                         </div>
                                     </template>
                                 </div>
