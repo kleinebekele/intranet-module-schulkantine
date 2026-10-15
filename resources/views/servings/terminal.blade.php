@@ -806,7 +806,7 @@
                 @foreach ($week['days'] as $wd)
                     {{-- Ganze Tages-Zelle klickbar: springt auf diesen Tag (wie Kalenderauswahl). --}}
                     <button type="button" @click="gotoDate('{{ $wd['date'] }}')"
-                            class="flex min-w-[9rem] flex-1 flex-col px-3 py-1 text-left transition hover:bg-indigo-100/70 {{ $wd['isWorking'] ? 'bg-indigo-50/60' : '' }}">
+                            class="flex min-w-[9rem] flex-1 flex-col px-3 py-1 text-left transition hover:bg-indigo-100/70 {{ $wd['isWorking'] ? 'ring-4 ring-inset ring-indigo-500' : '' }}">
                         <div class="flex items-baseline justify-between">
                             <span class="text-sm font-semibold {{ $wd['isWorking'] ? 'text-indigo-700' : 'text-gray-700' }}">{{ $wd['weekday'] }} {{ $wd['dayLabel'] }}</span>
                         </div>
@@ -972,15 +972,6 @@
 
             <template x-if="!ovLoading && ovDays.length">
                 <div class="text-sm">
-                    {{-- Kopf: Tage der Woche, bleibt beim Scrollen stehen; der gewählte Tag ist hervorgehoben. --}}
-                    <div class="sticky top-0 z-10 grid border-b-2 border-gray-300 bg-white shadow-sm" :style="ovGridStyle">
-                        <div class="border-r border-gray-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Name</div>
-                        <template x-for="d in ovDays" :key="'kopf' + d.date">
-                            <div class="border-r border-gray-100 px-3 py-2 font-bold"
-                                 :class="d.date === date ? 'border-x-4 border-t-4 border-x-indigo-500 border-t-indigo-500 text-indigo-700' : 'text-gray-700'"
-                                 x-text="d.weekday + ' ' + d.dayLabel"></div>
-                        </template>
-                    </div>
                     <template x-for="(p, i) in ovFiltered" :key="p.user_id">
                         <div class="grid border-b border-gray-100" :class="i % 2 ? 'bg-gray-100/70' : 'bg-white'" :style="ovGridStyle">
                             {{-- Name, darunter Gruppe/Klasse/Auswertung --}}
