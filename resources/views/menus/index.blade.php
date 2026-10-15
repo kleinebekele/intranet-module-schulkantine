@@ -33,9 +33,9 @@
         @else
             @php $dishesByCat = $dishes->groupBy(fn ($d) => $d->category?->name ?? 'Ohne Kategorie'); @endphp
 
-            {{-- Wochen-Navigation --}}
-            <div class="mb-4 flex items-center justify-between gap-4">
-                <div>
+            {{-- Wochen-Navigation: drei Spalten, die KW steht immer genau mittig – auch wenn ein Knopf fehlt. --}}
+            <div class="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+                <div class="justify-self-start">
                     @if ($canPrev)
                         <a href="{{ route('module.schulkantine.menus.index', ['week' => $prevWeek]) }}"
                            class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">‹ Vorige Woche</a>
@@ -45,7 +45,7 @@
                     <div class="text-sm font-semibold text-gray-800">KW {{ $weekStart->isoWeek() }} · {{ $weekStart->format('d.m.') }} – {{ $weekEnd->format('d.m.Y') }}</div>
                     <div class="text-xs text-gray-400">Saison „{{ $season->name }}"</div>
                 </div>
-                <div>
+                <div class="justify-self-end">
                     @if ($canNext)
                         <a href="{{ route('module.schulkantine.menus.index', ['week' => $nextWeek]) }}"
                            class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Nächste Woche ›</a>

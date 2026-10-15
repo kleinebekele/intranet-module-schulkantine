@@ -44,9 +44,9 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             Es ist keine Saison aktiv – aktuell kann nicht bestellt werden.
         </div>
     @else
-        {{-- Wochen-Navigation --}}
-        <div class="mb-4 flex items-center justify-between gap-4">
-            <div>
+        {{-- Wochen-Navigation: drei Spalten, die KW steht immer genau mittig – auch wenn ein Knopf fehlt. --}}
+        <div class="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+            <div class="justify-self-start">
                 @if ($canPrev)
                     <a href="{{ route($routen['woche'], ['week' => $prevWeek]) }}"
                        class="inline-flex items-center gap-1 border border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 {{ $t('rounded-lg px-3 py-2 text-sm', 'rounded-xl px-6 py-4 text-lg shadow-sm') }}">‹<span class="hidden sm:inline"> Vorige Woche</span></a>
@@ -56,7 +56,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                 <div class="font-semibold text-gray-800 {{ $t('text-sm', 'text-xl') }}">KW {{ $weekStart->isoWeek() }} · {{ $weekStart->format('d.m.') }} – {{ $weekEnd->format('d.m.Y') }}</div>
                 <div class="text-gray-400 {{ $t('text-xs', 'text-sm') }}">Saison „{{ $season->name }}"</div>
             </div>
-            <div>
+            <div class="justify-self-end">
                 @if ($canNext)
                     <a href="{{ route($routen['woche'], ['week' => $nextWeek]) }}"
                        class="inline-flex items-center gap-1 border border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 {{ $t('rounded-lg px-3 py-2 text-sm', 'rounded-xl px-6 py-4 text-lg shadow-sm') }}"><span class="hidden sm:inline">Nächste Woche </span>›</a>
