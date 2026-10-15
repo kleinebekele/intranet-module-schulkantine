@@ -206,6 +206,7 @@ class SeasonController
             'opening_weekdays' => ['array'],
             'opening_weekdays.*' => [Rule::in(['1', '2', '3', '4', '5', '6', '7'])],
             'hinweis_offen' => ['nullable', 'string', 'max:1000'],
+            'allergie_hinweis' => ['nullable', 'string', 'max:2000'],
         ]);
         // Unverändert der Standardtext → nichts speichern, damit eine spätere Änderung des Standards greift.
         $hinweis = trim((string) $request->input('hinweis_offen', ''));
@@ -224,6 +225,7 @@ class SeasonController
             'show_diets' => $request->boolean('show_diets'),
             'ratings_enabled' => $request->boolean('ratings_enabled'),
             'daten_selbst' => $request->boolean('daten_selbst'),
+            'allergie_hinweis' => trim((string) $request->input('allergie_hinweis', '')) ?: null,
             'hinweis_offen' => $hinweis === '' || $hinweis === Season::HINWEIS_OFFEN ? null : $hinweis,
         ];
     }

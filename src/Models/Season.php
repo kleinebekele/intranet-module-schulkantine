@@ -27,6 +27,7 @@ class Season extends Model
         'show_diets',
         'ratings_enabled',
         'daten_selbst',
+        'allergie_hinweis',
         'hinweis_offen',
     ];
 

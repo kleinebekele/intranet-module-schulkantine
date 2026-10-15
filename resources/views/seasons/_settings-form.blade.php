@@ -145,6 +145,15 @@
                    class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
             Esser pflegen ihre Allergien selbst
         </label>
+        <x-input-label for="allergie_hinweis" value="Hinweis zu Allergenen" class="mt-4" />
+        <p class="mt-0.5 text-xs text-gray-400">
+            Nur wenn die Esser ihre Allergien nicht selbst pflegen: erscheint bei „Essen bestellen" hinter der Kachel
+            „Fragen zu Allergenen?". Leer = keine Kachel.
+        </p>
+        <textarea id="allergie_hinweis" name="allergie_hinweis" rows="3"
+                  placeholder="z. B. Bitte melden Sie Allergien und Unverträglichkeiten im Sekretariat."
+                  class="mt-2 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ old('allergie_hinweis', $season->allergie_hinweis) }}</textarea>
+        <x-input-error :messages="$errors->get('allergie_hinweis')" class="mt-2" />
     </div>
 
     <div class="border-t border-gray-100 pt-5">
