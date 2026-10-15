@@ -1715,6 +1715,7 @@ class ServingController
                 'mode' => $isOgs ? 'ogs' : 'menue',
                 'group' => $group?->name,
                 'klasse' => self::klasse($u),
+                'vertrag' => \Intranet\Modules\Schulkantine\Support\Essensvertrag::hat($u),
                 'days' => $daysData,
             ];
         })->values();

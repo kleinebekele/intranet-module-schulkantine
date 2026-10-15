@@ -722,6 +722,7 @@
             // Person zeigen, als hätte sie den Chip aufgelegt. Immer die Vorbesteller-
             // Ansicht – in der OGS-Ansicht würde ein Treffer sofort als abgeholt gebucht.
             async ovPick(p) {
+                if (! p.vertrag) return;
                 this.ovSearchOpen = false;
                 this.mode = 'vorbesteller';
                 await this.zeigePerson(p.user_id);
@@ -975,8 +976,11 @@
                         <div class="grid border-b border-gray-100" :style="ovGridStyle">
                             {{-- Name (Spalte = KW-Box-Breite) --}}
                             <div class="border-r border-gray-200 px-3 py-2" :class="p.mode === 'ogs' ? 'bg-indigo-50/50' : ''">
-                                <button type="button" @click="ovPick(p)" title="In der Ausgabe anzeigen"
+                                {{-- Ohne Essensvertrag kein Sprung in die Ausgabe – die Person darf nicht bestellen. --}}
+                                <button type="button" x-show="p.vertrag" @click="ovPick(p)" title="In der Ausgabe anzeigen"
                                         class="text-left font-semibold text-indigo-700 hover:underline" x-text="p.name"></button>
+                                <span x-show="!p.vertrag" class="font-semibold text-gray-500" x-text="p.name"></span>
+                                <span x-show="!p.vertrag" class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">kein Essensvertrag</span>
                                 <span class="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-gray-500" x-text="p.group"></span>
                                 <span x-show="p.klasse" class="ml-1 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700" x-text="'Kl. ' + p.klasse"></span>
                                 {{-- Auswertung nur, wenn der Aufruf auch durchginge. --}}
