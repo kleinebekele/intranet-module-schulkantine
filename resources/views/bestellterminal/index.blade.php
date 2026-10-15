@@ -31,7 +31,7 @@
                 @if ($besteller)
                     <div class="text-sm text-gray-500">Angemeldet: <span class="font-semibold text-gray-800">{{ $besteller->name }}</span></div>
                 @else
-                    <div class="text-sm font-semibold text-indigo-700">Bitte Chip auflegen, um zu bestellen</div>
+                    <div class="mt-1 inline-block rounded-lg bg-indigo-600 px-4 py-2 text-2xl font-bold text-white shadow">Bitte Chip auflegen, um zu bestellen</div>
                 @endif
             </div>
         </div>
