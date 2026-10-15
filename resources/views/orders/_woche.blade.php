@@ -21,7 +21,8 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
     // Fleischart-Symbole eines Menüs (aus seinen Gerichten, ohne Doppelte).
     $menuSymbole = fn ($md) => $md->slots->map(fn ($s) => $s->dish?->symbol())->filter()->unique()->join(' ');
     $menuArten = fn ($md) => $md->slots->map(fn ($s) => $s->dish?->fleischartName())->filter()->unique()->join(', ');
-    $money = fn ($v) => number_format((float) $v, 2, ',', '.').' €';
+    // Ohne angemeldeten Besteller (Terminal ohne Chip) keine Preise – sie hängen am Vertrag.
+    $money = $gast ? fn ($v) => '' : fn ($v) => number_format((float) $v, 2, ',', '.').' €';
 @endphp
 
 <div class="max-w-full" id="orders-content">
