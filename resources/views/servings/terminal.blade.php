@@ -96,7 +96,7 @@
             hasOgs: @js($hasOgs ?? false),   // gibt/gab es OGS in der Saison? (steuert den Umschalter)
             // „Übersicht"-Ansicht (Männchen-Button): Wochen-Matrix aller Esser.
             ovLoaded: false, ovLoading: false, ovPeople: [], ovDays: [],
-            ovSearchOpen: false, ovQuery: '',
+            ovSearchOpen: false, ovQuery: '', ovKlasse: '',
             ovReturnMode: 'vorbesteller',  // Ansicht, aus der die Übersicht geöffnet wurde
             sbw: 0,   // Scrollleisten-Breite (für die bündige Übersicht-Matrix)
             rcw: 80,  // Breite der rechten Header-Steuerung (› + Übersicht-Button)
@@ -708,11 +708,20 @@
             ovKey(ch) { this.ovQuery += (ch === ' ' ? ' ' : ch.toLowerCase()); },
             ovBackspace() { this.ovQuery = this.ovQuery.slice(0, -1); },
             ovClear() { this.ovQuery = ''; },
+            // Filter zurücksetzen: Suchtext UND Klasse.
+            ovReset() { this.ovQuery = ''; this.ovKlasse = ''; },
+            // Klassen-Knöpfe: alle Klassen der Liste, natürlich sortiert (2a vor 10b).
+            get ovKlassen() {
+                return [...new Set(this.ovPeople.map(p => p.klasse).filter(Boolean))]
+                    .sort((a, b) => a.localeCompare(b, 'de', { numeric: true }));
+            },
+            ovKlasseWaehlen(k) { this.ovKlasse = this.ovKlasse === k ? '' : k; },
             get ovFiltered() {
+                const liste = this.ovKlasse ? this.ovPeople.filter(p => p.klasse === this.ovKlasse) : this.ovPeople;
                 const q = this.ovQuery.trim().toLowerCase();
-                if (q.length < 3) return this.ovPeople;
+                if (q.length < 3) return liste;
                 // Auch nach Klasse filterbar ("5a").
-                return this.ovPeople.filter(p => (p.name || '').toLowerCase().includes(q) || (p.klasse || '').toLowerCase() === q);
+                return liste.filter(p => (p.name || '').toLowerCase().includes(q) || (p.klasse || '').toLowerCase() === q);
             },
             // Raster: Namensspalte 16rem (wie die KW-Box), dann je Öffnungstag eine
             // gleich breite Spalte – bündig zu den Header-Tagen.
@@ -960,10 +969,11 @@
     <main x-show="mode === 'overview'" x-cloak class="flex min-h-0 flex-1 flex-col bg-gray-50">
         {{-- Aktiver Filter: dicker Knopf zum Zurücksetzen, ohne die Tastatur
              unten erst wieder öffnen zu müssen. --}}
-        <div x-show="ovQuery.trim() !== ''" x-cloak
+        <div x-show="ovQuery.trim() !== '' || ovKlasse" x-cloak
              class="flex items-center justify-between gap-4 border-b border-indigo-200 bg-indigo-50 px-4 py-2">
-            <span class="truncate text-lg text-indigo-800">Gefiltert nach: <strong x-text="ovQuery"></strong></span>
-            <button type="button" @click="ovClear()"
+            <span class="truncate text-lg text-indigo-800">Gefiltert nach:
+                <strong x-show="ovKlasse" x-text="'Klasse ' + ovKlasse"></strong><span x-show="ovKlasse && ovQuery.trim()"> · </span><strong x-text="ovQuery"></strong></span>
+            <button type="button" @click="ovReset()"
                     class="shrink-0 rounded-xl bg-indigo-600 px-6 py-3 text-lg font-bold text-white shadow hover:bg-indigo-700">✕ Suche zurücksetzen</button>
         </div>
         <div class="min-h-0 flex-1 overflow-y-scroll overflow-x-hidden pb-20" :style="'padding-right:' + rcw + 'px'">
@@ -1287,6 +1297,15 @@
                 <span x-show="!ovQuery" x-cloak class="text-gray-400">Name eingeben – ab dem 3. Buchstaben filtert die Liste …</span>
             </div>
             <button type="button" @click="toggleOvSearch()" class="rounded-xl px-3 py-2 text-xl text-gray-400 hover:bg-gray-100">✕</button>
+        </div>
+        {{-- Klassen-Filter: ein Knopf je Klasse, nochmal tippen hebt ihn auf. --}}
+        <div x-show="ovKlassen.length" class="mb-3 flex flex-wrap gap-1.5">
+            <template x-for="k in ovKlassen" :key="'kl'+k">
+                <button type="button" @click="ovKlasseWaehlen(k)"
+                        class="h-11 min-w-[3.5rem] rounded-lg px-3 text-base font-bold shadow-sm"
+                        :class="ovKlasse === k ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'"
+                        x-text="k"></button>
+            </template>
         </div>
         <div class="select-none space-y-2">
             <template x-for="(row, i) in keyboardRows" :key="'ov'+i">
