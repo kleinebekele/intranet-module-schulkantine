@@ -1674,6 +1674,12 @@ class ServingController
             ->whereNotNull('category_id')->where('status', Order::STATUS_ORDERED)
             ->with('dish', 'menuDay')->get()->groupBy('user_id');
 
+        // Wer in der Woche etwas abgeholt hat (auch spontan) – für den Filter „nur Besteller".
+        $abgeholt = Serving::where('season_id', $season->id)
+            ->whereBetween('date', [$weekStart, $weekEnd])
+            ->where('declined', false)
+            ->distinct()->pluck('user_id')->flip();
+
         // OGS-Teilnahme je Öffnungstag (Set der user_ids).
         $attendingByDay = [];
         foreach ($days as $d) {
@@ -1692,7 +1698,7 @@ class ServingController
         $groups = CustomerGroup::all()->keyBy('role_id');
         $eaters = User::whereIn('id', $eaterIds)->with('roles')->orderBy('name')->get();
 
-        $people = $eaters->map(function (User $u) use ($groups, $dayStrs, $ordersByUser, $attendingByDay) {
+        $people = $eaters->map(function (User $u) use ($groups, $dayStrs, $ordersByUser, $attendingByDay, $abgeholt) {
             $group = CustomerGroup::forUser($u, $groups);
             $isOgs = $group?->ordering_mode === CustomerGroup::MODE_JA_NEIN;
             $userOrders = $ordersByUser->get($u->id, collect());
@@ -1721,6 +1727,9 @@ class ServingController
                 'group' => $group?->name,
                 'klasse' => self::klasse($u),
                 'vertrag' => \Intranet\Modules\Schulkantine\Support\Essensvertrag::hat($u),
+                // An irgendeinem Tag der Woche bestellt, als OGS angemeldet oder etwas abgeholt.
+                'besteller' => $userOrders->isNotEmpty() || $abgeholt->has($u->id)
+                    || collect($dayStrs)->contains(fn ($ds) => $attendingByDay[$ds]->has($u->id)),
                 'days' => $daysData,
             ];
         })->values();

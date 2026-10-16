@@ -96,7 +96,7 @@
             hasOgs: @js($hasOgs ?? false),   // gibt/gab es OGS in der Saison? (steuert den Umschalter)
             // „Übersicht"-Ansicht (Männchen-Button): Wochen-Matrix aller Esser.
             ovLoaded: false, ovLoading: false, ovPeople: [], ovDays: [],
-            ovSearchOpen: false, ovQuery: '', ovKlasse: '',
+            ovSearchOpen: false, ovQuery: '', ovKlasse: '', ovNurVertrag: false, ovNurBesteller: false,
             ovReturnMode: 'vorbesteller',  // Ansicht, aus der die Übersicht geöffnet wurde
             sbw: 0,   // Scrollleisten-Breite (für die bündige Übersicht-Matrix)
             rcw: 80,  // Breite der rechten Header-Steuerung (› + Übersicht-Button)
@@ -709,7 +709,8 @@
             ovBackspace() { this.ovQuery = this.ovQuery.slice(0, -1); },
             ovClear() { this.ovQuery = ''; },
             // Filter zurücksetzen: Suchtext UND Klasse.
-            ovReset() { this.ovQuery = ''; this.ovKlasse = ''; },
+            ovReset() { this.ovQuery = ''; this.ovKlasse = ''; this.ovNurVertrag = false; this.ovNurBesteller = false; },
+            get ovFilterAktiv() { return this.ovQuery.trim() !== '' || !!this.ovKlasse || this.ovNurVertrag || this.ovNurBesteller; },
             // Klassen-Knöpfe: alle Klassen der Liste, natürlich sortiert (2a vor 10b).
             get ovKlassen() {
                 return [...new Set(this.ovPeople.map(p => p.klasse).filter(Boolean))]
@@ -717,7 +718,8 @@
             },
             ovKlasseWaehlen(k) { this.ovKlasse = this.ovKlasse === k ? '' : k; },
             get ovFiltered() {
-                const liste = this.ovKlasse ? this.ovPeople.filter(p => p.klasse === this.ovKlasse) : this.ovPeople;
+                const liste = this.ovPeople.filter(p => (!this.ovKlasse || p.klasse === this.ovKlasse)
+                    && (!this.ovNurVertrag || p.vertrag) && (!this.ovNurBesteller || p.besteller));
                 const q = this.ovQuery.trim().toLowerCase();
                 if (q.length < 3) return liste;
                 // Auch nach Klasse filterbar ("5a").
@@ -969,11 +971,21 @@
     <main x-show="mode === 'overview'" x-cloak class="flex min-h-0 flex-1 flex-col bg-gray-50">
         {{-- Aktiver Filter: dicker Knopf zum Zurücksetzen, ohne die Tastatur
              unten erst wieder öffnen zu müssen. --}}
-        <div x-show="ovQuery.trim() !== '' || ovKlasse" x-cloak
-             class="flex items-center justify-between gap-4 border-b border-indigo-200 bg-indigo-50 px-4 py-2">
-            <span class="truncate text-lg text-indigo-800">Gefiltert nach:
-                <strong x-show="ovKlasse" x-text="'Klasse ' + ovKlasse"></strong><span x-show="ovKlasse && ovQuery.trim()"> · </span><strong x-text="ovQuery"></strong></span>
-            <button type="button" @click="ovReset()"
+        {{-- Filterleiste: immer da (Vertrag/Besteller), Suchtext und Klasse erscheinen, sobald gesetzt. --}}
+        <div class="flex items-center justify-between gap-4 border-b border-indigo-200 bg-indigo-50 px-4 py-2">
+            <div class="flex min-w-0 flex-wrap items-center gap-3">
+                <span x-show="ovQuery.trim() !== '' || ovKlasse" x-cloak class="truncate text-lg text-indigo-800">Gefiltert nach:
+                    <strong x-show="ovKlasse" x-text="'Klasse ' + ovKlasse"></strong><span x-show="ovKlasse && ovQuery.trim()"> · </span><strong x-text="ovQuery"></strong></span>
+                <button type="button" @click="ovNurVertrag = ! ovNurVertrag"
+                        class="inline-flex items-center gap-2 rounded-xl border-2 px-4 py-2 text-base font-semibold"
+                        :class="ovNurVertrag ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-indigo-200 bg-white text-indigo-700'">
+                    <span x-text="ovNurVertrag ? '☑' : '☐'"></span> mit Vertrag</button>
+                <button type="button" @click="ovNurBesteller = ! ovNurBesteller"
+                        class="inline-flex items-center gap-2 rounded-xl border-2 px-4 py-2 text-base font-semibold"
+                        :class="ovNurBesteller ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-indigo-200 bg-white text-indigo-700'">
+                    <span x-text="ovNurBesteller ? '☑' : '☐'"></span> nur Besteller</button>
+            </div>
+            <button type="button" x-show="ovFilterAktiv" x-cloak @click="ovReset()"
                     class="shrink-0 rounded-xl bg-indigo-600 px-6 py-3 text-lg font-bold text-white shadow hover:bg-indigo-700">✕ Suche zurücksetzen</button>
         </div>
         <div class="min-h-0 flex-1 overflow-y-scroll overflow-x-hidden pb-20" :style="'padding-right:' + rcw + 'px'">
