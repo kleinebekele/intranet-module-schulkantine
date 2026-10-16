@@ -169,7 +169,8 @@ class MenuController
         if (! $season->isOpenOn($date)) {
             return back()->withErrors(['date' => 'Die Mensa hat an diesem Tag nicht geöffnet.']);
         }
-        if ($this->weekLocked($season, $date)) {
+        // Gerichte nachtragen geht auch in festgeschriebenen Wochen – nur vergangene sind gelaufen.
+        if ($this->weekPast($date)) {
             return $this->redirectToWeek($date)->withErrors(['menu' => $this->lockedMessage()]);
         }
 

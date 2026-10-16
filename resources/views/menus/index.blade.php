@@ -10,6 +10,8 @@
         // Vergangene Wochen sind gelaufen: wie festgeschrieben, ohne Freigabe-Knöpfe.
         $weekPast = $weekPast ?? false;
         $gesperrt = $weekReleased || $weekPast;
+        // Festgeschriebene (nicht vergangene) Woche: Gerichte lassen sich über „Gericht nachtragen" trotzdem ergänzen.
+        $nachtragbar = $weekReleased && ! $weekPast && $darfGerichtHinzufuegen;
     @endphp
     <x-slot name="header">
         <div class="flex items-center gap-2">
@@ -18,7 +20,7 @@
         </div>
     </x-slot>
 
-    <div class="max-w-full">
+    <div class="max-w-full" x-data="{ nachtragen: false }">
         {{-- Erfolgsmeldungen zeigt das App-Layout bereits global; hier nur Fehler. --}}
         @if ($errors->any())
             <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -111,6 +113,12 @@
                          solange es noch KEINE Bestellungen gibt (sonst würde man sie entwerten). --}}
                     @if ($weekHasOrders)
                         <span class="text-xs text-gray-400">🔒 bereits bestellt – die Woche ist festgeschrieben und nicht mehr bearbeitbar</span>
+                        @if ($nachtragbar)
+                            <button type="button" @click="nachtragen = ! nachtragen"
+                                    class="inline-flex items-center gap-1 rounded-md border border-indigo-300 bg-white px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50">
+                                <x-module-icon name="plus" class="text-sm" /> <span x-text="nachtragen ? 'Nachtragen beenden' : 'Gericht nachtragen'"></span>
+                            </button>
+                        @endif
                     @else
                         @if ($weekOverride !== 'held')
                             <form method="POST" action="{{ route('module.schulkantine.menus.release') }}">
@@ -259,10 +267,11 @@
                                             $addOptions = ($dishesByCategory[$category->id] ?? collect())->map(fn ($x) => ['id' => $x->id, 'name' => $x->name])->values();
                                         @endphp
                                         {{-- Freigegebene Woche: Kategorien ohne gesetztes Gericht komplett ausblenden. --}}
-                                        @if ($gesperrt && $catItems->isEmpty())
+                                        @if ($gesperrt && $catItems->isEmpty() && ! $nachtragbar)
                                             @continue
                                         @endif
                                         <fieldset class="rounded-lg border px-2 pb-2 {{ $catColor ? '' : 'border-gray-200' }}"
+                                                  @if ($gesperrt && $catItems->isEmpty()) x-show="nachtragen" x-cloak @endif
                                                   @if ($catColor) style="border-color: {{ $catColor }}; background-color: {{ $catColor }}1a;" @endif>
                                             <legend class="px-1 text-[11px] font-medium uppercase tracking-wide {{ $catColor ? '' : 'text-gray-400' }}"
                                                     @if ($catColor) style="color: {{ $catColor }};" @endif>{{ $category->name }}</legend>
@@ -288,7 +297,8 @@
 
                                             {{-- + hinzufügen: Such-Dropdown der Gerichte dieser Kategorie; Klick fügt hinzu.
                                                  In festgeschriebenen Wochen komplett ausgeblendet. --}}
-                                            @if (! $gesperrt && $darfGerichtHinzufuegen)
+                                            @if ((! $gesperrt || $nachtragbar) && $darfGerichtHinzufuegen)
+                                                <div @if ($gesperrt) x-show="nachtragen" x-cloak @endif>
                                                 <form method="POST" action="{{ route('module.schulkantine.menus.store') }}" class="relative mt-1.5"
                                                       x-data="{ open: false, query: '', options: @js($addOptions),
                                                                 get filtered() { const t = this.query.trim().toLowerCase(); const o = t ? this.options.filter(d => d.name.toLowerCase().includes(t)) : this.options; return o.slice(0, 50); } }"
@@ -317,6 +327,7 @@
                                                         ℹ️ Nur für spontane Abholung eingestellt – Gerichte dieser Kategorie erscheinen NICHT auf „Essen bestellen".
                                                     </p>
                                                 @endunless
+                                                </div>
                                             @endif
                                         </fieldset>
                                     @endforeach
