@@ -95,12 +95,13 @@
                 </form>
             </div>
         @else
-            <div x-show="chipUi" x-cloak class="flex items-center gap-3 rounded-xl bg-indigo-600 px-5 py-3 text-white shadow" :class="busy ? 'animate-pulse' : ''">
-                <svg class="h-8 w-8 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/></svg>
-                <div>
-                    <div class="text-lg font-semibold leading-tight">Chip auflegen</div>
-                    <div class="text-xs text-indigo-200">zum Bestellen</div>
-                </div>
+            {{-- Oben rechts (nur mit ?chip=an): Stand des alten COM-Lesers. Der Hinweis „Chip auflegen"
+                 steht unter dem Speiseplan. --}}
+            <div x-show="chipUi" x-cloak class="text-sm font-semibold">
+                <span x-show="serialOk" class="inline-block rounded-lg bg-green-100 px-3 py-2 text-green-800">✓ Chip-Leser verbunden</span>
+                <button type="button" x-show="! serialOk && hasSerial()" @click="serialConnect(true)"
+                        class="rounded-lg border border-indigo-300 bg-white px-3 py-2 text-indigo-700 hover:bg-indigo-50">COM-Leser verbinden</button>
+                <span x-show="! hasSerial()" class="inline-block rounded-lg bg-red-100 px-3 py-2 text-red-700">Browser kann keinen COM-Leser ansprechen</span>
             </div>
         @endif
     </header>
@@ -162,10 +163,6 @@
         </main>
     @endif
 
-    {{-- Alter COM-Leser (Web Serial): einmalig je Gerät freigeben, danach verbindet er sich selbst. --}}
-    <footer class="px-4 pb-3 text-right" x-show="chipUi && hasSerial() && ! serialOk" x-cloak>
-        <button type="button" @click="serialConnect(true)" class="text-xs text-gray-400 underline hover:text-gray-600">COM-Leser verbinden (alter Leser)</button>
-    </footer>
 </div>
 
 @include('schulkantine::partials.chip-bedienung')
