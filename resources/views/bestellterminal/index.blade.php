@@ -15,6 +15,29 @@
     </style>
 </head>
 <body class="min-h-full bg-gray-100 font-sans antialiased text-gray-800">
+    {{-- Rechter Rand in Prozent für Terminals mit Sichtblende (z. B. ?rand=20). Gemerkt für dieses
+         Browserfenster wie ?chip=an; ?rand=0 hebt ihn wieder auf. --}}
+    <script>
+        (function () {
+            const p = new URLSearchParams(location.search);
+            let rand = p.get('rand');
+            if (rand !== null) {
+                try { sessionStorage.setItem('kantine.rand', rand); } catch (e) {}
+                p.delete('rand');
+                history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : '') + location.hash);
+            } else {
+                try { rand = sessionStorage.getItem('kantine.rand'); } catch (e) {}
+            }
+            const n = Math.min(60, Math.max(0, parseFloat(rand) || 0));
+            if (n > 0) {
+                document.body.style.paddingRight = n + '%';
+                // Dialoge (fixed inset-0) ebenfalls vor der Blende enden lassen.
+                const st = document.createElement('style');
+                st.textContent = '.fixed.inset-0 { right: ' + n + '% !important; }';
+                document.head.appendChild(st);
+            }
+        })();
+    </script>
 
 @php
     $money = fn ($v) => number_format((float) $v, 2, ',', '.').' €';
