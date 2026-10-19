@@ -38,6 +38,25 @@
             }
         })();
     </script>
+    {{-- Mauszeiger ausblenden für Touch-Terminals (?zeiger=aus, zurück mit ?zeiger=an). Gemerkt wie ?rand. --}}
+    <script>
+        (function () {
+            const p = new URLSearchParams(location.search);
+            let zeiger = p.get('zeiger');
+            if (zeiger !== null) {
+                try { sessionStorage.setItem('kantine.zeiger', zeiger); } catch (e) {}
+                p.delete('zeiger');
+                history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : '') + location.hash);
+            } else {
+                try { zeiger = sessionStorage.getItem('kantine.zeiger'); } catch (e) {}
+            }
+            if (zeiger === 'aus') {
+                const st = document.createElement('style');
+                st.textContent = '*, *::before, *::after { cursor: none !important; }';
+                document.head.appendChild(st);
+            }
+        })();
+    </script>
 
 @php
     $money = fn ($v) => number_format((float) $v, 2, ',', '.').' €';
