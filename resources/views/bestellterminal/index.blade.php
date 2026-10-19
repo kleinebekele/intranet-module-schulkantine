@@ -63,6 +63,10 @@
 @endphp
 
 <div x-data="bestellTerminal" class="flex min-h-screen flex-col">
+    {{-- Abmeldung: sofort im Browser abdecken, nicht erst auf die (langsame) Antwort des Servers warten. --}}
+    <div x-show="abgemeldet" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-gray-100">
+        <div class="rounded-2xl border-4 border-amber-500 bg-amber-300 px-8 py-4 text-3xl font-extrabold text-gray-900 shadow-lg">Abgemeldet – bitte Chip auflegen</div>
+    </div>
 
     {{-- Kopfzeile --}}
     <header class="flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
@@ -86,7 +90,7 @@
                         <div class="text-lg font-bold text-indigo-700" id="month-total">{{ $money($monthTotal) }}</div>
                     </div>
                 @endif
-                <form method="POST" action="{{ route('kantine.bestellterminal.abmelden') }}" x-ref="abmelden">
+                <form method="POST" action="{{ route('kantine.bestellterminal.abmelden') }}" x-ref="abmelden" @submit="abgemeldet = true">
                     @csrf
                     <button type="submit" class="rounded-xl bg-indigo-600 px-6 py-3 text-lg font-semibold text-white shadow hover:bg-indigo-700">
                         <svg class="-ml-1 mr-1 inline h-6 w-6 align-[-5px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/></svg>Abmelden
@@ -179,6 +183,7 @@
             leerlauf: 30,
             warnAb: 10,
             rest: 30,
+            abgemeldet: false,   // deckt die Seite ab, sobald abgemeldet wird
             // Ohne Chip: nach so vielen Sekunden ohne Eingabe die Seite neu laden.
             neuLadenNach: 300,
             wedgeBuf: '',
@@ -198,11 +203,10 @@
                 if (this.angemeldet) {
                     // Abmeldung genau einmal abschicken – auf langsamen Geräten dauert sie ein paar
                     // Sekunden; der Zähler bleibt bei 0 statt weiterzulaufen und erneut zu senden.
-                    let abgemeldet = false;
                     setInterval(() => {
-                        if (abgemeldet) return;
+                        if (this.abgemeldet) return;
                         this.rest = Math.max(0, this.rest - 1);
-                        if (this.rest === 0) { abgemeldet = true; this.$refs.abmelden.submit(); }
+                        if (this.rest === 0) { this.abgemeldet = true; this.$refs.abmelden.submit(); }
                     }, 1000);
                 } else {
                     // Ohne Chip: nach Untätigkeit neu laden (Startwoche). Aus einer anderen Woche
