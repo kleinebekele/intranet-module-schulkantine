@@ -196,9 +196,13 @@
                 ['pointerdown', 'keydown', 'scroll', 'wheel'].forEach(ev =>
                     window.addEventListener(ev, () => { this.rest = this.leerlauf; }, { passive: true }));
                 if (this.angemeldet) {
+                    // Abmeldung genau einmal abschicken – auf langsamen Geräten dauert sie ein paar
+                    // Sekunden; der Zähler bleibt bei 0 statt weiterzulaufen und erneut zu senden.
+                    let abgemeldet = false;
                     setInterval(() => {
-                        this.rest--;
-                        if (this.rest <= 0) this.$refs.abmelden.submit();
+                        if (abgemeldet) return;
+                        this.rest = Math.max(0, this.rest - 1);
+                        if (this.rest === 0) { abgemeldet = true; this.$refs.abmelden.submit(); }
                     }, 1000);
                 } else {
                     // Ohne Chip: nach Untätigkeit neu laden (Startwoche). Aus einer anderen Woche
