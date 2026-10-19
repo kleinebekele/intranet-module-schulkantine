@@ -38,6 +38,17 @@
             }
         })();
     </script>
+    {{-- Schwache Kiosk-Rechner (XP + Supermium) zeichnen die Seite beim ersten Start oft nicht –
+         erst ein Neuladen (F5) hilft. Darum einmal je Browserfenster 8 s nach dem ersten Öffnen neu laden. --}}
+    <script>
+        (function () {
+            try {
+                if (sessionStorage.getItem('kantine.erstladen')) return;
+                sessionStorage.setItem('kantine.erstladen', '1');
+                setTimeout(function () { location.reload(); }, 8000);
+            } catch (e) {}
+        })();
+    </script>
     {{-- Mauszeiger ausblenden für Touch-Terminals (?zeiger=aus, zurück mit ?zeiger=an). Gemerkt wie ?rand. --}}
     <script>
         (function () {
