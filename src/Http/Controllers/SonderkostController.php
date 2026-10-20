@@ -118,18 +118,21 @@ class SonderkostController
             'walkin.*' => ['integer'],
         ]);
 
-        // Wochenbudget (allgemein).
-        $general = Budget::where('user_id', $user->id)->whereNull('week_start')->first();
-        if (! $request->filled('weekly_budget')) {
-            $general?->delete();
-        } else {
-            $amount = (float) $data['weekly_budget'];
-            $general
-                ? $general->update(['amount' => $amount])
-                : Budget::create(['user_id' => $user->id, 'week_start' => null, 'amount' => $amount]);
-        }
+        // Wochenbudget (allgemein) – nur, wenn es in dieser Saison Budgets gibt (sonst fehlt das
+        // Feld im Formular und ein leerer Wert würde ein gespeichertes Budget löschen).
+        if (Budget::aktiv()) {
+            $general = Budget::where('user_id', $user->id)->whereNull('week_start')->first();
+            if (! $request->filled('weekly_budget')) {
+                $general?->delete();
+            } else {
+                $amount = (float) $data['weekly_budget'];
+                $general
+                    ? $general->update(['amount' => $amount])
+                    : Budget::create(['user_id' => $user->id, 'week_start' => null, 'amount' => $amount]);
+            }
 
-        Budget::amAusgabeterminalSetzen($user->id, $request->boolean('am_ausgabeterminal'));
+            Budget::amAusgabeterminalSetzen($user->id, $request->boolean('am_ausgabeterminal'));
+        }
 
         // Kategorie-Freigaben (Zeile nur speichern, wenn eingeschränkt).
         $preorder = collect($request->input('preorder', []))->map(fn ($v) => (int) $v);
@@ -163,6 +166,7 @@ class SonderkostController
      */
     public function saveWeekBudget(Request $request, User $user)
     {
+        abort_unless(Budget::aktiv(), 403, 'Ein Wochenbudget gibt es in dieser Saison nicht.');
         $actor = $request->user();
         abort_if($actor->id === $user->id, 403, 'Das Budget legen die Eltern fest, nicht man selbst.');
         abort_unless($this->mayEditFor($actor, $user), 403, 'Du darfst das für diese Person nicht festlegen.');
@@ -215,6 +219,7 @@ class SonderkostController
      */
     public function ueberschreitungBestaetigen(Request $request, User $user, int $ueberschreitung)
     {
+        abort_unless(Budget::aktiv(), 403, 'Ein Wochenbudget gibt es in dieser Saison nicht.');
         $actor = $request->user();
         abort_if($actor->id === $user->id, 403, 'Das bestätigen die Eltern, nicht man selbst.');
         abort_unless($this->mayEditFor($actor, $user), 403, 'Du darfst das für diese Person nicht bestätigen.');

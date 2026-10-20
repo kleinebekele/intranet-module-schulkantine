@@ -27,6 +27,7 @@ class Season extends Model
         'show_diets',
         'ratings_enabled',
         'daten_selbst',
+        'budget_aktiv',
         'allergie_hinweis',
         'hinweis_offen',
     ];
@@ -55,6 +56,7 @@ class Season extends Model
             'show_diets' => 'boolean',
             'ratings_enabled' => 'boolean',
             'daten_selbst' => 'boolean',
+            'budget_aktiv' => 'boolean',
         ];
     }
 
@@ -101,6 +103,20 @@ class Season extends Model
     {
         try {
             $value = static::where('is_active', true)->value('daten_selbst');
+        } catch (\Throwable $e) {
+            return true;
+        }
+
+        return $value === null ? true : (bool) $value;
+    }
+
+    /**
+     * Können Eltern in der aktiven Saison ein Wochenbudget deckeln? Fehlertolerant wie oben.
+     */
+    public static function budgetAktivForActive(): bool
+    {
+        try {
+            $value = static::where('is_active', true)->value('budget_aktiv');
         } catch (\Throwable $e) {
             return true;
         }

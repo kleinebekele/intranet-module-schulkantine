@@ -63,10 +63,22 @@ class Budget extends Model
     }
 
     /**
+     * Gibt es in der aktiven Saison überhaupt Budgets? Aus = kein Limit für niemanden,
+     * keine Prüfung an der Ausgabe – abgerechnet wird trotzdem alles.
+     */
+    public static function aktiv(): bool
+    {
+        return Season::budgetAktivForActive();
+    }
+
+    /**
      * @return array{betrag: ?float, nurWoche: bool, allgemein: ?float}
      */
     public static function stand(int $userId, Carbon $weekStart): array
     {
+        if (! self::aktiv()) {
+            return ['betrag' => null, 'nurWoche' => false, 'allgemein' => null];
+        }
         $allgemein = self::weeklyAmount($userId) ?? (self::istKind($userId) ? 0.0 : null);
         $woche = static::where('user_id', $userId)->whereDate('week_start', $weekStart->toDateString())->value('amount');
 

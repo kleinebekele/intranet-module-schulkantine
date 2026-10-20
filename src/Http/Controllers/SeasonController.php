@@ -225,6 +225,7 @@ class SeasonController
             'show_diets' => $request->boolean('show_diets'),
             'ratings_enabled' => $request->boolean('ratings_enabled'),
             'daten_selbst' => $request->boolean('daten_selbst'),
+            'budget_aktiv' => $request->boolean('budget_aktiv'),
             'allergie_hinweis' => trim((string) $request->input('allergie_hinweis', '')) ?: null,
             'hinweis_offen' => $hinweis === '' || $hinweis === Season::HINWEIS_OFFEN ? null : $hinweis,
         ];

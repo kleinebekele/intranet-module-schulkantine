@@ -144,6 +144,9 @@ class BestellTerminalController
     /** Budget je Kind (Nicht-OGS, mit Eltern) für die Woche – Budget::ansicht. */
     private function budgets(array $daten): array
     {
+        if (! \Intranet\Modules\Schulkantine\Models\Budget::aktiv()) {
+            return [];
+        }
         if (empty($daten['season'])) {
             return [];
         }

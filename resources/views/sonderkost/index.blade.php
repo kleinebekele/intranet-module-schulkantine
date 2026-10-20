@@ -70,7 +70,8 @@
                             </div>
                         @endif
 
-                        {{-- Wochenbudget für Spontankäufe --}}
+                        {{-- Wochenbudget für Spontankäufe (nur, wenn die Saison Budgets vorsieht) --}}
+                        @if (\Intranet\Modules\Schulkantine\Models\Budget::aktiv())
                         <div>
                             <x-input-label value="Wochenbudget für Spontankäufe" />
                             <div class="mt-1 flex items-center gap-2">
@@ -90,6 +91,7 @@
                                 Budget dem Ausgabe-Personal anzeigen
                             </label>
                         </div>
+                        @endif
 
                         <div>
                             <button type="submit" class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">

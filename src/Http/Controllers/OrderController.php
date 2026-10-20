@@ -50,6 +50,9 @@ class OrderController
      */
     private function budgets(array $daten, User $user): array
     {
+        if (! \Intranet\Modules\Schulkantine\Models\Budget::aktiv()) {
+            return [];
+        }
         if (empty($daten['season'])) {
             return [];
         }

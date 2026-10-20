@@ -135,6 +135,19 @@
     </div>
 
     <div class="border-t border-gray-100 pt-5">
+        <h2 class="text-sm font-semibold text-gray-700">Wochenbudget</h2>
+        <p class="mt-0.5 text-xs text-gray-400">
+            Steuert, ob Eltern ein Wochenbudget für Spontankäufe ihrer Kinder festlegen können. Ist es aus, gibt es kein
+            Budget, keine Budget-Kachel und keine Prüfung an der Ausgabe – abgerechnet wird trotzdem alles.
+        </p>
+        <label class="mt-3 flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" name="budget_aktiv" value="1" @checked(old('budget_aktiv', $season->budget_aktiv ?? true))
+                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+            Eltern können das Wochenbudget deckeln
+        </label>
+    </div>
+
+    <div class="border-t border-gray-100 pt-5">
         <h2 class="text-sm font-semibold text-gray-700">Meine Daten</h2>
         <p class="mt-0.5 text-xs text-gray-400">
             Steuert, ob die Esser (bzw. die Eltern für ihre Kinder) Allergien, Diäten und Freigaben selbst pflegen.
