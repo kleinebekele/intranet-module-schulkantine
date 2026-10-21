@@ -14,7 +14,7 @@
         body { -webkit-tap-highlight-color: transparent; }
     </style>
 </head>
-<body class="min-h-full bg-gray-100 font-sans antialiased text-gray-800">
+<body class="min-h-full select-none bg-gray-100 font-sans antialiased text-gray-800" oncontextmenu="return false">
     {{-- Rechter Rand in Prozent für Terminals mit Sichtblende (z. B. ?rand=20). Gemerkt für dieses
          Browserfenster wie ?chip=an; ?rand=0 hebt ihn wieder auf. --}}
     <script>
@@ -110,12 +110,11 @@
                 </form>
             </div>
         @else
-            {{-- Oben rechts (nur mit ?chip=an): Stand des alten COM-Lesers. Der Hinweis „Chip auflegen"
-                 steht unter dem Speiseplan. --}}
-            <div x-show="chipUi" x-cloak class="text-sm font-semibold">
-                <span x-show="serialOk" class="inline-block rounded-lg bg-green-100 px-3 py-2 text-green-800">✓ Chip-Leser verbunden</span>
-                <button type="button" x-show="! serialOk && hasSerial()" @click="serialConnect(true)"
-                        class="rounded-lg border border-indigo-300 bg-white px-3 py-2 text-indigo-700 hover:bg-indigo-50">COM-Leser verbinden</button>
+            {{-- Oben rechts (nur mit ?chip=an): nur bei einem Problem mit dem alten COM-Leser etwas
+                 zeigen – verbunden = nichts. Der Hinweis „Chip auflegen" steht unter dem Speiseplan. --}}
+            <div x-show="chipUi && ! serialOk" x-cloak class="text-sm font-semibold">
+                <button type="button" x-show="hasSerial()" @click="serialConnect(true)"
+                        class="rounded-lg bg-red-600 px-3 py-2 text-white shadow hover:bg-red-700">⚠ Chip-Leser nicht verbunden – antippen</button>
                 <span x-show="! hasSerial()" class="inline-block rounded-lg bg-red-100 px-3 py-2 text-red-700">Browser kann keinen COM-Leser ansprechen</span>
             </div>
         @endif
