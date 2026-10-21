@@ -87,6 +87,11 @@ class SonderkostController
 
         $user->kantineAllergens()->sync($request->input('allergens', []));
         $user->kantineDiets()->sync($request->input('diets', []));
+        $user->load('kantineAllergens', 'kantineDiets');
+        \Intranet\Modules\Schulkantine\Support\MensaAudit::schreiben('kantine.vertraeglichkeiten', 'Allergien/Diäten gespeichert', $user, [
+            'Allergien' => $user->kantineAllergens->pluck('name')->join(', ') ?: '–',
+            'Diäten' => $user->kantineDiets->pluck('name')->join(', ') ?: '–',
+        ]);
 
         return redirect()
             ->route('module.schulkantine.sonderkost.index')
@@ -138,7 +143,8 @@ class SonderkostController
         $preorder = collect($request->input('preorder', []))->map(fn ($v) => (int) $v);
         $walkin = collect($request->input('walkin', []))->map(fn ($v) => (int) $v);
 
-        foreach (Category::where('is_active', true)->get() as $cat) {
+        $categories = Category::where('is_active', true)->get();
+        foreach ($categories as $cat) {
             $mayPre = $preorder->contains($cat->id);
             $mayWalk = $cat->allows_walkin ? $walkin->contains($cat->id) : true;
 
@@ -151,6 +157,12 @@ class SonderkostController
                 );
             }
         }
+
+        \Intranet\Modules\Schulkantine\Support\MensaAudit::schreiben('kantine.freigaben', 'Freigaben/Budget gespeichert', $user, [
+            'Vorbestellen' => $categories->filter(fn ($c) => $preorder->contains($c->id))->pluck('name')->join(', ') ?: '–',
+            'Spontan' => $categories->filter(fn ($c) => ! $c->allows_walkin || $walkin->contains($c->id))->pluck('name')->join(', ') ?: '–',
+            'Wochenbudget' => Budget::aktiv() ? ($request->filled('weekly_budget') ? number_format((float) $request->input('weekly_budget'), 2, ',', '.').' €' : 'leer (0 €)') : 'aus',
+        ]);
 
         return redirect()
             ->route('module.schulkantine.sonderkost.index')
@@ -209,6 +221,8 @@ class SonderkostController
         if ($request->has('am_ausgabeterminal')) {
             Budget::amAusgabeterminalSetzen($user->id, $request->boolean('am_ausgabeterminal'));
         }
+
+        \Intranet\Modules\Schulkantine\Support\MensaAudit::schreiben('kantine.budget', 'Wochenbudget: '.$text, $user);
 
         return back()->with('status', $user->name.': '.$text.'.');
     }

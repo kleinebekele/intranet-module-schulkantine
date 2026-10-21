@@ -85,8 +85,13 @@ class SeasonController
     {
         $this->authorizeAdmin($request);
 
-        $season->update($this->validated($request));
+        $season->fill($this->validated($request));
+        $geaendert = array_keys(array_diff_key($season->getDirty(), ['updated_at' => 1]));
+        $season->save();
         $this->syncActiveFlag($season);
+        if ($geaendert) {
+            \Intranet\Modules\Schulkantine\Support\MensaAudit::schreiben('kantine.saison_geaendert', 'Saison „'.$season->name.'": '.implode(', ', $geaendert));
+        }
 
         // Globale Mensa-Einstellungen (Fristen, Freigabe-Vorlauf) werden auf der
         // Saison-Bearbeiten-Seite mitgepflegt – sie gelten übergreifend, nicht je Saison.

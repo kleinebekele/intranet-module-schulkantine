@@ -368,14 +368,32 @@ class OrderController
 
         // Ganzes Menü bestellen/abbestellen (nicht für OGS-Esser).
         if (! empty($data['menu_day_id']) && $mode !== CustomerGroup::MODE_JA_NEIN) {
-            return $this->handleMenuDay($season, $eater, $date, $deadline, (int) $data['menu_day_id'], $data['attend'] ?? '1');
+            $antwort = $this->handleMenuDay($season, $eater, $date, $deadline, (int) $data['menu_day_id'], $data['attend'] ?? '1');
+        } elseif ($mode === CustomerGroup::MODE_JA_NEIN) {
+            $antwort = $this->handleOgs($request, $season, $eater, $date, $deadline, $data['attend'] ?? '1');
+        } else {
+            $antwort = $this->handleMenu($request, $season, $eater, $date, $deadline, $data);
         }
 
-        if ($mode === CustomerGroup::MODE_JA_NEIN) {
-            return $this->handleOgs($request, $season, $eater, $date, $deadline, $data['attend'] ?? '1');
-        }
+        $this->protokollieren($request, $user, $eater, $date);
 
-        return $this->handleMenu($request, $season, $eater, $date, $deadline, $data);
+        return $antwort;
+    }
+
+    /**
+     * Audit: Was die Bestellung bewirkt hat, steht in der Erfolgsmeldung dieser Anfrage
+     * („Bestellt: …", „Abbestellt: …", „… isst NICHT"). Ohne Meldung (Fehler) kein Eintrag.
+     */
+    private function protokollieren(Request $request, User $besteller, User $eater, Carbon $date): void
+    {
+        if (! in_array('status', (array) $request->session()->get('_flash.new', []), true)) {
+            return;
+        }
+        $text = (string) $request->session()->get('status');
+        $ab = str_starts_with($text, 'Abbestellt') || str_contains($text, ' NICHT');
+        \Intranet\Modules\Schulkantine\Support\MensaAudit::schreiben($ab ? 'kantine.abbestellt' : 'kantine.bestellt', $text, $eater,
+            ['Tag' => $date->format('d.m.Y')] + ($besteller->is($eater) ? [] : ['Besteller' => $besteller->name]),
+            $request->user() ?? $besteller);
     }
 
     /**
@@ -521,10 +539,17 @@ class OrderController
         $weekdays = collect($data['weekdays'] ?? [])
             ->map(fn ($d) => (int) $d)->unique()->sort()->values()->all();
 
+        $vorher = Subscription::where('season_id', $season->id)->where('user_id', $eater->id)->first();
+        $aboText = fn (?bool $an, ?array $tage) => ! $an ? 'kein Abo'
+            : ($tage ? collect($tage)->map(fn ($d) => self::WEEKDAY_KURZ[$d] ?? $d)->join(', ') : 'alle Öffnungstage');
+
         Subscription::updateOrCreate(
             ['season_id' => $season->id, 'user_id' => $eater->id],
             ['active' => $active, 'weekdays' => $weekdays ?: null],
         );
+
+        \Intranet\Modules\Schulkantine\Support\MensaAudit::schreiben('kantine.abo_geaendert', 'OGS-Abo: '.$aboText($vorher?->active, $vorher?->weekdays).' → '.$aboText($active, $weekdays ?: null),
+            $eater, $user->is($eater) ? [] : ['Besteller' => $user->name], $request->user() ?? $user);
 
         if (! $active) {
             return back()->with('status', $eater->name.': Abo gekündigt – isst nur noch an einzeln angehakten Tagen.');

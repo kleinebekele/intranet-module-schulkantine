@@ -155,6 +155,8 @@ class ReportController
         }
 
         $meldung = sprintf('Monat abgeschlossen: %d Zeilen mit %s € an Linear übertragen.', $e['gesendet'], number_format($e['summe'], 2, ',', '.'));
+        \Intranet\Modules\Schulkantine\Support\MensaAudit::schreiben('kantine.linear_gesendet', sprintf('%02d/%d: %s', $month, $year, $meldung), null,
+            $e['fehler'] !== [] ? ['Fehler' => implode(' · ', $e['fehler'])] : []);
         if ($e['vermerkt'] > 0) {
             $meldung .= " {$e['vermerkt']} standen bereits in Linear und wurden nur vermerkt.";
         }

@@ -328,6 +328,9 @@ class MenuController
 
         $date = $order->date->copy();
         $name = $order->user?->name;
+        \Intranet\Modules\Schulkantine\Support\MensaAudit::schreiben('kantine.bestellung_geloescht',
+            'Bestellung gelöscht: '.($order->dish?->name ?? 'Gericht').' am '.$date->format('d.m.Y'), $order->user,
+            ['Tag' => $date->format('d.m.Y'), 'Gericht' => $order->dish?->name, 'Preis' => $order->price_snapshot]);
         $order->delete();
 
         return $this->redirectToWeek($date)

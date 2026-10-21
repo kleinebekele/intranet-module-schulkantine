@@ -211,6 +211,9 @@ class MenueServeImportController
             }
         }
         $e = (new MenueServeBuchungen)->uebernehmen($season, $ab, $request->user()->id, $tag, $loeschen);
+        \Intranet\Modules\Schulkantine\Support\MensaAudit::schreiben('kantine.menueserve_buchungen',
+            "{$e['angelegt']} angelegt, {$e['geloescht']} gelöscht".($tag ? ' ('.Carbon::parse($tag)->format('d.m.Y').')' : ' (ab '.$ab->format('d.m.Y').')'),
+            null, ['Modus' => $request->input('modus') === 'loeschen' ? 'übernehmen und löschen' : 'nur übernehmen']);
 
         return redirect()->route('module.schulkantine.seasons.menueserve.buchungen', ['ab' => $ab->format('Y-m-d')])
             ->with('status', "{$e['angelegt']} Bestellungen aus Menü&Serve angelegt, {$e['geloescht']} Bestellungen gelöscht"
