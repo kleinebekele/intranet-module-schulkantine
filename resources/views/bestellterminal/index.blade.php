@@ -205,14 +205,19 @@
             wedgeBuf: '',
             wedgeAt: 0,
             serialOk: false,
+            serialVerbindet: false,
             serialBuf: '',
 
             init() {
                 this.chipUi = window.kantineChipBedienung();
                 // USB-Leser in Tastatur-Emulation: immer global mithören.
                 window.addEventListener('keydown', (e) => this.onWedgeKey(e));
-                // Bereits freigegebener COM-Leser: ohne Klick wieder verbinden.
-                if (this.hasSerial()) this.serialConnect(false);
+                // Bereits freigegebener COM-Leser: ohne Klick wieder verbinden. Beim Neuladen hält die
+                // alte Seite den Anschluss oft noch kurz fest – darum alle 3 s erneut versuchen.
+                if (this.hasSerial()) {
+                    this.serialConnect(false);
+                    setInterval(() => { if (! this.serialOk) this.serialConnect(false); }, 3000);
+                }
 
                 ['pointerdown', 'keydown', 'scroll', 'wheel'].forEach(ev =>
                     window.addEventListener(ev, () => { this.rest = this.leerlauf; }, { passive: true }));
@@ -286,17 +291,22 @@
             // ---- Alter serieller Leser (Web Serial), wie im Ausgabe-Terminal ----
             hasSerial() { return 'serial' in navigator; },
             async serialConnect(ask) {
+                if (this.serialVerbindet) return;
+                this.serialVerbindet = true;
                 try {
                     let port = null;
                     if (ask) port = await navigator.serial.requestPort();
                     else port = (await navigator.serial.getPorts())[0] || null;
                     if (!port) return;
-                    await port.open({ baudRate: 9600 });
+                    // Schon offen (in dieser Seite)? Dann nur wieder mitlesen statt erneut öffnen.
+                    if (!port.readable) await port.open({ baudRate: 9600 });
                     this.serialOk = true;
                     this.serialRead(port);
                 } catch (err) {
                     this.serialOk = false;
                     if (ask) this.meldung = 'COM-Leser: ' + (err && err.message ? err.message : err);
+                } finally {
+                    this.serialVerbindet = false;
                 }
             },
             async serialRead(port) {
