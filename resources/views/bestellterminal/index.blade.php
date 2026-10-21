@@ -74,6 +74,42 @@
 @endphp
 
 <div x-data="bestellTerminal" class="flex min-h-screen flex-col">
+    {{-- Diagnose (F10): Stand des Chip-Lesers und was zuletzt ankam. Schließt nach 60 s oder
+         sobald ein echter Chip gelesen wird. --}}
+    <div x-show="diag" x-cloak class="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-6">
+        <div class="w-full max-w-xl rounded-2xl bg-white p-6 text-base shadow-2xl">
+            <div class="mb-4 flex items-center justify-between">
+                <h2 class="text-xl font-bold text-gray-800">Diagnose Chip-Leser</h2>
+                <span class="text-sm text-gray-400" x-text="'schließt in ' + diagRest + ' s'"></span>
+            </div>
+            <dl class="grid grid-cols-[11rem_1fr] gap-x-3 gap-y-2">
+                <dt class="text-gray-500">Browser (Web Serial)</dt>
+                <dd class="font-semibold" x-text="hasSerial() ? 'kann COM' : 'kann kein COM'"></dd>
+                <dt class="text-gray-500">COM-Leser</dt>
+                <dd class="font-semibold" :class="serialOk ? 'text-green-700' : 'text-red-700'" x-text="serialOk ? 'verbunden' : 'nicht verbunden'"></dd>
+                <dt class="text-gray-500">Letzter Fehler</dt>
+                <dd class="break-all text-sm" x-text="serialFehler || '–'"></dd>
+                <dt class="text-gray-500">Zuletzt empfangen</dt>
+                <dd class="text-sm">
+                    <template x-if="diagLetzte">
+                        <div>
+                            <div><span x-text="diagLetzte.zeit"></span> · über <span class="font-semibold" x-text="diagLetzte.quelle"></span></div>
+                            <div class="break-all font-mono" x-text="'roh: ' + diagLetzte.roh"></div>
+                            <div class="font-mono font-semibold" x-text="'Chip: ' + (diagLetzte.uid || '(nicht erkannt)')"></div>
+                        </div>
+                    </template>
+                    <span x-show="! diagLetzte">noch nichts</span>
+                </dd>
+            </dl>
+            <form class="mt-5 flex gap-2 border-t border-gray-100 pt-4" @submit.prevent="diagTestanmeldung()">
+                <input type="text" x-model="diagUid" placeholder="Chipnummer für Testanmeldung"
+                       class="min-w-0 flex-1 rounded-lg border-gray-300 font-mono text-sm">
+                <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Testanmeldung</button>
+                <button type="button" @click="diagSchliessen()" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Schließen</button>
+            </form>
+            <p class="mt-2 text-xs text-gray-400">Die Testanmeldung prüft den Weg zur Anmeldung, nicht den Leser. Den Leser prüft nur ein echter Chip.</p>
+        </div>
+    </div>
     {{-- Abmeldung: sofort im Browser abdecken, nicht erst auf die (langsame) Antwort des Servers warten. --}}
     <div x-show="abgemeldet" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-gray-100">
         <div class="rounded-2xl border-4 border-amber-500 bg-amber-300 px-8 py-4 text-3xl font-extrabold text-gray-900 shadow-lg">Abgemeldet – bitte Chip auflegen</div>
@@ -206,6 +242,13 @@
             wedgeAt: 0,
             serialOk: false,
             serialVerbindet: false,
+            serialFehler: '',
+            // Diagnose (F10)
+            diag: false,
+            diagRest: 60,
+            diagUhr: null,
+            diagLetzte: null,
+            diagUid: '',
             serialBuf: '',
 
             init() {
@@ -271,6 +314,7 @@
 
             // USB-Kartenleser „tippt" die Kennung sehr schnell und schließt mit Enter/Tab ab.
             onWedgeKey(e) {
+                if (e.key === 'F10') { e.preventDefault(); this.diag ? this.diagSchliessen() : this.diagOeffnen(); return; }
                 const t = e.target;
                 if (t && (t.isContentEditable || ((t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') && !t.readOnly))) return;
                 if (e.ctrlKey || e.altKey || e.metaKey) return;
@@ -279,7 +323,7 @@
                 if (e.key === 'Enter' || e.key === 'Tab') {
                     const uid = this.wedgeBuf;
                     this.wedgeBuf = '';
-                    if (uid.length >= 4) { e.preventDefault(); this.anmelden(uid); }
+                    if (uid.length >= 4) { e.preventDefault(); this.chipGelesen(uid, 'Tastatur', uid); }
                     return;
                 }
                 if (e.key.length !== 1) return;
@@ -304,6 +348,7 @@
                     this.serialRead(port);
                 } catch (err) {
                     this.serialOk = false;
+                    this.serialFehler = new Date().toLocaleTimeString('de-DE') + ': ' + (err && err.message ? err.message : err);
                     if (ask) this.meldung = 'COM-Leser: ' + (err && err.message ? err.message : err);
                 } finally {
                     this.serialVerbindet = false;
@@ -330,14 +375,39 @@
                     const c = ch.charCodeAt(0);
                     if (c === 2) { this.serialBuf = ''; continue; }
                     if (c === 3 || c === 13 || c === 10) {
-                        const uid = this.serialUid(this.serialBuf);
+                        const roh = this.serialBuf;
+                        const uid = this.serialUid(roh);
                         this.serialBuf = '';
-                        if (uid) this.anmelden(uid);
+                        if (roh.trim() !== '') this.chipGelesen(uid, 'COM', roh);
                         continue;
                     }
                     this.serialBuf += ch;
                 }
             },
+            // Ein echter Chip kam an (COM-Leser oder Tastatur-Leser): für die Diagnose merken,
+            // Diagnose schließen und anmelden.
+            chipGelesen(uid, quelle, roh) {
+                this.diagLetzte = { zeit: new Date().toLocaleTimeString('de-DE'), quelle, roh: JSON.stringify(roh), uid };
+                if (this.diag) this.diagSchliessen();
+                if (uid) this.anmelden(uid);
+            },
+            diagOeffnen() {
+                this.diag = true;
+                this.diagRest = 60;
+                clearInterval(this.diagUhr);
+                this.diagUhr = setInterval(() => { if (--this.diagRest <= 0) this.diagSchliessen(); }, 1000);
+            },
+            diagSchliessen() {
+                this.diag = false;
+                clearInterval(this.diagUhr);
+            },
+            diagTestanmeldung() {
+                const uid = this.diagUid.trim();
+                if (uid.length < 4) return;
+                this.diagSchliessen();
+                this.anmelden(uid);
+            },
+
             // Alter Leser: führende „0" + 10 Hex Kennung + Prüfzeichen.
             serialUid(raw) {
                 const s = raw.trim();
