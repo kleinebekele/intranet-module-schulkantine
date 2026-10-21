@@ -101,13 +101,6 @@
                         <div class="text-lg font-bold text-indigo-700" id="month-total">{{ $money($monthTotal) }}</div>
                     </div>
                 @endif
-                <form method="POST" action="{{ route('kantine.bestellterminal.abmelden') }}" x-ref="abmelden" @submit="abgemeldet = true">
-                    @csrf
-                    <button type="submit" class="rounded-xl bg-indigo-600 px-6 py-3 text-lg font-semibold text-white shadow hover:bg-indigo-700">
-                        <svg class="-ml-1 mr-1 inline h-6 w-6 align-[-5px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/></svg>Abmelden
-                        <span x-show="rest <= warnAb" x-cloak class="ml-1 text-sm font-normal text-indigo-200" x-text="'(' + rest + ' s)'"></span>
-                    </button>
-                </form>
             </div>
         @else
             {{-- Oben rechts (nur mit ?chip=an): nur bei einem Problem mit dem alten COM-Leser etwas
@@ -137,6 +130,19 @@
                 'terminal' => true,
                 'statusZeigen' => true,
             ])
+
+            {{-- Unter dem Speiseplan, mittig – an derselben Stelle und genauso groß wie „Bitte Chip
+                 auflegen" vor der Anmeldung, nur rötlich. --}}
+            <form method="POST" action="{{ route('kantine.bestellterminal.abmelden') }}" x-ref="abmelden" @submit="abgemeldet = true"
+                  class="mt-6 flex justify-center">
+                @csrf
+                <button type="submit"
+                        class="flex items-center gap-3 rounded-2xl border-4 border-red-600 bg-red-500 px-8 py-3 text-3xl font-extrabold text-white shadow-lg hover:bg-red-600">
+                    <svg class="h-10 w-10 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/></svg>
+                    Abmelden
+                    <span x-show="rest <= warnAb" x-cloak class="text-xl font-semibold text-red-100" x-text="'(' + rest + ' s)'"></span>
+                </button>
+            </form>
         </main>
     @else
         {{-- Ohne Anmeldung: Speiseplan der Woche zum Ansehen; bestellen erst nach Chip. --}}
