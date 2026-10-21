@@ -14,6 +14,14 @@ class Bestellterminal
 {
     public const EINSTELLUNG = 'kantine.bestellterminal.netze';
 
+    /** Zeigt das Bestell-Terminal Preise und Kosten? '1' = ja (Standard), '0' = nein. */
+    public const KOSTEN = 'kantine.bestellterminal.kosten';
+
+    public static function kostenZeigen(): bool
+    {
+        return (string) Setting::get(self::KOSTEN, '1') !== '0';
+    }
+
     /** @return list<string> */
     public static function netze(): array
     {

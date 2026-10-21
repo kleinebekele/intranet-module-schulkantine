@@ -45,6 +45,12 @@
                 @method('PUT')
                 <textarea name="netze" rows="5" class="w-full rounded-lg border-gray-300 font-mono text-sm"
                           placeholder="192.168.10.0/24  # Schulnetz">{{ old('netze', $netzeText) }}</textarea>
+                <label class="mt-3 flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" name="kosten" value="1" @checked(old('kosten', $kostenZeigen))
+                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    Preise und Kosten am Bestell-Terminal anzeigen
+                </label>
+                <p class="mt-1 text-xs text-gray-400">Aus = keine Beträge am Terminal (Preise, Wochen- und Monatskosten, Budget). In „Essen bestellen" im Intranet und in der Abrechnung bleiben sie sichtbar.</p>
                 @darfRoute('module.schulkantine.bestellterminal.update')
                     <div class="mt-3 flex justify-end">
                         <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Speichern</button>

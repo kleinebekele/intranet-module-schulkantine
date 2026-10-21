@@ -131,7 +131,7 @@
 
         @if ($besteller)
             <div class="flex items-center gap-3">
-                @if ($season)
+                @if ($season && $kostenZeigen)
                     <div class="hidden rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-1.5 text-right sm:block">
                         <div class="text-[11px] uppercase tracking-wide text-indigo-400">Kosten im {{ $monthStart->isoFormat('MMMM YYYY') }}</div>
                         <div class="text-lg font-bold text-indigo-700" id="month-total">{{ $money($monthTotal) }}</div>
@@ -164,6 +164,7 @@
                 ],
                 'ichId' => $besteller->id,
                 'terminal' => true,
+                'preiseAus' => ! $kostenZeigen,
                 'statusZeigen' => true,
             ])
 
@@ -193,6 +194,7 @@
                 ],
                 'ichId' => 0,
                 'terminal' => true,
+                'preiseAus' => ! $kostenZeigen,
                 'gast' => true,
             ])
 

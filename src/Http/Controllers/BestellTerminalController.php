@@ -47,6 +47,7 @@ class BestellTerminalController
             'ip' => $request->ip(),
             'ipErlaubt' => Bestellterminal::erlaubt($request->ip()),
             'terminalUrl' => route('kantine.bestellterminal.index'),
+            'kostenZeigen' => Bestellterminal::kostenZeigen(),
         ]);
     }
 
@@ -61,8 +62,9 @@ class BestellTerminalController
         }
 
         Setting::set(Bestellterminal::EINSTELLUNG, trim($text));
+        Setting::set(Bestellterminal::KOSTEN, $request->boolean('kosten') ? '1' : '0');
 
-        return back()->with('status', 'Freigegebene Netze gespeichert.');
+        return back()->with('status', 'Einstellungen des Bestell-Terminals gespeichert.');
     }
 
     public function index(Request $request, OrderController $orders)
@@ -89,6 +91,7 @@ class BestellTerminalController
             return view('schulkantine::bestellterminal.index', $daten + [
                 'besteller' => null,
                 'simChips' => $this->simChips(),
+                'kostenZeigen' => Bestellterminal::kostenZeigen(),
             ]);
         }
 
@@ -98,8 +101,10 @@ class BestellTerminalController
             'besteller' => $besteller,
             'simChips' => collect(),
             // Wochenbudget der Kinder nur zum Ansehen (ändern dürfen es nur die Eltern im Intranet).
-            'budgets' => $this->budgets($daten),
+            // Ohne Kosten-Anzeige auch kein Budget (das sind ebenfalls Beträge).
+            'budgets' => Bestellterminal::kostenZeigen() ? $this->budgets($daten) : [],
             'budgetNurAnsicht' => true,
+            'kostenZeigen' => Bestellterminal::kostenZeigen(),
         ]);
     }
 

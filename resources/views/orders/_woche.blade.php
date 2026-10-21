@@ -22,7 +22,9 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
     $menuSymbole = fn ($md) => $md->slots->map(fn ($s) => $s->dish?->symbol())->filter()->unique()->join(' ');
     $menuArten = fn ($md) => $md->slots->map(fn ($s) => $s->dish?->fleischartName())->filter()->unique()->join(', ');
     // Ohne angemeldeten Besteller (Terminal ohne Chip) keine Preise – sie hängen am Vertrag.
-    $money = $gast ? fn ($v) => '' : fn ($v) => number_format((float) $v, 2, ',', '.').' €';
+    // Am Bestell-Terminal lässt sich die Kosten-Anzeige abschalten ($preiseAus).
+    $ohnePreise = $gast || ($preiseAus ?? false);
+    $money = $ohnePreise ? fn ($v) => '' : fn ($v) => number_format((float) $v, 2, ',', '.').' €';
 @endphp
 
 <div class="max-w-full" id="orders-content">
@@ -191,7 +193,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                 @include('schulkantine::orders._budget')
                             @endif
                             {{-- Kosten DIESER Person in der angezeigten Woche (der Monat steht oben im Kopf) --}}
-                            <div class="{{ $gast ? 'hidden' : '' }} flex items-center gap-1.5" title="Monat {{ $monthStart->isoFormat('MMMM') }}: {{ $money($monthByUser[$eater->id] ?? 0) }}">
+                            <div class="{{ $ohnePreise ? 'hidden' : '' }} flex items-center gap-1.5" title="Monat {{ $monthStart->isoFormat('MMMM') }}: {{ $money($monthByUser[$eater->id] ?? 0) }}">
                                 <span class="text-[11px] uppercase tracking-wide text-gray-400">Kosten KW {{ $weekStart->isoWeek() }}</span>
                                 <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-sm font-bold text-indigo-700">{{ $money($weekByUser[$eater->id] ?? 0) }}</span>
                             </div>
@@ -245,9 +247,9 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                     <div class="{{ $t('text-xs', 'text-base') }} {{ $day['open'] ? 'text-gray-400' : 'text-amber-500' }}">{{ $day['date']->format('d.m.Y') }}</div>
                                                 </div>
                                                 @if ($day['open'] && $hasOrder && ! $isOgs)
-                                                    <span class="rounded-full bg-green-600 px-2 py-0.5 font-semibold text-white {{ $t('text-xs', 'text-base') }}">{{ $money($eaterTotal) }}</span>
+                                                    <span class="rounded-full bg-green-600 px-2 py-0.5 font-semibold text-white {{ $t('text-xs', 'text-base') }}">{{ $ohnePreise ? '✓ bestellt' : $money($eaterTotal) }}</span>
                                                 @elseif ($day['open'] && $hasOrder && $isOgs)
-                                                    <span class="rounded-full bg-green-600 px-2 py-0.5 text-xs font-semibold text-white">{{ $ogsPrice > 0 ? '✓ '.$money($ogsPrice) : '✓ isst' }}</span>
+                                                    <span class="rounded-full bg-green-600 px-2 py-0.5 text-xs font-semibold text-white">{{ $ogsPrice > 0 && ! $ohnePreise ? '✓ '.$money($ogsPrice) : '✓ isst' }}</span>
                                                 @endif
                                             </div>
                                             @unless ($day['open'])
