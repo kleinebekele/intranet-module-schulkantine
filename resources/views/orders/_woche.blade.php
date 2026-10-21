@@ -20,6 +20,12 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
     $t = fn (string $normal, string $gross) => $terminal ? $gross : $normal;
     // Fleischart-Symbole eines Menüs (aus seinen Gerichten, ohne Doppelte).
     $menuSymbole = fn ($md) => $md->slots->map(fn ($s) => $s->dish?->symbol())->filter()->unique()->join(' ');
+    // Emoji kennt nicht jedes System (Windows XP zeigt Kästchen) – daneben der Text, den
+    // ein kleines Skript unten einblendet, wenn der Browser Emoji nicht darstellen kann.
+    $symbolAnzeige = fn (string $symbol, string $text) => $symbol === '' ? ''
+        : '<span class="kantine-emoji">'.e($symbol).'</span><span class="kantine-emoji-text rounded bg-gray-100 px-1.5 py-0.5 align-middle text-xs font-semibold text-gray-600">'.e($text).'</span>';
+    // Haken als Grafik statt Zeichen „✓" (fehlt ebenfalls in alten Schriften).
+    $haken = '<svg class="inline-block h-[1em] w-[1em] align-[-0.125em]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clip-rule="evenodd"/></svg>';
     $menuArten = fn ($md) => $md->slots->map(fn ($s) => $s->dish?->fleischartName())->filter()->unique()->join(', ');
     // Ohne angemeldeten Besteller (Terminal ohne Chip) keine Preise – sie hängen am Vertrag.
     // Am Bestell-Terminal lässt sich die Kosten-Anzeige abschalten ($preiseAus).
@@ -247,9 +253,9 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                     <div class="{{ $t('text-xs', 'text-base') }} {{ $day['open'] ? 'text-gray-400' : 'text-amber-500' }}">{{ $day['date']->format('d.m.Y') }}</div>
                                                 </div>
                                                 @if ($day['open'] && $hasOrder && ! $isOgs)
-                                                    <span class="rounded-full bg-green-600 px-2 py-0.5 font-semibold text-white {{ $t('text-xs', 'text-base') }}">{{ $ohnePreise ? '✓ bestellt' : $money($eaterTotal) }}</span>
+                                                    <span class="rounded-full bg-green-600 px-2 py-0.5 font-semibold text-white {{ $t('text-xs', 'text-base') }}">{!! $ohnePreise ? $haken.' bestellt' : e($money($eaterTotal)) !!}</span>
                                                 @elseif ($day['open'] && $hasOrder && $isOgs)
-                                                    <span class="rounded-full bg-green-600 px-2 py-0.5 text-xs font-semibold text-white">{{ $ogsPrice > 0 && ! $ohnePreise ? '✓ '.$money($ogsPrice) : '✓ isst' }}</span>
+                                                    <span class="rounded-full bg-green-600 px-2 py-0.5 text-xs font-semibold text-white">{!! $ogsPrice > 0 && ! $ohnePreise ? $haken.' '.e($money($ogsPrice)) : $haken.' isst' !!}</span>
                                                 @endif
                                             </div>
                                             @unless ($day['open'])
@@ -328,7 +334,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                             'clickable' => ! $gast && $menuClickable,
                                                         ];
                                                     @endphp
-                                                    <form method="POST" action="{{ route($routen['bestellen']) }}">
+                                                    <form method="POST" action="{{ route($routen['bestellen']) }}" @if ($isMenuOrdered && ! $day['canOrder'] && $menuClickable) data-bestaetigen="Wirklich abbestellen? Die Bestellfrist für diesen Tag ist vorbei – du kannst danach nicht mehr neu bestellen." data-titel="Abbestellen" data-knopf="Abbestellen" @endif>
                                                         @csrf
                                                         <input type="hidden" name="eater_id" value="{{ $eater->id }}">
                                                         <input type="hidden" name="date" value="{{ $dateStr }}">
@@ -357,13 +363,13 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                         <span class="inline-flex items-center gap-1 rounded-md bg-red-600 px-2 py-1 text-sm font-bold text-white">⚠️ Nicht geeignet</span>
                                                                     @endif
                                                                 </div>
-                                                                <span class="text-4xl leading-none" title="{{ $menuArten($md) }}">{{ $menuSymbole($md) }}</span>
+                                                                <span class="text-4xl leading-none" title="{{ $menuArten($md) }}">{!! $symbolAnzeige($menuSymbole($md), $menuArten($md)) !!}</span>
                                                             </div>
                                                             @unless ($gast)
                                                                 <div class="mt-3 rounded-lg py-3 text-center text-lg font-semibold
                                                                             {{ $isMenuOrdered ? 'bg-emerald-600 text-white' : ($menuClickable ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-500') }}">
                                                                     @if ($isMenuOrdered)
-                                                                        ✓ Bestellt{{ $menuClickable ? ' – antippen zum Abbestellen' : '' }}
+                                                                        {!! $haken !!} Bestellt{{ $menuClickable ? ' – antippen zum Abbestellen' : '' }}
                                                                     @elseif ($menuClickable)
                                                                         Bestellen
                                                                     @else
@@ -376,7 +382,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                 <span class="text-sm font-semibold text-emerald-800">🍽 {{ $md->name }}<span x-data @click.stop.prevent="$dispatch('open-dish', @js($menuData))" role="button" tabindex="0" title="Details anzeigen" aria-label="Details anzeigen" class="{{ $infoKnopf }} text-emerald-600 hover:text-emerald-800 {{ $terminal ? 'bg-emerald-50' : '' }}"><svg class="inline {{ $infoIcon }}" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg></span></span>
                                                                 <span class="flex items-center gap-1 text-xs font-bold {{ $isMenuOrdered ? 'text-emerald-700' : 'text-gray-700' }}">
                                                                     @if ($isMenuOrdered)
-                                                                        <span class="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">✓</span>
+                                                                        <span class="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">{!! $haken !!}</span>
                                                                     @endif
                                                                     {{ $money($mdPreis) }}
                                                                 </span>
@@ -463,7 +469,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                         ? 'border-color: '.$catColor.'; box-shadow: 0 0 0 2px '.$catColor.'59;'
                                                                         : '';
                                                                 @endphp
-                                                                <form method="POST" action="{{ route($routen['bestellen']) }}" class="relative">
+                                                                <form method="POST" action="{{ route($routen['bestellen']) }}" class="relative" @if ($isSel && ! $day['canOrder'] && $clickable) data-bestaetigen="Wirklich abbestellen? Die Bestellfrist für diesen Tag ist vorbei – du kannst danach nicht mehr neu bestellen." data-titel="Abbestellen" data-knopf="Abbestellen" @endif>
                                                                     @csrf
                                                                     <input type="hidden" name="eater_id" value="{{ $eater->id }}">
                                                                     <input type="hidden" name="date" value="{{ $dateStr }}">
@@ -487,10 +493,10 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                             @endif
                                                                             <div class="min-w-0 flex-1 {{ $t('p-1.5 lg:py-1 lg:pl-2 lg:pr-1', 'p-3') }}">
                                                                                 <div class="{{ $t('flex items-start justify-between gap-1', 'flex flex-col gap-1') }}">
-                                                                                    <span class="font-semibold text-gray-800 {{ $t('text-xs', 'text-lg leading-snug') }}">@if ($m->dish->symbol())<span class="mr-1 {{ $t('', 'text-2xl') }}" title="{{ $m->dish->fleischartName() }}">{{ $m->dish->symbol() }}</span>@endif{{ $m->dish->name }}<span x-data @click.stop.prevent="$dispatch('open-dish', @js($dishData))" role="button" tabindex="0" title="Details anzeigen" aria-label="Details anzeigen" class="{{ $infoKnopf }} text-indigo-500 hover:text-indigo-700 {{ $terminal ? 'bg-indigo-50' : '' }}"><svg class="inline {{ $infoIcon }}" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg></span></span>
+                                                                                    <span class="font-semibold text-gray-800 {{ $t('text-xs', 'text-lg leading-snug') }}">@if ($m->dish->symbol())<span class="mr-1 {{ $t('', 'text-2xl') }}" title="{{ $m->dish->fleischartName() }}">{!! $symbolAnzeige($m->dish->symbol(), (string) $m->dish->fleischartName()) !!}</span>@endif{{ $m->dish->name }}<span x-data @click.stop.prevent="$dispatch('open-dish', @js($dishData))" role="button" tabindex="0" title="Details anzeigen" aria-label="Details anzeigen" class="{{ $infoKnopf }} text-indigo-500 hover:text-indigo-700 {{ $terminal ? 'bg-indigo-50' : '' }}"><svg class="inline {{ $infoIcon }}" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg></span></span>
                                                                                     <span class="flex flex-none items-center gap-1 font-bold {{ $t('text-xs', 'text-lg') }} {{ $isSel ? 'text-green-700' : 'text-gray-700' }}">
                                                                                         @if ($isSel)
-                                                                                            <span class="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] font-bold text-white">✓</span>
+                                                                                            <span class="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] font-bold text-white">{!! $haken !!}</span>
                                                                                         @endif
                                                                                         {{ $money($m->dish->preisFuer($eater)) }}
                                                                                     </span>
@@ -520,7 +526,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                             <div class="border-t py-2.5 text-center text-base font-semibold
                                                                                         {{ $isSel ? 'border-green-600 bg-green-600 text-white' : ($clickable ? 'border-indigo-100 bg-indigo-50 text-indigo-800' : 'border-gray-100 bg-gray-100 text-gray-500') }}">
                                                                                 @if ($isSel)
-                                                                                    ✓ Bestellt{{ $clickable ? ' – antippen zum Abbestellen' : '' }}
+                                                                                    {!! $haken !!} Bestellt{{ $clickable ? ' – antippen zum Abbestellen' : '' }}
                                                                                 @elseif ($clickable)
                                                                                     Bestellen
                                                                                 @else
@@ -737,6 +743,30 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
      Bestell-Bereich austauschen. Die Scrollposition bleibt so erhalten.
      Fällt JS aus, senden die Formulare ganz normal (Server-Redirect). --}}
 @once
+    <style>
+        .kantine-emoji-text { display: none; }
+        html.ohne-emoji .kantine-emoji { display: none; }
+        html.ohne-emoji .kantine-emoji-text { display: inline; }
+    </style>
+    <script>
+    // Kann der Browser Emoji darstellen? Sonst (z. B. Windows XP) Text statt Kästchen zeigen.
+    (function () {
+        try {
+            const c = document.createElement('canvas');
+            c.width = c.height = 16;
+            const x = c.getContext('2d');
+            x.textBaseline = 'top';
+            x.font = '14px sans-serif';
+            x.fillText('\u{1F966}', 0, 0); // Brokkoli
+            const d = x.getImageData(0, 0, 16, 16).data;
+            let farbig = false;
+            for (let i = 0; i < d.length; i += 4) {
+                if (d[i + 3] > 0 && (Math.abs(d[i] - d[i + 1]) > 30 || Math.abs(d[i + 1] - d[i + 2]) > 30)) { farbig = true; break; }
+            }
+            if (! farbig) document.documentElement.classList.add('ohne-emoji');
+        } catch (e) {}
+    })();
+    </script>
     <script>
     (function () {
         const ziele = @js([route($routen['bestellen']), route($routen['abo'])]);

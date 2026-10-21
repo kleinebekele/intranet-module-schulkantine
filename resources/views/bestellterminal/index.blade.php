@@ -223,6 +223,8 @@
     </main>
 </div>
 
+{{-- Rückfragen (data-bestaetigen, z. B. vor dem Abbestellen) – der Dialog des Cores. --}}
+@includeIf('layouts.dialog')
 @include('schulkantine::partials.chip-bedienung')
 <script>
     document.addEventListener('alpine:init', () => {
