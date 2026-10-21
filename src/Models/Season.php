@@ -28,6 +28,8 @@ class Season extends Model
         'ratings_enabled',
         'daten_selbst',
         'budget_aktiv',
+        'kosten_kinder',
+        'kosten_andere',
         'allergie_hinweis',
         'hinweis_offen',
     ];
@@ -57,6 +59,8 @@ class Season extends Model
             'ratings_enabled' => 'boolean',
             'daten_selbst' => 'boolean',
             'budget_aktiv' => 'boolean',
+            'kosten_kinder' => 'boolean',
+            'kosten_andere' => 'boolean',
         ];
     }
 

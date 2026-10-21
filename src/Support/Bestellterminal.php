@@ -14,12 +14,18 @@ class Bestellterminal
 {
     public const EINSTELLUNG = 'kantine.bestellterminal.netze';
 
-    /** Zeigt das Bestell-Terminal Preise und Kosten? '1' = ja (Standard), '0' = nein. */
-    public const KOSTEN = 'kantine.bestellterminal.kosten';
-
-    public static function kostenZeigen(): bool
+    /**
+     * Sieht dieser Besteller am Bestell-Terminal Preise und Kosten? Saison-Einstellung,
+     * getrennt für Kinder (über die Eltern abgerechnet) und alle anderen.
+     */
+    public static function kostenZeigen(?\Intranet\Modules\Schulkantine\Models\Season $season, ?\App\Models\User $besteller): bool
     {
-        return (string) Setting::get(self::KOSTEN, '1') !== '0';
+        if (! $season || ! $besteller) {
+            return true;
+        }
+        $wert = \Intranet\Modules\Schulkantine\Models\Budget::istKind($besteller->id) ? $season->kosten_kinder : $season->kosten_andere;
+
+        return $wert === null ? true : (bool) $wert;
     }
 
     /** @return list<string> */

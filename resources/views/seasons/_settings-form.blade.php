@@ -148,6 +148,24 @@
     </div>
 
     <div class="border-t border-gray-100 pt-5">
+        <h2 class="text-sm font-semibold text-gray-700">Bestell-Terminal: Preise und Kosten</h2>
+        <p class="mt-0.5 text-xs text-gray-400">
+            Was der angemeldete Besteller am Bestell-Terminal sieht. Aus = keine Beträge (Preise, Wochen- und Monatskosten,
+            Budget). In „Essen bestellen" im Intranet und in der Abrechnung bleiben sie sichtbar.
+        </p>
+        <label class="mt-3 flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" name="kosten_kinder" value="1" @checked(old('kosten_kinder', $season->kosten_kinder ?? true))
+                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+            Kindern anzeigen (werden über die Eltern abgerechnet)
+        </label>
+        <label class="mt-2 flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" name="kosten_andere" value="1" @checked(old('kosten_andere', $season->kosten_andere ?? true))
+                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+            Allen anderen anzeigen (Lehrer, Mitarbeiter, Eltern …)
+        </label>
+    </div>
+
+    <div class="border-t border-gray-100 pt-5">
         <h2 class="text-sm font-semibold text-gray-700">Meine Daten</h2>
         <p class="mt-0.5 text-xs text-gray-400">
             Steuert, ob die Esser (bzw. die Eltern für ihre Kinder) Allergien, Diäten und Freigaben selbst pflegen.
