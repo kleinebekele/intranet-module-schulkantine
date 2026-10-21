@@ -172,7 +172,9 @@
                                               onsubmit="return confirm(@js('Als '.$user->name.' handeln? Bis du es beendest, gilt alles, was du in der Mensa einstellst, für diese Person.'))">
                                             @csrf
                                             <button type="submit" title="Als {{ $user->name }} handeln"
-                                                    class="inline-flex items-center rounded-md px-1.5 py-1 text-xs font-medium text-gray-400 hover:bg-red-50 hover:text-red-700">als …</button>
+                                                    class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700">
+                                                <x-module-icon name="user" class="text-sm" /> Als Person handeln
+                                            </button>
                                         </form>
                                         @endunless
                                         @enddarfRoute
