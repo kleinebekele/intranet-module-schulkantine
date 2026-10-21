@@ -94,8 +94,11 @@
             <dl class="grid grid-cols-[11rem_1fr] gap-x-3 gap-y-2">
                 <dt class="text-gray-500">Browser (Web Serial)</dt>
                 <dd class="font-semibold" x-text="hasSerial() ? 'kann COM' : 'kann kein COM'"></dd>
-                <dt class="text-gray-500">COM-Leser</dt>
-                <dd class="font-semibold" :class="serialOk ? 'text-green-700' : 'text-red-700'" x-text="serialOk ? 'verbunden' : 'nicht verbunden'"></dd>
+                <dt class="text-gray-500">COM direkt im Browser</dt>
+                <dd>
+                    <span class="font-semibold" :class="serialOk ? 'text-green-700' : 'text-gray-600'" x-text="serialOk ? 'verbunden' : 'nicht verbunden'"></span>
+                    <span x-show="! serialOk" class="block text-xs text-gray-500">Normal, wenn ein Hilfsprogramm (z. B. ComTastatur auf XP) oder ein USB-Leser den Chip wie eine Tastatur eintippt – dann steht unten „über Tastatur".</span>
+                </dd>
                 <dt class="text-gray-500">Letzter Fehler</dt>
                 <dd class="break-all text-sm" x-text="serialFehler || '–'"></dd>
                 <dt class="text-gray-500">Zuletzt empfangen</dt>
