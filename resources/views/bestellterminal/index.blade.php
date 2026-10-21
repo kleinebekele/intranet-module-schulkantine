@@ -111,51 +111,58 @@
         </div>
     </div>
     {{-- Abmeldung: sofort im Browser abdecken, nicht erst auf die (langsame) Antwort des Servers warten. --}}
-    <div x-show="abgemeldet" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-gray-100">
+    <div :style="abgemeldet ? '' : 'display:none'" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-gray-100">
         <div class="rounded-2xl border-4 border-amber-500 bg-amber-300 px-8 py-4 text-3xl font-extrabold text-gray-900 shadow-lg">Abgemeldet – bitte Chip auflegen</div>
     </div>
 
-    {{-- Kopfzeile --}}
-    <header class="flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
+    {{-- Schwebende Hinweise: liegen über der Seite und schieben nichts weg (langsame Rechner
+         zeichnen sonst die ganze Seite neu). Ein-/Ausblenden per :style statt x-show – x-show
+         blendet erst beim nächsten Bildaufbau ein und kann auf langsamen Geräten ein späteres
+         Ausblenden überholen. --}}
+    <div :style="angemeldet && rest <= warnAb ? '' : 'display:none'" x-cloak
+         class="fixed inset-x-0 top-0 z-50 bg-amber-300 px-4 py-3 text-center text-lg font-semibold text-amber-900 shadow-lg">
+        Keine Eingabe – du wirst in <span x-text="rest"></span> Sekunden abgemeldet. Tippe irgendwo, um weiterzumachen.
+    </div>
+    <div :style="meldung ? '' : 'display:none'" x-cloak
+         class="fixed inset-x-0 top-0 z-50 bg-red-600 px-4 py-3 text-center text-lg font-semibold text-white shadow-lg" x-text="meldung"></div>
+
+    {{-- Kopfzeile: feste Höhe; ausgetauscht werden nur Name und Kosten-Kachel. --}}
+    <header class="flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-4 py-3 sm:px-6" style="height: 88px">
         <div class="flex items-center gap-3">
             <x-module-icon name="restaurant" class="text-3xl text-indigo-600" />
             <div>
                 <div class="text-lg font-semibold text-gray-800">Essen bestellen</div>
-                @if ($besteller)
-                    <div class="text-sm text-gray-500">Angemeldet: <span class="font-semibold text-gray-800">{{ $besteller->name }}</span></div>
-                @else
-                    <div class="text-sm text-gray-500">Bestell-Terminal der Mensa</div>
-                @endif
+                <div class="text-sm text-gray-500" id="kopf-name">
+                    @if ($besteller)
+                        Angemeldet: <span class="font-semibold text-gray-800">{{ $besteller->name }}</span>
+                    @else
+                        Bestell-Terminal der Mensa
+                    @endif
+                </div>
             </div>
         </div>
 
-        @if ($besteller)
-            <div class="flex items-center gap-3">
-                @if ($season && $kostenZeigen)
+        <div class="flex items-center gap-3">
+            {{-- Nur bei einem Problem mit dem alten COM-Leser (mit ?chip=an) – verbunden = nichts. --}}
+            <div x-show="chipUi && ! serialOk" x-cloak class="text-sm font-semibold">
+                <button type="button" x-show="hasSerial()" @click="serialConnect(true)"
+                        class="rounded-lg bg-red-600 px-3 py-2 text-white shadow hover:bg-red-700">⚠ Chip-Leser nicht verbunden – antippen</button>
+                <span x-show="! hasSerial()" class="inline-block rounded-lg bg-red-100 px-3 py-2 text-red-700">Browser kann keinen COM-Leser ansprechen</span>
+            </div>
+            <div id="kopf-kosten">
+                @if ($besteller && $season && $kostenZeigen)
                     <div class="hidden rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-1.5 text-right sm:block">
                         <div class="text-[11px] uppercase tracking-wide text-indigo-400">Kosten im {{ $monthStart->isoFormat('MMMM YYYY') }}</div>
                         <div class="text-lg font-bold text-indigo-700" id="month-total">{{ $money($monthTotal) }}</div>
                     </div>
                 @endif
             </div>
-        @else
-            {{-- Oben rechts (nur mit ?chip=an): nur bei einem Problem mit dem alten COM-Leser etwas
-                 zeigen – verbunden = nichts. Der Hinweis „Chip auflegen" steht unter dem Speiseplan. --}}
-            <div x-show="chipUi && ! serialOk" x-cloak class="text-sm font-semibold">
-                <button type="button" x-show="hasSerial()" @click="serialConnect(true)"
-                        class="rounded-lg bg-red-600 px-3 py-2 text-white shadow hover:bg-red-700">⚠ Chip-Leser nicht verbunden – antippen</button>
-                <span x-show="! hasSerial()" class="inline-block rounded-lg bg-red-100 px-3 py-2 text-red-700">Browser kann keinen COM-Leser ansprechen</span>
-            </div>
-        @endif
+        </div>
     </header>
 
-    @if ($besteller)
-        {{-- Untätigkeit: kurz vor der Abmeldung deutlich warnen. --}}
-        <div x-show="rest <= warnAb" x-cloak class="bg-amber-100 px-4 py-2 text-center text-sm font-medium text-amber-800">
-            Keine Eingabe – du wirst in <span x-text="rest"></span> Sekunden abgemeldet. Tippe irgendwo, um weiterzumachen.
-        </div>
-
-        <main class="flex-1 p-3 sm:p-6">
+    {{-- Inhalt: wird beim An- und Abmelden per JS ausgetauscht (kein Neuladen der Seite). --}}
+    <main class="flex-1 p-3 sm:p-6" id="terminal-inhalt" data-angemeldet="{{ $besteller ? '1' : '0' }}">
+        @if ($besteller)
             @include('schulkantine::orders._woche', [
                 'routen' => [
                     'woche' => 'kantine.bestellterminal.index',
@@ -170,22 +177,16 @@
 
             {{-- Unter dem Speiseplan, mittig – an derselben Stelle und genauso groß wie „Bitte Chip
                  auflegen" vor der Anmeldung, nur rötlich. --}}
-            <form method="POST" action="{{ route('kantine.bestellterminal.abmelden') }}" x-ref="abmelden" @submit="abgemeldet = true"
-                  class="mt-6 flex justify-center">
-                @csrf
-                <button type="submit"
+            <div class="mt-6 flex justify-center">
+                <button type="button" @click="abmelden()"
                         class="flex items-center gap-3 rounded-2xl border-4 border-red-600 bg-red-500 px-8 py-3 text-3xl font-extrabold text-white shadow-lg hover:bg-red-600">
                     <svg class="h-10 w-10 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/></svg>
                     Abmelden
-                    <span x-show="rest <= warnAb" x-cloak class="text-xl font-semibold text-red-100" x-text="'(' + rest + ' s)'"></span>
+                    <span :style="rest <= warnAb ? '' : 'display:none'" class="text-xl font-semibold text-red-100" x-text="'(' + rest + ' s)'"></span>
                 </button>
-            </form>
-        </main>
-    @else
-        {{-- Ohne Anmeldung: Speiseplan der Woche zum Ansehen; bestellen erst nach Chip. --}}
-        <div x-show="meldung" x-cloak class="bg-red-100 px-4 py-3 text-center text-lg font-medium text-red-700" x-text="meldung"></div>
-
-        <main class="flex-1 p-3 sm:p-6">
+            </div>
+        @else
+            {{-- Ohne Anmeldung: Speiseplan der Woche zum Ansehen; bestellen erst nach Chip. --}}
             @include('schulkantine::orders._woche', [
                 'routen' => [
                     'woche' => 'kantine.bestellterminal.index',
@@ -218,9 +219,8 @@
                     </select>
                 </div>
             @endif
-        </main>
-    @endif
-
+        @endif
+    </main>
 </div>
 
 @include('schulkantine::partials.chip-bedienung')
@@ -230,6 +230,7 @@
             chipUi: false,   // „Chip auflegen" + COM-Knopf: nur mit ?chip=an in der Adresse
             angemeldet: @js((bool) $besteller),
             urlAnmelden: @js(route('kantine.bestellterminal.anmelden')),
+            urlAbmelden: @js(route('kantine.bestellterminal.abmelden')),
             csrf: document.querySelector('meta[name=csrf-token]').content,
             busy: false,
             meldung: '',
@@ -264,30 +265,76 @@
                     setInterval(() => { if (! this.serialOk) this.serialConnect(false); }, 3000);
                 }
 
+                // Ein Takt für beide Zustände – „angemeldet" wechselt ohne Neuladen.
+                //  angemeldet: nach leerlauf Sekunden ohne Eingabe abmelden (genau einmal).
+                //  ohne Chip:  nach Untätigkeit neu laden (Startwoche) – aus einer anderen Woche nach
+                //              leerlauf Sekunden, sonst alle 5 Minuten (neuer Speiseplan, neue Version).
+                let ruhe = 0;
                 ['pointerdown', 'keydown', 'scroll', 'wheel'].forEach(ev =>
-                    window.addEventListener(ev, () => { this.rest = this.leerlauf; }, { passive: true }));
-                if (this.angemeldet) {
-                    // Abmeldung genau einmal abschicken – auf langsamen Geräten dauert sie ein paar
-                    // Sekunden; der Zähler bleibt bei 0 statt weiterzulaufen und erneut zu senden.
-                    setInterval(() => {
-                        if (this.abgemeldet) return;
+                    window.addEventListener(ev, () => { this.rest = this.leerlauf; ruhe = 0; }, { passive: true }));
+                setInterval(() => {
+                    if (this.busy || this.abgemeldet) return;
+                    if (this.angemeldet) {
                         this.rest = Math.max(0, this.rest - 1);
-                        if (this.rest === 0) { this.abgemeldet = true; this.$refs.abmelden.submit(); }
-                    }, 1000);
-                } else {
-                    // Ohne Chip: nach Untätigkeit neu laden (Startwoche). Aus einer anderen Woche
-                    // nach leerlauf Sekunden, sonst alle 5 Minuten – so kommen neuer Speiseplan und
-                    // neue Versionen nach einem Deploy ohne F5 an.
+                        if (this.rest === 0) this.abmelden();
+                        return;
+                    }
+                    ruhe++;
                     const andereWoche = new URLSearchParams(location.search).has('week');
-                    let ruhe = 0;
-                    ['pointerdown', 'keydown', 'scroll', 'wheel'].forEach(ev =>
-                        window.addEventListener(ev, () => { ruhe = 0; }, { passive: true }));
-                    setInterval(() => {
-                        ruhe++;
-                        if (! this.busy && ((andereWoche && ruhe >= this.leerlauf) || ruhe >= this.neuLadenNach)) {
-                            location.href = location.pathname;
-                        }
-                    }, 1000);
+                    if ((andereWoche && ruhe >= this.leerlauf) || ruhe >= this.neuLadenNach) location.href = location.pathname;
+                }, 1000);
+            },
+
+            // Seite für den neuen Zustand holen und nur Name, Kosten-Kachel und Inhalt austauschen.
+            async seiteLaden(html) {
+                try {
+                    if (html === undefined) {
+                        const res = await fetch(location.pathname, { credentials: 'same-origin', headers: { 'Accept': 'text/html' } });
+                        html = await res.text();
+                    }
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    const inhalt = doc.getElementById('terminal-inhalt');
+                    if (! inhalt) throw new Error('kein Inhalt');
+                    ['kopf-name', 'kopf-kosten'].forEach(id => {
+                        const neu = doc.getElementById(id), alt = document.getElementById(id);
+                        if (neu && alt) alt.innerHTML = neu.innerHTML;
+                    });
+                    const main = document.getElementById('terminal-inhalt');
+                    main.innerHTML = inhalt.innerHTML;
+                    main.dataset.angemeldet = inhalt.dataset.angemeldet;
+                    const token = doc.querySelector('meta[name=csrf-token]');
+                    if (token) {
+                        this.csrf = token.content;
+                        document.querySelector('meta[name=csrf-token]').content = token.content;
+                    }
+                    this.angemeldet = inhalt.dataset.angemeldet === '1';
+                    this.rest = this.leerlauf;
+                    if (location.search) history.replaceState(null, '', location.pathname);
+                    window.scrollTo(0, 0);
+                } catch (e) {
+                    location.href = location.pathname; // Notfall: klassisch neu laden
+                    return;
+                }
+                this.abgemeldet = false;
+                this.busy = false;
+            },
+
+            // Abmelden ohne Seitenwechsel: sofort abdecken, dann im Hintergrund abmelden und
+            // die Gast-Ansicht einsetzen (die Antwort auf die Abmeldung IST schon diese Seite).
+            async abmelden() {
+                if (this.abgemeldet) return;
+                this.abgemeldet = true;
+                this.busy = true;
+                try {
+                    const res = await fetch(this.urlAbmelden, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': this.csrf, 'Accept': 'text/html' },
+                        credentials: 'same-origin',
+                    });
+                    if (res.status === 419) { location.href = location.pathname; return; }
+                    await this.seiteLaden(await res.text());
+                } catch (e) {
+                    location.href = location.pathname;
                 }
             },
 
@@ -304,10 +351,11 @@
                     });
                     if (res.status === 419) { location.reload(); return; }
                     const data = await res.json();
-                    if (data.found) { location.href = location.pathname; return; }
+                    if (data.found) { this.meldung = ''; await this.seiteLaden(); return; }
                     // Unbekannter Chip: wer gerade angemeldet war, ist jetzt abgemeldet.
-                    if (this.angemeldet) { location.href = location.pathname; return; }
+                    if (this.angemeldet) { await this.seiteLaden(); return; }
                     this.meldung = 'Dieser Chip ist nicht bekannt. Bitte im Sekretariat melden.';
+                    setTimeout(() => { this.meldung = ''; }, 5000);
                 } catch (e) {
                     this.meldung = 'Anmeldung nicht möglich – bitte noch einmal versuchen.';
                 }
