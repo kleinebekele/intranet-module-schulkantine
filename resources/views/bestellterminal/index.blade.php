@@ -239,6 +239,8 @@
 @includeIf('layouts.dialog')
 @include('schulkantine::partials.chip-bedienung')
 <script>
+    // Offene COM-Anschlüsse (bewusst außerhalb von Alpine, s. serialConnect).
+    const offenePorts = new Set();
     document.addEventListener('alpine:init', () => {
         Alpine.data('bestellTerminal', () => ({
             chipUi: false,   // „Chip auflegen" + COM-Knopf: nur mit ?chip=an in der Adresse
@@ -400,28 +402,38 @@
 
             // ---- Alter serieller Leser (Web Serial), wie im Ausgabe-Terminal ----
             hasSerial() { return 'serial' in navigator; },
+            // Verbindet ALLE freigegebenen Anschlüsse und hört auf jedem mit – per Edge-Richtlinie
+            // (SerialAllowAllPortsForUrls) sind das alle COM-Anschlüsse des Geräts, der Leser kann
+            // also an irgendeinem hängen. Die Ports liegen außerhalb des Alpine-Zustands (offenePorts),
+            // weil ein Proxy um das native SerialPort-Objekt dessen Methoden bricht.
             async serialConnect(ask) {
                 if (this.serialVerbindet) return;
                 this.serialVerbindet = true;
                 try {
-                    let port = null;
-                    if (ask) port = await navigator.serial.requestPort();
-                    else port = (await navigator.serial.getPorts())[0] || null;
-                    if (!port) return;
-                    // Schon offen (in dieser Seite)? Dann nur wieder mitlesen statt erneut öffnen.
-                    if (!port.readable) await port.open({ baudRate: 9600 });
-                    this.serialOk = true;
-                    this.serialRead(port);
+                    const ports = ask ? [await navigator.serial.requestPort()] : await navigator.serial.getPorts();
+                    for (const port of ports) {
+                        if (offenePorts.has(port)) continue;
+                        try {
+                            if (!port.readable) await port.open({ baudRate: 9600 });
+                            offenePorts.add(port);
+                            this.serialRead(port);
+                        } catch (err) {
+                            // belegt oder kein serielles Gerät – beim nächsten Versuch erneut
+                            this.serialFehler = new Date().toLocaleTimeString('de-DE') + ': ' + (err && err.message ? err.message : err);
+                            if (ask) this.meldung = 'COM-Leser: ' + (err && err.message ? err.message : err);
+                        }
+                    }
                 } catch (err) {
-                    this.serialOk = false;
                     this.serialFehler = new Date().toLocaleTimeString('de-DE') + ': ' + (err && err.message ? err.message : err);
                     if (ask) this.meldung = 'COM-Leser: ' + (err && err.message ? err.message : err);
                 } finally {
+                    this.serialOk = offenePorts.size > 0;
                     this.serialVerbindet = false;
                 }
             },
             async serialRead(port) {
                 const dec = new TextDecoder();
+                const puffer = { text: '' };
                 try {
                     while (port.readable) {
                         const reader = port.readable.getReader();
@@ -429,25 +441,27 @@
                             while (true) {
                                 const { value, done } = await reader.read();
                                 if (done) break;
-                                this.serialChunk(dec.decode(value));
+                                this.serialChunk(dec.decode(value), puffer);
                             }
                         } finally { reader.releaseLock(); }
                     }
                 } catch (e) { /* Leser abgezogen */ }
-                this.serialOk = false;
+                offenePorts.delete(port);
+                this.serialOk = offenePorts.size > 0;
             },
-            serialChunk(text) {
+            serialChunk(text, puffer) {
                 for (const ch of text) {
                     const c = ch.charCodeAt(0);
-                    if (c === 2) { this.serialBuf = ''; continue; }
+                    if (c === 2) { puffer.text = ''; continue; }
                     if (c === 3 || c === 13 || c === 10) {
-                        const roh = this.serialBuf;
+                        const roh = puffer.text;
                         const uid = this.serialUid(roh);
-                        this.serialBuf = '';
-                        if (roh.trim() !== '') this.chipGelesen(uid, 'COM', roh);
+                        puffer.text = '';
+                        // Nur echte Leser-Rahmen werten – andere Geräte an anderen Ports ignorieren.
+                        if (roh.trim() !== '' && /^0?[0-9A-Fa-f]{10}.$/.test(roh.trim())) this.chipGelesen(uid, 'COM', roh);
                         continue;
                     }
-                    this.serialBuf += ch;
+                    if (puffer.text.length < 64) puffer.text += ch;
                 }
             },
             // Ein echter Chip kam an (COM-Leser oder Tastatur-Leser): für die Diagnose merken,
