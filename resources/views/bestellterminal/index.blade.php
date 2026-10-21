@@ -12,6 +12,15 @@
         [x-cloak] { display: none !important; }
         html, body { overscroll-behavior: none; }
         body { -webkit-tap-highlight-color: transparent; }
+        /* Schwebende Meldungen (Bestellt/Abbestellt …) blenden sich selbst aus. */
+        @keyframes kantine-toast-weg { 0%, 80% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+        /* Rückfrage-Dialog des Intranets in Terminal-Farben und für Finger: groß, Abbestellen rot. */
+        [role="dialog"] h3 { font-size: 1.5rem; }
+        [role="dialog"] p { font-size: 1.125rem; }
+        [role="dialog"] button { font-size: 1.125rem; padding: 0.75rem 1.5rem; border-radius: 0.75rem; }
+        [role="dialog"] button[x-ref="ok"] { background-color: #dc2626 !important; font-weight: 700; }
+        [role="dialog"] button[x-ref="ok"]:hover { background-color: #b91c1c !important; }
+        [role="dialog"] button:not([x-ref="ok"]) { background-color: #f3f4f6; color: #374151; }
     </style>
 </head>
 <body class="min-h-full select-none bg-gray-100 font-sans antialiased text-gray-800" oncontextmenu="return false">
@@ -33,7 +42,7 @@
                 document.body.style.paddingRight = n + '%';
                 // Dialoge (fixed inset-0) ebenfalls vor der Blende enden lassen.
                 const st = document.createElement('style');
-                st.textContent = '.fixed.inset-0 { right: ' + n + '% !important; }';
+                st.textContent = '.fixed.inset-0, .fixed.inset-x-0 { right: ' + n + '% !important; }';
                 document.head.appendChild(st);
             }
         })();
@@ -120,11 +129,11 @@
          blendet erst beim nächsten Bildaufbau ein und kann auf langsamen Geräten ein späteres
          Ausblenden überholen. --}}
     <div :style="angemeldet && rest <= warnAb ? '' : 'display:none'" x-cloak
-         class="fixed inset-x-0 top-0 z-50 bg-amber-300 px-4 py-3 text-center text-lg font-semibold text-amber-900 shadow-lg">
+         class="fixed inset-x-0 bottom-0 z-50 bg-amber-300 px-4 py-3 text-center text-lg font-semibold text-amber-900 shadow-lg">
         Keine Eingabe – du wirst in <span x-text="rest"></span> Sekunden abgemeldet. Tippe irgendwo, um weiterzumachen.
     </div>
     <div :style="meldung ? '' : 'display:none'" x-cloak
-         class="fixed inset-x-0 top-0 z-50 bg-red-600 px-4 py-3 text-center text-lg font-semibold text-white shadow-lg" x-text="meldung"></div>
+         class="fixed inset-x-0 bottom-0 z-50 bg-red-600 px-4 py-3 text-center text-lg font-semibold text-white shadow-lg" x-text="meldung"></div>
 
     {{-- Kopfzeile: feste Höhe; ausgetauscht werden nur Name und Kosten-Kachel. --}}
     <header class="relative flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-4 py-3 sm:px-6" style="height: 88px">
