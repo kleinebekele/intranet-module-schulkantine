@@ -174,20 +174,23 @@ class MenueServeImportController
             $buchungen = new MenueServeBuchungen;
             $plan = $buchungen->plan($season, $ab);
             $unbekannt = $buchungen->unbekannte($plan);
-            $vorhanden = $buchungen->vorhandeneJeTag($season, $plan);
+            $vorschau = $buchungen->vorschau($season, $plan);
             $fehler = null;
         } catch (\Throwable $e) {
             report($e);
             $plan = [];
             $unbekannt = [];
-            $vorhanden = [];
+            $vorschau = [];
             $fehler = $e->getMessage();
         }
 
+        // OGS läuft im eigenen Tab – hier nicht mitzählen.
+        $plan = array_values(array_filter($plan, fn ($b) => $b['status'] !== 'ogs'));
+
         return view('schulkantine::dishes.menueserve-buchungen', [
             'plan' => $plan, 'unbekannt' => $unbekannt, 'fehler' => $fehler, 'ab' => $ab,
-            'vorhanden' => $vorhanden,
-            'statusText' => MenueServeBuchungen::STATUS,
+            'vorschau' => $vorschau,
+            'statusText' => array_diff_key(MenueServeBuchungen::STATUS, ['ogs' => true, 'bereit' => true]),
         ]);
     }
 
@@ -198,10 +201,19 @@ class MenueServeImportController
 
         // Nur ein Tag (Knopf in der Tageszeile) oder alle ab $ab.
         $tag = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->input('tag')) ? (string) $request->input('tag') : null;
-        $e = (new MenueServeBuchungen)->uebernehmen($season, $ab, $request->user()->id, $tag);
+        // Gelöscht wird nur bei „übernehmen und löschen" – und nur bei den angehakten Personen.
+        $loeschen = [];
+        if ($request->input('modus') === 'loeschen') {
+            foreach ((array) $request->input('loeschen', []) as $t => $ids) {
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $t)) {
+                    $loeschen[(string) $t] = array_map('intval', (array) $ids);
+                }
+            }
+        }
+        $e = (new MenueServeBuchungen)->uebernehmen($season, $ab, $request->user()->id, $tag, $loeschen);
 
         return redirect()->route('module.schulkantine.seasons.menueserve.buchungen', ['ab' => $ab->format('Y-m-d')])
-            ->with('status', "{$e['angelegt']} Buchungen aus Menü&Serve als Bestellung übernommen, {$e['geloescht']} bisherige Bestellzeilen ersetzt"
+            ->with('status', "{$e['angelegt']} Bestellungen aus Menü&Serve angelegt, {$e['geloescht']} Bestellungen gelöscht"
                 .($tag ? ' ('.Carbon::parse($tag)->format('d.m.Y').').' : '.'));
     }
 

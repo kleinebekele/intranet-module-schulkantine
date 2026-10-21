@@ -5,7 +5,7 @@
 
     @php
         $tage = collect($plan)->groupBy('tag')->sortKeys();
-        $bereit = collect($plan)->where('status', 'bereit')->count();
+        $summe = fn ($feld) => collect($vorschau)->sum($feld);
         $farbe = fn ($s) => match ($s) {
             'bereit' => 'text-sky-700',
             'storniert', 'ogs' => 'text-gray-400',
@@ -27,9 +27,11 @@
 
         <p class="text-sm text-gray-500">
             Jede Buchung wird über die Linear-Nummer einer Person zugeordnet und als Bestellung für das Speiseplan-Menü
-            des Tages angelegt (ohne Bestellfristen). Voraussetzung: das Menü ist zugeordnet und steht vollständig im Speiseplan.
-            <strong>Für jeden übernommenen Tag werden alle bisherigen Menü- und Gericht-Bestellungen bei uns ersetzt</strong>
-            (Menü&amp;Serve ist bis zum Umstieg die Quelle; ein zweiter Lauf ergibt dasselbe). OGS-Kinder laufen bei uns über das Abo – dafür der Tab „OGS übernehmen".
+            des Tages angelegt (ohne Bestellfristen). Gezählt wird in <strong>Bestellungen</strong>: ein Menü oder ein Einzelgericht.
+            <strong>„Nur übernehmen"</strong> legt an, was fehlt, und löscht nichts. <strong>„Übernehmen und löschen"</strong>
+            löscht zusätzlich bei den angehakten Personen, was bei uns steht, aber nicht so in Menü&amp;Serve gebucht ist.
+            Wer an einem Tag nur bei uns bestellt hat (keine Menü&amp;Serve-Buchung), ist standardmäßig nicht angehakt.
+            OGS-Kinder laufen über das Abo – dafür der Tab „OGS übernehmen".
         </p>
 
         @if ($fehler)
@@ -37,55 +39,114 @@
         @endif
 
         @if ($plan)
-            {{-- Je Tag: wie viele Buchungen mit welchem Ergebnis --}}
-            <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400">
-                                <th class="px-4 py-2 font-medium">Tag</th>
-                                <th class="px-3 py-2 text-right font-medium">Buchungen</th>
-                                @foreach ($statusText as $s => $text)
-                                    <th class="px-3 py-2 text-right font-medium {{ $farbe($s) }}">{{ $text }}</th>
-                                @endforeach
-                                <th class="px-3 py-2 text-right font-medium text-red-700" title="Menü-/Gericht-Bestellzeilen, die bei uns an dem Tag schon stehen und ersetzt werden">wird ersetzt</th>
-                                <th class="px-3 py-2"></th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            @foreach ($tage as $tag => $liste)
-                                <tr>
-                                    <td class="whitespace-nowrap px-4 py-2 font-medium text-gray-900">
-                                        {{ \Illuminate\Support\Carbon::parse($tag)->locale('de')->isoFormat('dd DD.MM.YYYY') }}
-                                        <span class="ml-1 text-xs font-normal text-gray-400">{{ $liste->pluck('titel')->filter()->unique()->implode(', ') }}</span>
-                                    </td>
-                                    <td class="px-3 py-2 text-right tabular-nums text-gray-700">{{ $liste->count() }}</td>
-                                    @foreach ($statusText as $s => $text)
-                                        @php $n = $liste->where('status', $s)->count(); @endphp
-                                        <td class="px-3 py-2 text-right tabular-nums {{ $n ? $farbe($s) : 'text-gray-300' }}">{{ $n ?: '–' }}</td>
-                                    @endforeach
-                                    @php
-                                        $tagBereit = $liste->where('status', 'bereit')->count();
-                                        $ersetzt = $vorhanden[$tag] ?? 0;
-                                    @endphp
-                                    <td class="px-3 py-2 text-right tabular-nums {{ $ersetzt ? 'text-red-700' : 'text-gray-300' }}">{{ $ersetzt ?: '–' }}</td>
-                                    <td class="px-3 py-2 text-right">
-                                        @if ($tagBereit > 0)
-                                            <form method="POST" action="{{ route('module.schulkantine.seasons.menueserve.buchungen.uebernehmen') }}"
-                                                  onsubmit="return confirm(@js($tagBereit.' Buchungen vom '.\Illuminate\Support\Carbon::parse($tag)->format('d.m.Y').' als Bestellung anlegen? '.$ersetzt.' bisherige Bestellzeilen dieses Tages werden ersetzt.'))">
-                                                @csrf
-                                                <input type="hidden" name="ab" value="{{ $ab->format('Y-m-d') }}">
-                                                <input type="hidden" name="tag" value="{{ $tag }}">
-                                                <button type="submit" class="whitespace-nowrap rounded-md border border-sky-300 bg-white px-2 py-1 text-xs font-medium text-sky-800 hover:bg-sky-50">Tag übernehmen</button>
-                                            </form>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+            {{-- Je Tag: was die Übernahme bewirkt. Ein Formular für alles; „Tag übernehmen" schickt
+                 nur seinen Tag, „Alle Tage übernehmen" alle. Gelöscht wird nur im Modus „löschen"
+                 und nur bei angehakten Personen. --}}
+            <form method="POST" action="{{ route('module.schulkantine.seasons.menueserve.buchungen.uebernehmen') }}" id="ms-uebernahme"
+                  x-data="{ modus: 'nur', n: {}, rechne() { const n = {}; this.$root.querySelectorAll('input[data-tag]:checked').forEach(c => { n[c.dataset.tag] = (n[c.dataset.tag] || 0) + Number(c.dataset.n); }); this.n = n; }, get gesamt() { return Object.values(this.n).reduce((a, b) => a + b, 0); } }"
+                  x-init="rechne()" @change="rechne()"
+                  onsubmit="return confirm('Übernahme starten? Angelegt wird, was fehlt. Gelöscht wird nur bei „Übernehmen und löschen“ und nur bei den angehakten Personen.')"
+                  class="space-y-4">
+                @csrf
+                <input type="hidden" name="ab" value="{{ $ab->format('Y-m-d') }}">
+
+                <div class="flex flex-wrap items-center gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm">
+                    <span class="font-medium text-gray-700">Modus:</span>
+                    <label class="inline-flex items-center gap-2"><input type="radio" name="modus" value="nur" x-model="modus" class="text-indigo-600"> Nur übernehmen (nichts löschen)</label>
+                    <label class="inline-flex items-center gap-2"><input type="radio" name="modus" value="loeschen" x-model="modus" class="text-red-600"> Übernehmen und angehakte löschen</label>
                 </div>
-            </div>
+
+                <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400">
+                                    <th class="px-4 py-2 font-medium">Tag</th>
+                                    <th class="px-3 py-2 text-right font-medium">Buchungen</th>
+                                    @foreach ($statusText as $s => $text)
+                                        <th class="px-3 py-2 text-right font-medium {{ $farbe($s) }}">{{ $text }}</th>
+                                    @endforeach
+                                    <th class="px-3 py-2 text-right font-medium text-sky-700" title="Bestellungen (Menü bzw. Einzelgericht), die neu angelegt werden">wird angelegt</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-500" title="Steht schon genauso bei uns – bleibt">schon vorhanden</th>
+                                    <th class="px-3 py-2 text-right font-medium text-red-700" title="Bestellungen der angehakten Personen, die gelöscht werden (nur im Modus „löschen“)">wird gelöscht</th>
+                                    <th class="px-3 py-2"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                @foreach ($tage as $tag => $liste)
+                                    @php
+                                        $v = $vorschau[$tag] ?? ['neu' => 0, 'vorhanden' => 0, 'loeschbar' => []];
+                                        $moeglich = collect($v['loeschbar'])->sum(fn ($p) => count($p['posten']));
+                                    @endphp
+                                    <tr>
+                                        <td class="whitespace-nowrap px-4 py-2 font-medium text-gray-900">
+                                            {{ \Illuminate\Support\Carbon::parse($tag)->locale('de')->isoFormat('dd DD.MM.YYYY') }}
+                                            <span class="ml-1 text-xs font-normal text-gray-400">{{ $liste->pluck('titel')->filter()->unique()->implode(', ') }}</span>
+                                        </td>
+                                        <td class="px-3 py-2 text-right tabular-nums text-gray-700">{{ $liste->count() }}</td>
+                                        @foreach ($statusText as $s => $text)
+                                            @php $n = $liste->where('status', $s)->count(); @endphp
+                                            <td class="px-3 py-2 text-right tabular-nums {{ $n ? $farbe($s) : 'text-gray-300' }}">{{ $n ?: '–' }}</td>
+                                        @endforeach
+                                        <td class="px-3 py-2 text-right font-semibold tabular-nums {{ $v['neu'] ? 'text-sky-700' : 'text-gray-300' }}">{{ $v['neu'] ?: '–' }}</td>
+                                        <td class="px-3 py-2 text-right tabular-nums {{ $v['vorhanden'] ? 'text-gray-500' : 'text-gray-300' }}">{{ $v['vorhanden'] ?: '–' }}</td>
+                                        <td class="px-3 py-2 text-right font-semibold tabular-nums">
+                                            <span x-show="modus === 'loeschen'" :class="(n['{{ $tag }}'] || 0) ? 'text-red-700' : 'text-gray-300'"
+                                                  x-text="(n['{{ $tag }}'] || 0) || '–'"></span>
+                                            <span x-show="modus !== 'loeschen'" class="font-normal text-gray-300"
+                                                  title="{{ $moeglich }} Bestellungen wären löschbar">–</span>
+                                        </td>
+                                        <td class="px-3 py-2 text-right">
+                                            @if ($v['neu'] > 0 || $moeglich > 0)
+                                                <button type="submit" name="tag" value="{{ $tag }}"
+                                                        class="whitespace-nowrap rounded-md border border-sky-300 bg-white px-2 py-1 text-xs font-medium text-sky-800 hover:bg-sky-50">Tag übernehmen</button>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                    @if ($v['loeschbar'])
+                                        {{-- Wer würde gelöscht? Je Person anhakbar. --}}
+                                        <tr x-show="modus === 'loeschen'" x-cloak class="bg-red-50/40">
+                                            <td colspan="{{ 6 + count($statusText) }}" class="px-4 py-2">
+                                                <div class="mb-1 text-xs font-medium uppercase tracking-wide text-red-700">Löschen am {{ \Illuminate\Support\Carbon::parse($tag)->format('d.m.') }} – Personen anhaken</div>
+                                                <div class="grid gap-x-6 gap-y-1 sm:grid-cols-2 xl:grid-cols-3">
+                                                    @foreach ($v['loeschbar'] as $p)
+                                                        <label class="flex items-start gap-2 text-sm">
+                                                            <input type="checkbox" name="loeschen[{{ $tag }}][]" value="{{ $p['user_id'] }}"
+                                                                   data-tag="{{ $tag }}" data-n="{{ count($p['posten']) }}" @checked($p['inMs'])
+                                                                   class="mt-0.5 rounded border-gray-300 text-red-600 focus:ring-red-500">
+                                                            <span>
+                                                                <span class="font-medium text-gray-900">{{ $p['name'] }}</span>
+                                                                <span class="text-gray-500">– {{ implode(', ', $p['posten']) }}</span>
+                                                                @if (! $p['inMs'])
+                                                                    <span class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">nur bei uns bestellt</span>
+                                                                @else
+                                                                    <span class="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600">in Menü&amp;Serve anders gebucht</span>
+                                                                @endif
+                                                            </span>
+                                                        </label>
+                                                    @endforeach
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endif
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-end gap-4">
+                    <span class="text-sm text-gray-600">
+                        Insgesamt: <strong class="text-sky-700">{{ $summe('neu') }}</strong> anlegen ·
+                        <strong>{{ $summe('vorhanden') }}</strong> bleiben ·
+                        <strong class="text-red-700" x-text="modus === 'loeschen' ? gesamt : 0"></strong> löschen
+                    </span>
+                    <button type="submit"
+                            class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                        Alle Tage übernehmen
+                    </button>
+                </div>
+            </form>
 
             {{-- Unbekannte Konten: wer ist das? --}}
             @if ($unbekannt)
@@ -139,15 +200,6 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('module.schulkantine.seasons.menueserve.buchungen.uebernehmen') }}" class="flex justify-end"
-                  onsubmit="return confirm(@js($bereit.' Buchungen als Bestellung anlegen? Alle bisherigen Menü-/Gericht-Bestellungen dieser Tage ('.array_sum($vorhanden).' Zeilen) werden ersetzt.'))">
-                @csrf
-                <input type="hidden" name="ab" value="{{ $ab->format('Y-m-d') }}">
-                <button type="submit" @disabled($bereit === 0)
-                        class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50">
-                    {{ $bereit }} Buchungen übernehmen
-                </button>
-            </form>
         @elseif (! $fehler)
             <div class="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-500">Ab {{ $ab->format('d.m.Y') }} gibt es in Menü&amp;Serve keine Buchungen.</div>
         @endif

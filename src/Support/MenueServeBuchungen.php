@@ -23,9 +23,14 @@ use Intranet\Modules\Schulkantine\Models\Subscription;
  * gesucht, das genau diese Gerichte enthält (Snacks: das Einzelgericht auf dem
  * Tagesplan), und dafür bestellt – wie „Menü bestellen", nur ohne Fristen.
  *
- * Menü&Serve ist bis zum Umstieg die Quelle: Für jeden übernommenen Tag werden ALLE
- * Menü-/Gericht-Bestellungen bei uns gelöscht und aus den Buchungen neu angelegt (ein
- * zweiter Lauf ergibt dasselbe). OGS-Zeilen bleiben – die gleicht der OGS-Abgleich an.
+ * Gezählt wird in Bestellungen: ein Menü (mehrere Bestellzeilen, je Gericht eine) oder
+ * ein Einzelgericht. Je Tag:
+ *  - neu: in Menü&Serve gebucht, bei uns noch nicht bestellt → wird angelegt
+ *  - vorhanden: steht schon genauso bei uns → bleibt
+ *  - löschbar: steht bei uns, aber nicht (so) in Menü&Serve → wird nur gelöscht, wenn
+ *    „übernehmen und löschen" gewählt UND die Person angehakt ist. Personen, die an dem
+ *    Tag gar keine Menü&Serve-Buchung haben (nur im Intranet bestellt), sind standardmäßig
+ *    nicht angehakt. OGS-Zeilen bleiben immer – die gleicht der OGS-Abgleich an.
  *
  * Nicht übernommen: stornierte/gesperrte Buchungen (Menge 0, Status L), Personen
  * ohne Konto bei uns, OGS-Kinder (laufen über das Abo) und Tage ohne passendes Menü.
@@ -272,47 +277,124 @@ class MenueServeBuchungen
     }
 
     /**
-     * Wie viele Menü-/Gericht-Bestellungen je Tag bei uns schon stehen – die
-     * ersetzt die Übernahme (OGS-Zeilen zählen nicht).
+     * Je Tag, was eine Übernahme bewirkt – in Bestellungen (Menü bzw. Einzelgericht).
      *
-     * @return array<string, int>  Y-m-d → Anzahl Bestellzeilen
+     * @return array<string, array{neu: int, vorhanden: int, loeschbar: list<array{user_id: int, name: string, posten: list<string>, inMs: bool}>}>
      */
-    public function vorhandeneJeTag(Season $season, array $plan): array
+    public function vorschau(Season $season, array $plan): array
     {
-        $tage = array_values(array_unique(array_column($plan, 'tag')));
-        if ($tage === []) {
-            return [];
+        $ergebnis = [];
+        foreach ($this->tagesStand($season, $plan) as $tag => $stand) {
+            $neu = 0;
+            $vorhanden = 0;
+            foreach ($stand['gewollt'] as $userId => $schluessel) {
+                foreach (array_keys($schluessel) as $k) {
+                    isset($stand['bestehend'][$userId][$k]) ? $vorhanden++ : $neu++;
+                }
+            }
+            $loeschbar = [];
+            foreach ($stand['bestehend'] as $userId => $einheiten) {
+                $weg = array_diff_key($einheiten, $stand['gewollt'][$userId] ?? []);
+                if ($weg) {
+                    $loeschbar[] = [
+                        'user_id' => $userId,
+                        'name' => $stand['namen'][$userId] ?? ('#'.$userId),
+                        'posten' => array_values($weg),
+                        'inMs' => isset($stand['gewollt'][$userId]),
+                    ];
+                }
+            }
+            usort($loeschbar, fn ($x, $y) => strcmp($x['name'], $y['name']));
+            $ergebnis[$tag] = ['neu' => $neu, 'vorhanden' => $vorhanden, 'loeschbar' => $loeschbar];
         }
 
-        return Order::where('season_id', $season->id)->whereNotNull('category_id')
-            ->whereBetween('date', [min($tage), max($tage).' 23:59:59'])->get(['date'])
-            ->countBy(fn ($o) => $o->date->toDateString())->all();
+        return $ergebnis;
     }
 
     /**
-     * Buchungen ab $ab übernehmen – alle Tage oder nur einer. Je Tag werden zuerst
-     * ALLE Menü-/Gericht-Bestellungen gelöscht, dann aus den Buchungen neu angelegt.
+     * Je Tag: was Menü&Serve will (Person → Bestellschlüssel) und was bei uns steht
+     * (Person → Schlüssel → Bezeichnung). Schlüssel: "md<MenuDay-ID>" für ein Menü,
+     * "g<Gericht-ID>" für ein Einzelgericht.
      *
-     * @return array{angelegt: int, geloescht: int, plan: list<array>}
+     * @return array<string, array{gewollt: array<int, array<string, true>>, bestehend: array<int, array<string, string>>, namen: array<int, string>}>
      */
-    public function uebernehmen(Season $season, Carbon $ab, ?int $durch, ?string $nurTag = null): array
+    private function tagesStand(Season $season, array $plan): array
+    {
+        $plan = array_values(array_filter($plan, fn ($b) => $b['status'] !== 'ogs'));
+        $tage = array_values(array_unique(array_column($plan, 'tag')));
+        sort($tage);
+        $stand = [];
+        foreach ($tage as $tag) {
+            $stand[$tag] = ['gewollt' => [], 'bestehend' => [], 'namen' => []];
+        }
+        foreach ($plan as $b) {
+            if ($b['status'] === 'bereit') {
+                $stand[$b['tag']]['gewollt'][$b['user']->id][$this->schluessel($b['ziel'])] = true;
+            }
+        }
+        if ($tage === []) {
+            return [];
+        }
+        $orders = Order::with(['menuDay', 'dish', 'user'])->where('season_id', $season->id)
+            ->whereNotNull('category_id')->where('status', Order::STATUS_ORDERED)
+            ->whereBetween('date', [$tage[0], end($tage).' 23:59:59'])->get();
+        foreach ($orders as $o) {
+            $tag = $o->date->toDateString();
+            if (! isset($stand[$tag])) {
+                continue;
+            }
+            $k = $o->menu_day_id ? 'md'.$o->menu_day_id : 'g'.$o->dish_id;
+            $stand[$tag]['bestehend'][$o->user_id][$k] = $o->menu_day_id
+                ? ($o->menuDay?->name ?? 'Menü')
+                : ($o->dish?->name ?? 'Gericht');
+            $stand[$tag]['namen'][$o->user_id] = $o->user?->name ?? '';
+        }
+
+        return $stand;
+    }
+
+    private function schluessel(MenuDay|Menu $ziel): string
+    {
+        return $ziel instanceof MenuDay ? 'md'.$ziel->id : 'g'.$ziel->dish_id;
+    }
+
+    /**
+     * Buchungen ab $ab übernehmen – alle Tage oder nur einer. Angelegt wird, was in
+     * Menü&Serve gebucht und bei uns noch nicht bestellt ist. Gelöscht wird nur, was
+     * $loeschen ausdrücklich nennt (Tag → Personen-IDs) und Menü&Serve so nicht vorsieht.
+     *
+     * @param  array<string, list<int>>  $loeschen
+     * @return array{angelegt: int, geloescht: int}  in Bestellungen (Menü bzw. Einzelgericht)
+     */
+    public function uebernehmen(Season $season, Carbon $ab, ?int $durch, ?string $nurTag = null, array $loeschen = []): array
     {
         $plan = $this->plan($season, $ab);
+        $stand = $this->tagesStand($season, $plan);
         $angelegt = 0;
         $geloescht = 0;
-        $tage = collect($plan)->pluck('tag')->unique()
-            ->filter(fn ($t) => $nurTag === null || $t === $nurTag)->values();
+        $tage = collect(array_keys($stand))->filter(fn ($t) => $nurTag === null || $t === $nurTag)->values();
 
-        DB::transaction(function () use ($season, $plan, $durch, $tage, &$angelegt, &$geloescht) {
+        DB::transaction(function () use ($season, $plan, $stand, $durch, $tage, $loeschen, &$angelegt, &$geloescht) {
             foreach ($tage as $tag) {
-                $geloescht += Order::where('season_id', $season->id)->whereNotNull('category_id')
-                    ->whereDate('date', $tag)->delete();
+                foreach (array_map('intval', $loeschen[$tag] ?? []) as $userId) {
+                    $weg = array_keys(array_diff_key($stand[$tag]['bestehend'][$userId] ?? [], $stand[$tag]['gewollt'][$userId] ?? []));
+                    foreach ($weg as $k) {
+                        $q = Order::where('season_id', $season->id)->where('user_id', $userId)
+                            ->whereDate('date', $tag)->whereNotNull('category_id');
+                        str_starts_with($k, 'md')
+                            ? $q->where('menu_day_id', (int) substr($k, 2))
+                            : $q->whereNull('menu_day_id')->where('dish_id', (int) substr($k, 1));
+                        if ($q->delete() > 0) {
+                            $geloescht++;
+                        }
+                    }
+                }
             }
             foreach ($plan as $b) {
                 if ($b['status'] !== 'bereit' || ! $tage->contains($b['tag'])) {
                     continue;
                 }
-                // Zwei Buchungen derselben Person am selben Tag (z. B. doppelt gebucht) nur einmal.
+                // Schon bestellt (auch doppelt gebucht) – nichts anlegen.
                 if ($this->schonBestellt($season, $b['user'], $b['tag'], $b['ziel'])) {
                     continue;
                 }
@@ -325,7 +407,7 @@ class MenueServeBuchungen
             }
         });
 
-        return ['angelegt' => $angelegt, 'geloescht' => $geloescht, 'plan' => $plan];
+        return ['angelegt' => $angelegt, 'geloescht' => $geloescht];
     }
 
     /** @return list<array{id: string, ms_id: string, konto: string, tag: string, adrnr: string, menge: int, recsts: string, snack: bool}> */
