@@ -341,3 +341,5 @@ php artisan kantine:seed-ogs-testkinder [--count=50] [--remove]</pre>
     Ausprobieren. Vor dem echten Start die Testkonten entfernen (<code>--remove</code> bei den
     OGS-Testkindern, die übrigen in der Benutzerverwaltung).
 </div>
+
+<p class="muted" style="margin-top:1.5em;font-size:0.85em">Fleischart-Symbole: Twemoji © Twitter, Inc. und Mitwirkende (fortgeführt von jdecked/twemoji), lizenziert unter <a href="https://creativecommons.org/licenses/by/4.0/">CC-BY 4.0</a>.</p>

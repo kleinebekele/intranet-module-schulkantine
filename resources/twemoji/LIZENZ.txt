@@ -1,0 +1,5 @@
+Fleischart-Symbole (1f331, 1f966, 1f41f, 1f414, 1f404, 1f416, 1f411, 1f356)
+
+Twemoji – Copyright 2019 Twitter, Inc and other contributors; fortgeführt von jdecked/twemoji.
+Grafiken lizenziert unter CC-BY 4.0: https://creativecommons.org/licenses/by/4.0/
+Quelle: https://github.com/jdecked/twemoji (assets/svg), unverändert übernommen.

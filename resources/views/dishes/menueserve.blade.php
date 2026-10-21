@@ -32,7 +32,7 @@
                 @if ($se['gesetzt'])
                     <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-gray-600">
                         @foreach ($se['gesetzt'] as $g)
-                            <span>{{ $g['symbol'] }} {{ $g['name'] }}</span>
+                            <span>{{ \Intranet\Modules\Schulkantine\Support\Symbolbild::html($g['symbol']) }} {{ $g['name'] }}</span>
                         @endforeach
                     </div>
                 @endif

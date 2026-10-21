@@ -85,15 +85,15 @@
                     @foreach (\Intranet\Modules\Schulkantine\Models\Dish::FLEISCHARTEN as $key => [$label, $symbol])
                         <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
                             <input type="radio" name="fleischart" value="{{ $key }}" @checked($selArt === $key) class="sr-only">
-                            <span class="text-lg leading-none">{{ $symbol }}</span> {{ $label }}
+                            <span class="text-lg leading-none">{{ \Intranet\Modules\Schulkantine\Support\Symbolbild::html($symbol, $label) }}</span> {{ $label }}
                         </label>
                     @endforeach
                 </div>
                 <p class="mt-1.5 text-xs text-gray-400">
-                    Die Allergene haben Vorrang: Fisch, Krebstiere oder Weichtiere zeigen 🐟, Ei oder Milch machen aus „Vegan" „Vegetarisch".
+                    Die Allergene haben Vorrang: Fisch, Krebstiere oder Weichtiere zeigen {{ \Intranet\Modules\Schulkantine\Support\Symbolbild::html('🐟', 'Fisch') }}, Ei oder Milch machen aus „Vegan" „Vegetarisch".
                 </p>
                 @if ($dish->exists && $dish->fleischartWirksam() !== $dish->fleischart)
-                    <p class="mt-1 text-xs text-amber-700">Wegen der Allergene wird angezeigt: {{ $dish->symbol() }} {{ $dish->fleischartName() }}.</p>
+                    <p class="mt-1 text-xs text-amber-700">Wegen der Allergene wird angezeigt: {{ \Intranet\Modules\Schulkantine\Support\Symbolbild::html($dish->symbol(), $dish->fleischartName()) }} {{ $dish->fleischartName() }}.</p>
                 @endif
                 <x-input-error :messages="$errors->get('fleischart')" class="mt-2" />
             </div>

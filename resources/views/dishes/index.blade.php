@@ -147,7 +147,7 @@
                                     </td>
                                     <td class="px-3 py-2 font-medium text-gray-800">
                                         @if ($dish->symbol())
-                                            <span class="mr-1" title="{{ $dish->fleischartName() }}">{{ $dish->symbol() }}</span>
+                                            <span class="mr-1">{{ \Intranet\Modules\Schulkantine\Support\Symbolbild::html($dish->symbol(), $dish->fleischartName()) }}</span>
                                         @endif
                                         @if ($kannBearbeiten)
                                         <a href="{{ route('module.schulkantine.dishes.edit', ['dish' => $dish] + request()->only(['search', 'category', 'status', 'sort'])) }}"
