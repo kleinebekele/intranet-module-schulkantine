@@ -127,7 +127,7 @@
          class="fixed inset-x-0 top-0 z-50 bg-red-600 px-4 py-3 text-center text-lg font-semibold text-white shadow-lg" x-text="meldung"></div>
 
     {{-- Kopfzeile: feste Höhe; ausgetauscht werden nur Name und Kosten-Kachel. --}}
-    <header class="flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-4 py-3 sm:px-6" style="height: 88px">
+    <header class="relative flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-4 py-3 sm:px-6" style="height: 88px">
         <div class="flex items-center gap-3">
             <x-module-icon name="restaurant" class="text-3xl text-indigo-600" />
             <div>
@@ -140,6 +140,25 @@
                     @endif
                 </div>
             </div>
+        </div>
+
+        {{-- Mitte der Kopfzeile, unabhängig von links/rechts genau zentriert: „Bitte Chip auflegen"
+             bzw. „Abmelden". Steht oben statt unter dem Speiseplan, damit auf kleinen Monitoren
+             nichts scrollt. Wird beim An-/Abmelden mit ausgetauscht. --}}
+        <div id="kopf-mitte" class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            @if ($besteller)
+                <button type="button" @click="abmelden()"
+                        class="flex items-center gap-2 whitespace-nowrap rounded-2xl border-4 border-red-600 bg-red-500 px-5 py-1.5 text-xl font-extrabold text-white shadow-lg hover:bg-red-600">
+                    <svg class="h-8 w-8 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/></svg>
+                    Abmelden
+                    <span :style="rest <= warnAb ? '' : 'display:none'" class="text-lg font-semibold text-red-100" x-text="'(' + rest + ' s)'"></span>
+                </button>
+            @else
+                <div class="flex items-center gap-2 whitespace-nowrap rounded-2xl border-4 border-amber-500 bg-amber-300 px-5 py-1.5 text-xl font-extrabold text-gray-900 shadow-lg">
+                    <svg class="h-8 w-8 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/></svg>
+                    Bitte Chip auflegen
+                </div>
+            @endif
         </div>
 
         <div class="flex items-center gap-3">
@@ -174,17 +193,6 @@
                 'preiseAus' => ! $kostenZeigen,
                 'statusZeigen' => true,
             ])
-
-            {{-- Unter dem Speiseplan, mittig – an derselben Stelle und genauso groß wie „Bitte Chip
-                 auflegen" vor der Anmeldung, nur rötlich. --}}
-            <div class="mt-6 flex justify-center">
-                <button type="button" @click="abmelden()"
-                        class="flex items-center gap-3 rounded-2xl border-4 border-red-600 bg-red-500 px-8 py-3 text-3xl font-extrabold text-white shadow-lg hover:bg-red-600">
-                    <svg class="h-10 w-10 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/></svg>
-                    Abmelden
-                    <span :style="rest <= warnAb ? '' : 'display:none'" class="text-xl font-semibold text-red-100" x-text="'(' + rest + ' s)'"></span>
-                </button>
-            </div>
         @else
             {{-- Ohne Anmeldung: Speiseplan der Woche zum Ansehen; bestellen erst nach Chip. --}}
             @include('schulkantine::orders._woche', [
@@ -198,14 +206,6 @@
                 'preiseAus' => ! $kostenZeigen,
                 'gast' => true,
             ])
-
-            {{-- Unter dem Speiseplan, mittig: unübersehbarer Hinweis in Signalfarbe --}}
-            <div class="mt-6 flex justify-center">
-                <div class="flex items-center gap-3 rounded-2xl border-4 border-amber-500 bg-amber-300 px-8 py-3 text-3xl font-extrabold text-gray-900 shadow-lg">
-                    <svg class="h-10 w-10 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/></svg>
-                    Bitte Chip auflegen, um zu bestellen
-                </div>
-            </div>
 
             @if ($simChips->isNotEmpty())
                 {{-- Nur lokal (APP_ENV=local): Chip-Auswahl zum Testen ohne Leser. --}}
@@ -295,7 +295,7 @@
                     const doc = new DOMParser().parseFromString(html, 'text/html');
                     const inhalt = doc.getElementById('terminal-inhalt');
                     if (! inhalt) throw new Error('kein Inhalt');
-                    ['kopf-name', 'kopf-kosten'].forEach(id => {
+                    ['kopf-name', 'kopf-mitte', 'kopf-kosten'].forEach(id => {
                         const neu = doc.getElementById(id), alt = document.getElementById(id);
                         if (neu && alt) alt.innerHTML = neu.innerHTML;
                     });
