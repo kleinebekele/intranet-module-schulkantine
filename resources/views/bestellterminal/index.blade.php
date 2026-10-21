@@ -267,6 +267,8 @@
 
             init() {
                 this.chipUi = window.kantineChipBedienung();
+                // Diagnose: letzten Empfang über Neuladen hinweg behalten (je Browserfenster).
+                try { this.diagLetzte = JSON.parse(sessionStorage.getItem('kantine.diagLetzte') || 'null'); } catch (e) {}
                 // USB-Leser in Tastatur-Emulation: immer global mithören.
                 window.addEventListener('keydown', (e) => this.onWedgeKey(e));
                 // Bereits freigegebener COM-Leser: ohne Klick wieder verbinden. Beim Neuladen hält die
@@ -448,7 +450,8 @@
             // Ein echter Chip kam an (COM-Leser oder Tastatur-Leser): für die Diagnose merken,
             // Diagnose schließen und anmelden.
             chipGelesen(uid, quelle, roh) {
-                this.diagLetzte = { zeit: new Date().toLocaleTimeString('de-DE'), quelle, roh: JSON.stringify(roh), uid };
+                this.diagLetzte = { zeit: new Date().toLocaleString('de-DE'), quelle, roh: JSON.stringify(roh), uid };
+                try { sessionStorage.setItem('kantine.diagLetzte', JSON.stringify(this.diagLetzte)); } catch (e) {}
                 if (this.diag) this.diagSchliessen();
                 if (uid) this.anmelden(uid);
             },
