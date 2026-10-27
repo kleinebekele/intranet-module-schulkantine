@@ -79,10 +79,9 @@ class Essensvertrag
      * Hinweis für den Besteller selbst: Ein Vertrag ist nur nötig, wenn er SELBST essen
      * will. Eltern lasen den allgemeinen Hinweis sonst als „ich kann gar nicht bestellen".
      */
-    public static function hinweisFuerMich(bool $mitKindern): string
+    public static function hinweisFuerMich(): string
     {
         return 'Für Sie selbst liegt kein Essensvertrag vor. Diesen benötigen Sie nur, wenn Sie selbst in der Mensa '
-            .'essen möchten – dann wenden Sie sich bitte an das Sekretariat.'
-            .($mitKindern ? ' Für Ihre Kinder können Sie oben ganz normal bestellen.' : '');
+            .'essen möchten – dann wenden Sie sich bitte an das Sekretariat.';
     }
 }

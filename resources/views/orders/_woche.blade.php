@@ -224,7 +224,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                             {{-- Der Besteller selbst: nur ein Hinweis (grau), kein Warnkasten – für die
                                  Kinder darüber lässt sich trotzdem bestellen. --}}
                             <div class="m-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 sm:m-4">
-                                ℹ️ {{ \Intranet\Modules\Schulkantine\Support\Essensvertrag::hinweisFuerMich($eaters->count() > 1) }}
+                                ℹ️ {{ \Intranet\Modules\Schulkantine\Support\Essensvertrag::hinweisFuerMich() }}
                             </div>
                         @elseif (! $e['hasContract'])
                             <div class="m-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 sm:m-4">
