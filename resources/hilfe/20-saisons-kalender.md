@@ -84,3 +84,7 @@ Wer als Admin **als Person handelt** (Teilnehmer → „Als Person handeln"), is
 gebunden: Bestellen und Abbestellen gehen jederzeit, auch für vergangene Tage. Die Tage
 zeigen dann „Frist vorbei · als Admin änderbar". Gesperrt bleibt nur ein Monat, der für
 den Esser schon an Linear abgerechnet ist.
+
+Ein OGS-Abo ändert auch der Admin höchstens ab heute, nie rückwirkend. Was davor liegt,
+schreibt die Änderung als einzelne Tage fest. Für die Vergangenheit also einzelne Tage an-
+oder abhaken.

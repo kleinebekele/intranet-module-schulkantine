@@ -49,6 +49,9 @@ Arzttermin).
 Isst Ihr Kind nur an bestimmten Wochentagen, stellen Sie das über **„Tage ändern"** ein; das
 Abo gilt dann nur noch für diese Tage. Einzelne Tage lassen sich weiterhin an- oder abmelden.
 
+Eine Änderung am Abo gilt erst ab dem nächsten Tag, der noch bestellt werden kann. Tage davor
+bleiben, wie sie waren.
+
 Das ist die häufigste Rückfrage: Nein, Sie haben nichts vergessen. Kein Häkchen heißt nicht
 „nicht angemeldet".
 

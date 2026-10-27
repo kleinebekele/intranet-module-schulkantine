@@ -179,6 +179,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                 <input type="hidden" name="active" :value="n > 0 ? 1 : 0" value="1">
                                                 <h3 class="text-base font-semibold text-gray-800">{{ $isSubscribed ? 'Abo ändern' : 'Abo erstellen' }} – {{ $eater->name }}</h3>
                                                 <p class="mt-1 text-xs text-gray-500">An welchen Wochentagen isst {{ $eater->name }} standardmäßig? Einzelne Tage lassen sich weiter an- und abhaken; an Schließtagen wird ohnehin nichts bestellt.</p>
+                                                <p class="mt-1 text-xs text-amber-700">Die Änderung gilt ab dem nächsten Tag, der noch bestellt werden kann – vorherige Tage bleiben, wie sie sind.</p>
                                                 <div class="mt-3 flex flex-wrap gap-2">
                                                     @foreach (collect($openingWeekdays)->sort() as $wd)
                                                         <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">

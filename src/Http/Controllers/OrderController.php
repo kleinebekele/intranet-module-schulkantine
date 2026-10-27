@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Intranet\Modules\Schulkantine\Models\Category;
 use Intranet\Modules\Schulkantine\Models\ChildCategoryPermission;
 use Intranet\Modules\Schulkantine\Models\CustomerGroup;
@@ -551,23 +552,80 @@ class OrderController
         $aboText = fn (?bool $an, ?array $tage) => ! $an ? 'kein Abo'
             : ($tage ? collect($tage)->map(fn ($d) => self::WEEKDAY_KURZ[$d] ?? $d)->join(', ') : 'alle Öffnungstage');
 
-        Subscription::updateOrCreate(
-            ['season_id' => $season->id, 'user_id' => $eater->id],
-            ['active' => $active, 'weekdays' => $weekdays ?: null],
-        );
+        $neu = new Subscription(['active' => $active, 'weekdays' => $weekdays ?: null]);
+        $ab = $this->aboGiltAb($request, $season);
+
+        DB::transaction(function () use ($season, $eater, $vorher, $neu, $ab, $active, $weekdays) {
+            $this->aboVergangenheitFesthalten($season, $eater, $vorher, $neu, $ab);
+            Subscription::updateOrCreate(
+                ['season_id' => $season->id, 'user_id' => $eater->id],
+                ['active' => $active, 'weekdays' => $weekdays ?: null],
+            );
+        });
 
         \Intranet\Modules\Schulkantine\Support\MensaAudit::schreiben('kantine.abo_geaendert', 'OGS-Abo: '.$aboText($vorher?->active, $vorher?->weekdays).' → '.$aboText($active, $weekdays ?: null),
             $eater, $user->is($eater) ? [] : ['Besteller' => $user->name], $request->user() ?? $user);
 
+        $abText = ' Gilt ab '.$ab->isoFormat('dd DD.MM.YYYY').'.';
         if (! $active) {
-            return back()->with('status', $eater->name.': Abo gekündigt – isst nur noch an einzeln angehakten Tagen.');
+            return back()->with('status', $eater->name.': Abo gekündigt – isst nur noch an einzeln angehakten Tagen.'.$abText);
         }
 
         $tage = $weekdays === []
             ? 'an allen Öffnungstagen'
             : 'nur '.collect($weekdays)->map(fn ($d) => self::WEEKDAY_KURZ[$d] ?? $d)->join(', ');
 
-        return back()->with('status', $eater->name.': Abo gespeichert – isst '.$tage.' (außer abbestellten Tagen).');
+        return back()->with('status', $eater->name.': Abo gespeichert – isst '.$tage.' (außer abbestellten Tagen).'.$abText);
+    }
+
+    /**
+     * Ab welchem Tag greift eine Abo-Änderung? Normal: ab dem ersten Tag, der noch
+     * bestellt werden kann (Bestellfrist). Admin „als Person": ab heute. Nie rückwirkend –
+     * für die Vergangenheit gibt es nur einzelne Tage.
+     */
+    private function aboGiltAb(Request $request, Season $season): Carbon
+    {
+        $tag = Carbon::today();
+        $deadline = new DeadlineService;
+        $ohneFrist = self::ohneFrist($request);
+        // Erster Öffnungstag ab dann (für die Meldung; geschlossene Tage betrifft das Abo nicht).
+        while ($tag->lte($season->end_date) && (! $season->isOpenOn($tag) || (! $ohneFrist && ! $deadline->canOrder($season, $tag)))) {
+            $tag->addDay();
+        }
+
+        return $tag;
+    }
+
+    /**
+     * Die Teilnahme ohne Einzelzeile rechnet sich aus dem AKTUELLEN Abo. Damit eine
+     * Änderung nichts vor $ab verschiebt (gegessen, No-Show, Abrechnung), wird dort,
+     * wo altes und neues Abo verschieden ausfallen, der bisherige Stand als Einzeltag
+     * festgeschrieben. Vorhandene Zeilen bleiben unangetastet – sie gelten ohnehin.
+     */
+    private function aboVergangenheitFesthalten(Season $season, User $eater, ?Subscription $alt, Subscription $neu, Carbon $ab): void
+    {
+        $vorhanden = Order::where('season_id', $season->id)->where('user_id', $eater->id)
+            ->whereNull('category_id')->whereNull('menu_day_id')
+            ->where('date', '<', $ab->toDateString())
+            ->get(['date'])
+            ->map(fn ($o) => $o->date->toDateString())
+            ->flip();
+
+        for ($d = $season->start_date->copy()->startOfDay(); $d->lt($ab); $d->addDay()) {
+            if (! $season->isOpenOn($d) || $vorhanden->has($d->toDateString())) {
+                continue;
+            }
+            $assBisher = OgsAttendance::attends($alt, $d, false, false);
+            if ($assBisher === OgsAttendance::attends($neu, $d, false, false)) {
+                continue;
+            }
+            Order::create([
+                'season_id' => $season->id,
+                'user_id' => $eater->id,
+                'date' => $d->toDateString(),
+                'status' => $assBisher ? Order::STATUS_ORDERED : Order::STATUS_CANCELLED,
+            ]);
+        }
     }
 
     // ------------------------------------------------------------- Menü-Modus
