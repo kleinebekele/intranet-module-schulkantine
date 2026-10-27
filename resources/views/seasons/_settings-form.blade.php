@@ -209,10 +209,10 @@
 
             <div class="mt-3 grid gap-4 sm:grid-cols-2">
                 <div>
-                    <x-input-label for="order_deadline_time" value="Bestellschluss (voriger Öffnungstag)" />
+                    <x-input-label for="order_deadline_time" value="Bestellschluss (voriger Werktag)" />
                     <x-text-input id="order_deadline_time" name="order_deadline_time" type="time" class="mt-1 block"
                                   :value="old('order_deadline_time', $settings->order_deadline_time)" required />
-                    <p class="mt-1 text-xs text-gray-400">Bis wann am Vortag (Öffnungstag) bestellt/geändert werden darf. Standard 14:00.</p>
+                    <p class="mt-1 text-xs text-gray-400">Bis wann am vorigen Werktag (Mo–Fr, auch in den Ferien, ohne Feiertage) bestellt/geändert werden darf. Standard 14:00.</p>
                     <x-input-error :messages="$errors->get('order_deadline_time')" class="mt-2" />
                 </div>
 

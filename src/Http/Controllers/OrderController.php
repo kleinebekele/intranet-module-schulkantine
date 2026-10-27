@@ -96,6 +96,7 @@ class OrderController
 
         $release = new ReleaseService;
         $deadline = new DeadlineService;
+        $ohneFrist = self::ohneFrist($request);
         $weekReleased = $release->isWeekReleased($season, $weekStart);
 
         // GANZE Woche darstellen: alle Mensa-Wochentage (auch geschlossene →
@@ -126,9 +127,11 @@ class OrderController
                 'date' => $d->copy(),
                 'open' => $open,
                 'reason' => $reason,
-                'canOrder' => $open ? $deadline->canOrder($season, $d) : false,
-                'canCancel' => $open ? $deadline->canCancel($season, $d) : false,
+                'canOrder' => $open && ($ohneFrist || $deadline->canOrder($season, $d)),
+                'canCancel' => $open && ($ohneFrist || $deadline->canCancel($season, $d)),
                 'orderDeadline' => $open ? $deadline->orderDeadline($season, $d) : null,
+                // Frist vorbei, aber Admin als Person: trotzdem änderbar (Hinweis statt Sperre).
+                'ohneFrist' => $open && $ohneFrist && ! $deadline->canOrder($season, $d),
             ];
         }
 
@@ -357,6 +360,11 @@ class OrderController
         $date = Carbon::parse($data['date'])->startOfDay();
         abort_unless($season->isOpenOn($date), 422, 'An diesem Tag hat die Mensa nicht geöffnet.');
 
+        if (\Intranet\Modules\Schulkantine\Support\LinearExport::abgerechnet($eater->id, $date)) {
+            return back()->withErrors(['bestellung' => 'Der '.$date->isoFormat('MMMM YYYY').' ist für '.$eater->name
+                .' bereits abgerechnet – Änderungen bitte direkt in Linear.']);
+        }
+
         $release = new ReleaseService;
         if (! $release->isWeekReleased($season, $date)) {
             return back()->withErrors(['bestellung' => 'Diese Woche ist noch nicht zum Bestellen freigegeben.']);
@@ -364,7 +372,7 @@ class OrderController
 
         $group = CustomerGroup::forUser($eater);
         $mode = $group?->ordering_mode;
-        $deadline = new DeadlineService;
+        $deadline = new DeadlineService(ohneFrist: self::ohneFrist($request));
 
         // Ganzes Menü bestellen/abbestellen (nicht für OGS-Esser).
         if (! empty($data['menu_day_id']) && $mode !== CustomerGroup::MODE_JA_NEIN) {
@@ -769,6 +777,17 @@ class OrderController
     private function mayOrderFor(User $user, User $eater): bool
     {
         return $user->id === $eater->id || $user->children()->whereKey($eater->id)->exists();
+    }
+
+    /**
+     * Admin handelt „als Person": keine Bestell-/Abbestellfrist, auch nachträglich –
+     * etwa wenn Eltern versehentlich abbestellt haben. Grenze ist nur die Abrechnung.
+     */
+    private static function ohneFrist(Request $request): bool
+    {
+        $echt = $request->attributes->get(\Intranet\Modules\Schulkantine\Http\Middleware\AlsPerson::ECHTER_USER);
+
+        return $echt instanceof User && $echt->isAdmin();
     }
 
     private function resolveWeekStart(Request $request, Season $season): Carbon

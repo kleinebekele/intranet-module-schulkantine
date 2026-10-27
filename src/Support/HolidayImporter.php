@@ -106,6 +106,10 @@ class HolidayImporter
         $existing = $season->closedDays()->whereDate('date', $date)->first();
 
         if ($existing) {
+            // Feiertag in den Ferien bleibt Feiertag – die Bestellfrist überspringt nur Feiertage.
+            if ($type === 'ferien' && $existing->type === 'feiertag') {
+                return;
+            }
             $existing->update(['reason' => $reason, 'type' => $type, 'source' => $source]);
         } else {
             $season->closedDays()->create([

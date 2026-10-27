@@ -54,11 +54,11 @@ Das ist die häufigste Rückfrage: Nein, Sie haben nichts vergessen. Kein Häkch
 
 ## Bis wann Sie bestellen können
 
-Zwei verschiedene Fristen, und beide zählen in **Öffnungstagen**:
+Es gibt zwei verschiedene Fristen:
 
-- **Bestellen und ändern** geht bis zum **vorigen Öffnungstag um 14:00 Uhr**. Für einen
-  Montag ist das also der Donnerstag, wenn Freitag bis Sonntag geschlossen ist – nicht der
-  Sonntag.
+- **Bestellen und ändern** geht bis zum **vorigen Werktag um 14:00 Uhr** (Montag bis
+  Freitag, auch in den Ferien – nur Feiertage zählen nicht). Für einen Montag ist das der
+  Freitag davor, auch wenn die Mensa freitags geschlossen hat.
 - **Abbestellen** geht noch **am selben Tag bis 09:00 Uhr**. Damit lässt sich ein krankes
   Kind morgens noch abmelden.
 

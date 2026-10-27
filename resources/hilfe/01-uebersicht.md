@@ -14,8 +14,8 @@ Alles hängt an einer **Saison** – in der Regel ein Schuljahr. Sie legt Anfang
 und in ihr steht der Kalender: An welchen Wochentagen die Mensa öffnet und welche Tage
 wegen Ferien oder Feiertagen ausfallen.
 
-Ein **Öffnungstag** ist damit ein Tag, an dem tatsächlich gekocht wird. Das ist nicht
-Deko, sondern Rechengrundlage: Alle Fristen zählen in Öffnungstagen, nicht in Wochentagen.
+Ein **Öffnungstag** ist damit ein Tag, an dem tatsächlich gekocht wird. Der Bestellschluss
+liegt dagegen am vorigen Werktag (Mo–Fr ohne Feiertage) – auch in den Ferien.
 
 ## Kundengruppe und Bestellmodus
 

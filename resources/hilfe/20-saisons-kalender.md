@@ -68,17 +68,19 @@ bearbeitbar, und Sie können jederzeit welche hinzufügen oder löschen.
 
 rollen: admin
 
-Die Fristen rechnen **in Öffnungstagen**. Der Bestellschluss für einen Montag liegt beim
-vorherigen Öffnungstag – ist das ein Donnerstag, weil Freitag geschlossen ist, dann gilt
-Donnerstag.
+Der Bestellschluss liegt am **vorigen Werktag** (Mo–Fr) zur eingestellten Uhrzeit – auch
+in den Ferien und auch, wenn die Mensa an dem Tag geschlossen hat. Übersprungen werden nur
+Schließtage vom Typ **Feiertag**. Für den ersten Tag nach den Ferien gilt also der letzte
+Ferien-Werktag.
 
-Ein falsch gesetzter Schließtag verschiebt also stillschweigend Bestellfristen. Nach jeder
-Änderung am Kalender lohnt ein Blick auf die Bestellseite, ob die Fristen noch stimmen.
+Ein Feiertag, der als „Ferien" eingetragen ist, zählt deshalb als Werktag. Der Import legt
+Feiertage in den Ferien als Feiertag an; nach dem Update einmal neu importieren.
 
-## Der allererste Öffnungstag
+## Nachträglich ändern (Admin)
 
 rollen: admin
 
-Für den ersten Mensatag einer Saison gibt es keinen vorherigen Öffnungstag – die Frist
-fällt dann auf den Kalendertag davor zurück. Ohne diese Ausnahme wäre der erste Tag nach den
-Sommerferien nie bestellbar.
+Wer als Admin **als Person handelt** (Teilnehmer → „Als Person handeln"), ist an keine Frist
+gebunden: Bestellen und Abbestellen gehen jederzeit, auch für vergangene Tage. Die Tage
+zeigen dann „Frist vorbei · als Admin änderbar". Gesperrt bleibt nur ein Monat, der für
+den Esser schon an Linear abgerechnet ist.

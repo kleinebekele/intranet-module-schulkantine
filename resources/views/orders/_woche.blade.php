@@ -278,8 +278,10 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                             @unless ($day['open'])
                                                 <div class="mt-0.5 text-xs text-amber-600" title="{{ $day['reason'] }}">🔒 {{ $day['reason'] }}</div>
                                             @else
-                                                <div class="mt-0.5 {{ $t('text-[11px]', 'text-sm') }} {{ $day['canOrder'] ? 'text-gray-400' : 'text-amber-600' }}">
-                                                    @if ($day['canOrder'] && $day['orderDeadline'])
+                                                <div class="mt-0.5 {{ $t('text-[11px]', 'text-sm') }} {{ $day['canOrder'] && empty($day['ohneFrist']) ? 'text-gray-400' : 'text-amber-600' }}">
+                                                    @if (! empty($day['ohneFrist']))
+                                                        Frist vorbei · als Admin änderbar
+                                                    @elseif ($day['canOrder'] && $day['orderDeadline'])
                                                         Bestellschluss {{ $day['orderDeadline']->isoFormat('dd HH:mm') }}
                                                     @else
                                                         Bestellfrist abgelaufen
@@ -580,7 +582,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             @else
             <p class="mt-4 text-xs text-gray-400">
                 Auf eine Gericht-Karte tippen = auswählen (erneut tippen = abwählen). Grün umrandete Tage sind bereits bestellt.
-                Bestellschluss ist der vorige Öffnungstag; Abbestellen ist am Tag selbst bis zur eingestellten Uhrzeit möglich.
+                Bestellschluss ist der vorige Werktag; Abbestellen ist am Tag selbst bis zur eingestellten Uhrzeit möglich.
             </p>
             @endif
         @endif

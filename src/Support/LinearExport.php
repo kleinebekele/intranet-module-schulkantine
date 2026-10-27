@@ -36,6 +36,15 @@ class LinearExport
     /** Frühester Sendezeitpunkt am letzten Mensatag, falls der Abbestellschluss früher liegt. */
     public const SENDEZEIT = '16:00';
 
+    /** Ist der Monat von $tag für diesen Esser schon an Linear gegangen? Dann bleibt er unverändert. */
+    public static function abgerechnet(int $userId, Carbon $tag): bool
+    {
+        return Schema::hasTable('kantine_linear_exports')
+            && DB::table('kantine_linear_exports')
+                ->where('user_id', $userId)->where('year', $tag->year)->where('month', $tag->month)
+                ->exists();
+    }
+
     /**
      * Ab wann darf der Monat an Linear? Am letzten Öffnungstag des Monats, sobald der
      * Abbestellschluss vorbei ist – frühestens zur $uhrzeit, damit spontane Abholungen

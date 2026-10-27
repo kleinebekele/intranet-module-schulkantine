@@ -137,15 +137,14 @@ php artisan kantine:seed-ogs-testkinder --remove</pre>
     <strong>Einstellungen</strong>.</p>
 <ul>
     <li><strong>Einstellungen:</strong> Name, Beginn/Ende, Bundesland, Öffnungs-Wochentage, aktiv.
-        Außerdem die Fristen (Bestellschluss am vorigen Öffnungstag, Abbestellen am selben Tag), der
+        Außerdem die Fristen (Bestellschluss am vorigen Werktag, Abbestellen am selben Tag), der
         automatische Freigabe-Vorlauf in Wochen und Anzeige-Schalter (Zusatzstoffe, Allergene, Diäten,
         Bewertungen).</li>
     <li><strong>OGS-Preis:</strong> Standardmäßig ist „Preis aus Linear übernehmen (Vertrag Klasse
         1–4)" angehakt – dann gilt der importierte Linear-Preis. Der eingetragene Fixpreis gilt nur ohne
         Haken oder solange noch keine Linear-Preise importiert sind.</li>
     <li><strong>Schließtage:</strong> Ferien und Feiertage per Knopf aus einer öffentlichen Quelle holen,
-        danach von Hand ergänzen. Die Fristen rechnen in Öffnungstagen – ein falscher Schließtag
-        verschiebt sie.</li>
+        danach von Hand ergänzen. Der Bestellschluss überspringt nur Schließtage vom Typ Feiertag.</li>
 </ul>
 
 <h3>5.2 Menüs (Saison → Tab „Menüs")</h3>
@@ -202,7 +201,7 @@ php artisan kantine:seed-ogs-testkinder --remove</pre>
         Gericht. Der angezeigte Menüpreis ist der Preis <em>dieses</em> Essers.</li>
     <li><strong>OGS</strong>: Abo mit Standard-Wochentagen („Tage ändern"); einzelne Tage an- oder
         abmelden.</li>
-    <li><strong>Fristen:</strong> Bestellen bis zum vorigen Öffnungstag (Standard 14:00), Abbestellen bis
+    <li><strong>Fristen:</strong> Bestellen bis zum vorigen Werktag Mo–Fr ohne Feiertage (Standard 14:00), Abbestellen bis
         zum selben Tag (Standard 09:00). Danach verbindlich.</li>
     <li>Unter <strong>Meine Daten</strong> pflegen Eltern Verträglichkeiten, eigene Chips, das Budget für
         Spontankäufe und welche Kategorien ihr Kind vorbestellen darf.</li>
