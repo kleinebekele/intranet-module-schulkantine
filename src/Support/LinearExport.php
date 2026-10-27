@@ -17,8 +17,8 @@ use Intranet\Modules\Schulkantine\Models\Season;
  * Vertragsnehmer (AdrNr), Esser (AbwAdrNr), Vertragsart, Vertragsnummer, Anzahl 1,
  * Betrag = Gesamt = Monatssumme, Datum = DatumU = letzter Tag des Monats. Die
  * Spalten Soll/DatumSoll/ZeitSoll füllt Linear selbst beim Sollstellungslauf.
- * Der Betrag umfasst Menüs, OGS, spontane Abholungen UND Chip-Pfand (Ausgabe +,
- * Rückgabe −). Beschreibung „Mensa Intranet" – bewusst anders als Menü&Serve.
+ * Der Betrag umfasst Menüs, OGS und spontane Abholungen – Chip-Pfand bucht die
+ * Buchhaltung außerhalb des Intranets. Beschreibung „Mensa Intranet" – bewusst anders als Menü&Serve.
  *
  * Gesendet wird immer der ganze Monat auf einmal ({@see sendenAlle()}): automatisch
  * durch den Task Linear/KantineAbrechnung am letzten Mensatag nach Abbestellschluss,
@@ -39,7 +39,7 @@ class LinearExport
     /**
      * Ab wann darf der Monat an Linear? Am letzten Öffnungstag des Monats, sobald der
      * Abbestellschluss vorbei ist – frühestens zur $uhrzeit, damit spontane Abholungen
-     * und Pfand des letzten Tages noch mitgehen. null = der Monat hat keinen Mensatag.
+     * des letzten Tages noch mitgehen. null = der Monat hat keinen Mensatag.
      */
     public function sendezeitpunkt(Season $season, int $year, int $month, string $uhrzeit = self::SENDEZEIT): ?Carbon
     {
@@ -104,13 +104,10 @@ class LinearExport
         $ausgeschlossen = [];
         foreach ($lines as $uid => $l) {
             $user = $users->get($uid);
-            $essen = round($l['menu_total'] + $l['ogs_total'] + $l['spontan_total'], 2);
-            $pfand = round($l['pfand_out'] - $l['pfand_back'], 2);
-            $betrag = round($essen + $pfand, 2);
+            $betrag = round($l['menu_total'] + $l['ogs_total'] + $l['spontan_total'], 2);
             $basis = [
                 'user' => $user,
                 'betrag' => $betrag,
-                'pfand' => $pfand,
                 'menu' => $l['menu_total'],
                 'ogs' => $l['ogs_total'],
                 'spontan' => $l['spontan_total'],
@@ -124,7 +121,7 @@ class LinearExport
                 continue;
             }
             if ($betrag < 0) {
-                $ausgeschlossen[] = $basis + ['grund' => 'Gutschrift (Pfand-Rückgabe) – bitte von Hand in Linear'];
+                $ausgeschlossen[] = $basis + ['grund' => 'Gutschrift – bitte von Hand in Linear'];
                 continue;
             }
 

@@ -156,9 +156,6 @@
                                 <div class="text-sm">
                                     <span class="font-medium text-amber-900">🔒 Schul-Chip</span>
                                     <span class="font-mono text-amber-800">{{ $chip->uid }}</span>
-                                    @if ($chip->deposit > 0)
-                                        <span class="text-amber-700">· Pfand {{ number_format((float) $chip->deposit, 2, ',', '.') }} €</span>
-                                    @endif
                                 </div>
                                 <span class="text-xs text-amber-600">von der Schule – Rückgabe nur über die Schule</span>
                             </div>

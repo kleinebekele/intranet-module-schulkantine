@@ -161,7 +161,6 @@
                                     <th class="px-3 py-2 text-right font-medium">Menü</th>
                                     <th class="px-3 py-2 text-right font-medium">OGS</th>
                                     <th class="px-3 py-2 text-right font-medium">Spontan</th>
-                                    <th class="px-3 py-2 text-right font-medium">Pfand</th>
                                     <th class="px-3 py-2 text-right font-medium" title="Bestellt, aber nicht abgeholt (wird trotzdem berechnet)">No-Show</th>
                                     <th class="px-3 py-2 text-right font-medium">Summe</th>
                                     <th class="px-4 py-2 text-center font-medium">Bezahlt</th>
@@ -205,7 +204,6 @@
                                         <td class="whitespace-nowrap px-3 py-2.5 text-right tabular-nums {{ $sum('menu_total') > 0 ? 'text-gray-800' : 'text-gray-300' }}">{{ $wert($sum('menu_total')) }}</td>
                                         <td class="whitespace-nowrap px-3 py-2.5 text-right tabular-nums {{ $sum('ogs_total') > 0 ? 'text-gray-800' : 'text-gray-300' }}">{{ $wert($sum('ogs_total')) }}</td>
                                         <td class="whitespace-nowrap px-3 py-2.5 text-right tabular-nums {{ $sum('spontan_total') > 0 ? 'text-gray-800' : 'text-gray-300' }}">{{ $wert($sum('spontan_total')) }}</td>
-                                        <td class="whitespace-nowrap px-3 py-2.5 text-right tabular-nums {{ $sum('pfand_net') != 0 ? 'text-gray-800' : 'text-gray-300' }}">{{ $wert($sum('pfand_net')) }}</td>
                                         <td class="whitespace-nowrap px-3 py-2.5 text-right tabular-nums {{ $sum('no_show_count') > 0 ? 'font-medium text-rose-600' : 'text-gray-300' }}">{{ $sum('no_show_count') ?: '–' }}</td>
                                         <td class="whitespace-nowrap px-3 py-2.5 text-right text-base font-bold tabular-nums text-gray-900">{{ $euro($hh['subtotal']) }}</td>
                                         <td class="px-4 py-2.5 text-center">
@@ -250,7 +248,6 @@
                                             <td class="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
                                                 {{ $wert($l['spontan_total']) }}@if ($l['spontan_count'] > 0)<span class="text-gray-400"> ({{ $l['spontan_count'] }})</span>@endif
                                             </td>
-                                            <td class="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">{{ $wert($l['pfand_net']) }}</td>
                                             <td class="whitespace-nowrap px-3 py-1.5 text-right tabular-nums {{ $l['no_show_count'] > 0 ? 'text-rose-600' : '' }}">{{ $l['no_show_count'] ?: '–' }}</td>
                                             <td class="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">{{ $euro($l['total']) }}</td>
                                             {{-- Nur-Anzeige: Bezahlt-Status kommt aus Linear, nicht manuell setzbar. --}}
@@ -274,7 +271,7 @@
                             <tfoot>
                                 <tr class="border-t-2 border-gray-200 bg-gray-50">
                                     <td class="px-4 py-3 font-semibold text-gray-700">Gesamt {{ $monthLabel }}</td>
-                                    <td colspan="5"></td>
+                                    <td colspan="4"></td>
                                     <td class="px-3 py-3 text-right text-lg font-bold tabular-nums text-gray-900">{{ $euro($grandTotal) }}</td>
                                     <td class="px-4 py-3 text-center text-xs text-amber-600">
                                         @if ($openTotal > 0) offen {{ $euro($openTotal) }} @else <span class="text-green-600">alles bezahlt</span> @endif
@@ -288,7 +285,7 @@
 
                 <p class="text-xs text-gray-400">
                     Abrechnungsbasis sind die <strong>verbindlichen Vorbestellungen</strong> (No-Shows zahlen trotzdem),
-                    die <strong>spontanen Abholungen</strong> und das <strong>Chip-Pfand</strong> (Ausgabe +, Rückgabe −).
+                    und die <strong>spontanen Abholungen</strong>.
                     Rechtzeitig stornierte Bestellungen sind nicht enthalten. Der Export liefert dieselben Zahlen für die externe Abrechnung.
                 </p>
             @endif

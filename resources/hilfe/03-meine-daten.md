@@ -48,9 +48,7 @@ Mit einem Chip erkennt die Ausgabe den Esser, ohne dass jemand einen Namen suche
 - **Eigene Chips** registrieren Sie hier selbst, so viele Sie möchten – ein alter
   Schlüsselanhänger, eine Bibliothekskarte, was ohnehin in der Tasche steckt. Sie können sie
   jederzeit wieder entfernen.
-- **Schul-Chips** gibt die Verwaltung aus. Sie stehen hier nur zur Ansicht. Auf einen
-  Schul-Chip kann **Pfand** anfallen; es erscheint in der Monatsabrechnung des Monats, in dem
-  der Chip ausgegeben wurde, und wird bei der Rückgabe wieder gutgeschrieben.
+- **Schul-Chips** gibt die Verwaltung aus. Sie stehen hier nur zur Ansicht.
 
 Verloren gegangene eigene Chips entfernen Sie am besten sofort – ein aktiver Chip
 funktioniert an der Ausgabe, egal wer ihn hält.

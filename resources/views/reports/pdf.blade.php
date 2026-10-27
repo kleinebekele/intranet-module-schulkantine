@@ -56,7 +56,6 @@
                     <th class="num">Menü</th>
                     <th class="num">OGS</th>
                     <th class="num">Spontan</th>
-                    <th class="num">Pfand</th>
                     <th class="num">Summe</th>
                     <th class="ctr">Bezahlt</th>
                 </tr>
@@ -64,7 +63,7 @@
             <tbody>
                 @foreach ($households as $hh)
                     <tr class="hh">
-                        <td colspan="5">Haushalt {{ $hh['name'] }}</td>
+                        <td colspan="4">Haushalt {{ $hh['name'] }}</td>
                         <td class="num">{{ $euro($hh['subtotal']) }}</td>
                         <td class="ctr">{{ $hh['open'] > 0 ? 'offen '.$euro($hh['open']) : 'ok' }}</td>
                     </tr>
@@ -77,7 +76,6 @@
                             <td class="num">{{ $l['menu_total'] > 0 ? $euro($l['menu_total']) : '–' }}</td>
                             <td class="num">{{ $l['ogs_total'] > 0 ? $euro($l['ogs_total']) : '–' }}</td>
                             <td class="num">{{ $l['spontan_total'] > 0 ? $euro($l['spontan_total']) : '–' }}</td>
-                            <td class="num">{{ $l['pfand_net'] != 0 ? $euro($l['pfand_net']) : '–' }}</td>
                             <td class="num sum">{{ $euro($l['total']) }}</td>
                             <td class="ctr">{!! $m['paid'] ? '<span class="paid">✓</span>' : '<span class="open">offen</span>' !!}</td>
                         </tr>
@@ -86,7 +84,7 @@
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="5">Gesamt {{ $monthLabel }}</td>
+                    <td colspan="4">Gesamt {{ $monthLabel }}</td>
                     <td class="num">{{ $euro($grandTotal) }}</td>
                     <td class="ctr">{{ $openTotal > 0 ? 'offen '.$euro($openTotal) : 'bezahlt' }}</td>
                 </tr>
@@ -96,7 +94,7 @@
 
     <div class="foot">
         Erzeugt am {{ $generatedAt->format('d.m.Y H:i') }} Uhr · Mensa · Intranet.
-        Basis: verbindliche Vorbestellungen (No-Shows zahlen), spontane Abholungen, Chip-Pfand (Ausgabe +, Rückgabe −).
+        Basis: verbindliche Vorbestellungen (No-Shows zahlen), spontane Abholungen.
         Rechtzeitig stornierte Bestellungen sind nicht enthalten.
     </div>
 </body>

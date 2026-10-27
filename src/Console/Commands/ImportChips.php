@@ -3,7 +3,6 @@
 namespace Intranet\Modules\Schulkantine\Console\Commands;
 
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Intranet\Modules\Schulkantine\Models\CustomerGroup;
@@ -21,16 +20,14 @@ use Intranet\Modules\Schulkantine\Models\NfcChip;
  *  - Bereits aktiv registrierte Codes werden übersprungen (Konflikt gemeldet,
  *    wenn sie an einer anderen Person hängen).
  *  - Unbekannte AdrNr und OGS-Kinder werden gemeldet und übersprungen.
- *  - Angelegt als Schul-Chip ohne Pfand (Alt-Chips sind schon bezahlt);
- *    `--quelle=eltern` bzw. `--pfand` ändern das für die ganze Datei.
+ *  - Angelegt als Schul-Chip; `--quelle=eltern` ändert das für die ganze Datei.
  */
 class ImportChips extends Command
 {
     protected $signature = 'kantine:import-chips
         {datei : Pfad zur CSV (AdrNr;Code)}
         {--live : Wirklich schreiben (sonst nur Probelauf)}
-        {--quelle=schule : schule oder eltern}
-        {--pfand : Schul-Chips mit Pfand (5,00 €) und heutigem Ausgabedatum anlegen}';
+        {--quelle=schule : schule oder eltern}';
 
     protected $description = 'Übernimmt Chip-Codes aus dem Altsystem (CSV: AdrNr;Code) in die Mensa.';
 
@@ -51,7 +48,6 @@ class ImportChips extends Command
         }
 
         $live = (bool) $this->option('live');
-        $mitPfand = $quelle === NfcChip::SOURCE_SCHULE && $this->option('pfand');
 
         $zeilen = $this->zeilenLesen($pfad);
         if ($zeilen === []) {
@@ -128,14 +124,12 @@ class ImportChips extends Command
             return self::SUCCESS;
         }
 
-        DB::transaction(function () use ($anlegen, $quelle, $mitPfand): void {
+        DB::transaction(function () use ($anlegen, $quelle): void {
             foreach ($anlegen as $a) {
                 NfcChip::create([
                     'user_id' => $a['user']->id,
                     'uid' => $a['uid'],
                     'source' => $quelle,
-                    'deposit' => $mitPfand ? NfcChip::SCHULE_DEPOSIT : 0.0,
-                    'lent_at' => $mitPfand ? Carbon::today()->toDateString() : null,
                 ]);
             }
         });

@@ -16,7 +16,7 @@ use Intranet\Modules\Schulkantine\Support\InfoImporter;
  * Teilnehmer-Verwaltung. Jeder Teilnehmer IST ein Benutzer (angelegt über den
  * Benutzer-Import). Die Kundengruppe ergibt sich AUS DEN ROLLEN des Benutzers.
  * Hier gepflegt werden Sonderkost und – nur durch die Schule – die Schul-Chips
- * (Ausgabe mit Pfand, Rückgabe).
+ * (Ausgabe, Rückgabe).
  */
 class EaterController
 {
@@ -133,7 +133,7 @@ class EaterController
 
     // ------------------------------------------------------- Schul-Chips
 
-    /** Schul-Chip an einen Esser ausgeben (mit optionalem Pfand). */
+    /** Schul-Chip an einen Esser ausgeben. */
     public function issueChip(Request $request, User $user)
     {
         $this->authorizeAdmin($request);
@@ -141,7 +141,6 @@ class EaterController
 
         $data = $request->validate([
             'nfc_uid' => ['required', 'string', 'max:255'],
-            'nfc_deposit' => ['nullable', 'in:0,1'],
         ]);
 
         $uid = NfcChip::normalize($data['nfc_uid']);
@@ -160,14 +159,13 @@ class EaterController
             'user_id' => $user->id,
             'uid' => $uid,
             'source' => NfcChip::SOURCE_SCHULE,
-            'deposit' => $request->boolean('nfc_deposit') ? NfcChip::SCHULE_DEPOSIT : 0.0,
             'lent_at' => Carbon::today()->toDateString(),
         ]);
 
         return back()->with('status', 'Schul-Chip an „'.$user->name.'" ausgegeben.');
     }
 
-    /** Schul-Chip zurücknehmen – nur die Schule. Erscheint als Pfand-Rückgabe. */
+    /** Schul-Chip zurücknehmen – nur die Schule. */
     public function returnChip(Request $request, NfcChip $chip)
     {
         $this->authorizeAdmin($request);
@@ -179,7 +177,7 @@ class EaterController
 
         $chip->update(['returned_at' => Carbon::today()->toDateString()]);
 
-        return back()->with('status', 'Schul-Chip von „'.$chip->user?->name.'" zurückgenommen (Pfand-Rückgabe in der Abrechnung dieses Monats).');
+        return back()->with('status', 'Schul-Chip von „'.$chip->user?->name.'" zurückgenommen.');
     }
 
     /** Chip endgültig entfernen (Korrektur). */

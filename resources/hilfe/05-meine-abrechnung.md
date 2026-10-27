@@ -16,7 +16,6 @@ Für jede Person werden die Posten des Monats aufgeführt:
   bei Menüs je nach Essensvertrag der Person).
 - **OGS-Essen** – teilgenommene Tage × OGS-Preis der Saison.
 - **Spontane Abholungen** – am Tresen mitgenommene Gerichte.
-- **Chip-Pfand** – Pfand für einen ausgegebenen Schul-Chip (+) bzw. zurück (−).
 
 Über „Einzelposten ansehen" öffnen Sie die Tag-für-Tag-Aufstellung einer Person.
 

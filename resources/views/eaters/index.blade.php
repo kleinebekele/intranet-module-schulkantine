@@ -154,7 +154,7 @@
                                             $userChips = $chips->get($user->id) ?: collect();
                                             $isOgs = $group && $group->ordering_mode === \Intranet\Modules\Schulkantine\Models\CustomerGroup::MODE_JA_NEIN;
                                             $chipTip = $userChips->map(fn ($c) => ($c->isSchool()
-                                                    ? 'Schul-Chip'.($c->deposit > 0 ? ' (Pfand '.number_format((float) $c->deposit, 2, ',', '.').' €)' : '')
+                                                    ? 'Schul-Chip'
                                                     : 'eigener Chip').' · '.$c->uid)->implode("\n");
                                         @endphp
                                         @if ($isOgs)

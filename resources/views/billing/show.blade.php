@@ -161,34 +161,6 @@
             </div>
         @endif
 
-        {{-- Chip-Pfand --}}
-        @if (! empty($chips))
-            <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
-                <div class="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-2">
-                    <span class="text-sm font-semibold text-gray-700">Chip-Pfand</span>
-                    <span class="text-sm font-semibold text-gray-700">{{ $euro($pfand_net) }}</span>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <tbody class="divide-y divide-gray-50">
-                            @foreach ($chips as $c)
-                                <tr>
-                                    <td class="px-4 py-2 whitespace-nowrap text-gray-600">{{ $day($c['date']) }}</td>
-                                    <td class="px-3 py-2 text-gray-700">
-                                        {{ $c['type'] === 'aus' ? 'Chip ausgegeben (Pfand)' : 'Chip zurückgegeben' }}
-                                        <span class="ml-1 font-mono text-xs text-gray-400">{{ $c['uid'] }}</span>
-                                    </td>
-                                    <td class="px-3 py-2 text-right tabular-nums {{ $c['amount'] < 0 ? 'text-green-600' : 'text-gray-700' }}">
-                                        {{ ($c['amount'] > 0 ? '+' : '').$euro($c['amount']) }}
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        @endif
-
         {{-- Gesamt --}}
         <div class="flex items-center justify-between rounded-xl border-2 border-gray-200 bg-gray-50 px-5 py-3">
             <span class="font-semibold text-gray-700">Gesamt {{ $monthLabel }}</span>
@@ -196,7 +168,7 @@
         </div>
 
         <p class="text-xs text-gray-400">
-            Abrechnungsbasis: verbindliche Vorbestellungen (No-Shows zahlen trotzdem), spontane Abholungen und Chip-Pfand.
+            Abrechnungsbasis: verbindliche Vorbestellungen (No-Shows zahlen trotzdem), und spontane Abholungen.
             Rechtzeitig stornierte Bestellungen sind nicht enthalten.
         </p>
     </div>

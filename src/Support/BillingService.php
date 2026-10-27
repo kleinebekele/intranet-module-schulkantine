@@ -4,7 +4,6 @@ namespace Intranet\Modules\Schulkantine\Support;
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Intranet\Modules\Schulkantine\Models\NfcChip;
 use Intranet\Modules\Schulkantine\Models\Order;
 use Intranet\Modules\Schulkantine\Models\Season;
 use Intranet\Modules\Schulkantine\Models\Serving;
@@ -20,8 +19,9 @@ use Intranet\Modules\Schulkantine\Support\OgsAttendance;
  *  - OGS-Teilnahme × Saison-Fixpreis (abgeleitet aus Abo minus Abbestellungen
  *    bzw. einzeln bestellten Tagen) – Logik identisch zum OrderController.
  *  - Spontane Abholungen (Preis-Snapshot) – hat gegessen, wird berechnet.
- *  - Chip-Pfand: Schul-Chip in diesem Monat ausgegeben → Pfand fällt an (+),
- *    in diesem Monat zurückgegeben → Pfand zurück (−).
+ *
+ * Chip-Pfand rechnet die Buchhaltung außerhalb des Intranets ab – hier bewusst
+ * kein Posten.
  *
  * No-Shows werden nur informativ mitgezählt (bezahlt wird trotzdem).
  * Die Ausgabe (servings, außer spontan) ist NICHT die Abrechnungsbasis.
@@ -30,7 +30,7 @@ class BillingService
 {
     /**
      * Liefert je Person eine Abrechnungszeile für den Monat. Enthalten sind nur
-     * Personen mit mindestens einem Posten (Menü, OGS, spontan oder Pfand).
+     * Personen mit mindestens einem Posten (Menü, OGS oder spontan).
      *
      * @return Collection<int, array> keyed by user_id
      */
@@ -53,7 +53,6 @@ class BillingService
                 'menu_total' => 0.0, 'menu_count' => 0,
                 'ogs_total' => 0.0, 'ogs_days' => 0,
                 'spontan_total' => 0.0, 'spontan_count' => 0,
-                'pfand_out' => 0.0, 'pfand_back' => 0.0,
                 'no_show_count' => 0,
             ];
         };
@@ -116,29 +115,7 @@ class BillingService
             }
         }
 
-        // 4) Chip-Pfand (nur Schul-Chips). Ausgabe in diesem Monat = Pfand (+),
-        //    Rückgabe in diesem Monat = Pfand zurück (−).
-        $lent = NfcChip::where('source', NfcChip::SOURCE_SCHULE)
-            ->whereBetween('lent_at', [$from, $to])
-            ->selectRaw('user_id, SUM(deposit) as total')
-            ->groupBy('user_id')->get();
-        foreach ($lent as $row) {
-            $l = $line($row->user_id);
-            $l['pfand_out'] = (float) $row->total;
-            $lines[$row->user_id] = $l;
-        }
-
-        $returned = NfcChip::where('source', NfcChip::SOURCE_SCHULE)
-            ->whereBetween('returned_at', [$from, $to])->whereNull('lost_at')
-            ->selectRaw('user_id, SUM(deposit) as total')
-            ->groupBy('user_id')->get();
-        foreach ($returned as $row) {
-            $l = $line($row->user_id);
-            $l['pfand_back'] = (float) $row->total;
-            $lines[$row->user_id] = $l;
-        }
-
-        // 5) No-Shows (nur informativ): verbindliche Menü-Bestellung ohne Ausgabe.
+        // 4) No-Shows (nur informativ): verbindliche Menü-Bestellung ohne Ausgabe.
         $servedOrderIds = Serving::where('season_id', $season->id)
             ->where('spontaneous', false)
             ->whereNotNull('order_id')
@@ -158,11 +135,7 @@ class BillingService
         // Summe je Zeile berechnen und Nullzeilen (nur durch No-Show-Init) filtern.
         return collect($lines)
             ->map(function (array $l) {
-                $l['pfand_net'] = $l['pfand_out'] - $l['pfand_back'];
-                $l['total'] = round(
-                    $l['menu_total'] + $l['ogs_total'] + $l['spontan_total'] + $l['pfand_net'],
-                    2
-                );
+                $l['total'] = round($l['menu_total'] + $l['ogs_total'] + $l['spontan_total'], 2);
 
                 return $l;
             });
@@ -170,7 +143,7 @@ class BillingService
 
     /**
      * Einzelposten einer Person im Monat (für die Detailseite): jede Bestellung,
-     * jeder OGS-Tag, jede spontane Abholung, jede Pfand-Buchung.
+     * jeder OGS-Tag, jede spontane Abholung.
      */
     public function detailsForUser(Season $season, int $userId, int $year, int $month): array
     {
@@ -342,29 +315,13 @@ class BillingService
         usort($spontan, fn ($a, $b) => $a['date'] <=> $b['date']);
         $spontanTotal = array_sum(array_column($spontan, 'price'));
 
-        // 4) Chip-Pfand – Ausgabe (+) und Rückgabe (−) in diesem Monat.
-        $chips = [];
-        $lent = NfcChip::where('user_id', $userId)->where('source', NfcChip::SOURCE_SCHULE)
-            ->whereBetween('lent_at', [$from, $to])->get();
-        foreach ($lent as $c) {
-            $chips[] = ['uid' => $c->uid, 'type' => 'aus', 'date' => $c->lent_at, 'amount' => (float) $c->deposit];
-        }
-        $returned = NfcChip::where('user_id', $userId)->where('source', NfcChip::SOURCE_SCHULE)
-            ->whereBetween('returned_at', [$from, $to])->whereNull('lost_at')->get();
-        foreach ($returned as $c) {
-            $chips[] = ['uid' => $c->uid, 'type' => 'zurueck', 'date' => $c->returned_at, 'amount' => -(float) $c->deposit];
-        }
-        $pfandNet = array_sum(array_column($chips, 'amount'));
-
         return [
             'menu' => $menu,
             'menu_total' => round($menuTotal, 2),
             'ogs' => $ogs,
             'spontan' => $spontan,
             'spontan_total' => round($spontanTotal, 2),
-            'chips' => $chips,
-            'pfand_net' => round($pfandNet, 2),
-            'total' => round($menuTotal + $ogs['total'] + $spontanTotal + $pfandNet, 2),
+            'total' => round($menuTotal + $ogs['total'] + $spontanTotal, 2),
         ];
     }
 

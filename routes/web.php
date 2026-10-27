@@ -199,7 +199,7 @@ Route::middleware(['web', 'auth', AlsPerson::class])
         // Läuft auch stündlich per Scheduler – der Button ist für „jetzt sofort".
         Route::post('teilnehmer/info-import', [EaterController::class, 'importInfos'])->name('eaters.info-import');
 
-        // Schul-Chips (nur Verwaltung): ausgeben (mit Pfand), zurücknehmen, entfernen.
+        // Schul-Chips (nur Verwaltung): ausgeben, zurücknehmen, entfernen.
         Route::post('teilnehmer/{user}/chip', [EaterController::class, 'issueChip'])->name('eaters.chip.issue');
         Route::post('teilnehmer/chip/{chip}/zurueck', [EaterController::class, 'returnChip'])->name('eaters.chip.return');
         Route::delete('teilnehmer/chip/{chip}', [EaterController::class, 'removeChip'])->name('eaters.chip.remove');

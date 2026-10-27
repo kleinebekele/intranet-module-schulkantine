@@ -21,7 +21,6 @@ Vier Posten:
 - **OGS-Teilnahme** mal OGS-Preis (standardmäßig der Linear-Preis der Vertragsart 27) –
   abgeleitet aus der Dauerbestellung abzüglich der Abbestellungen.
 - **Spontane Abholungen** mit ihrem Preis.
-- **Chip-Pfand**: im Monat der Ausgabe belastend, im Monat der Rückgabe gutschreibend.
 
 Personen ohne einen einzigen Posten tauchen nicht auf.
 

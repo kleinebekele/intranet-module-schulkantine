@@ -127,9 +127,6 @@
                             @if ($chip->isSchool())
                                 <span class="font-medium text-amber-900">🔒 Schul-Chip</span>
                                 <span class="font-mono text-amber-800">{{ $chip->uid }}</span>
-                                @if ($chip->deposit > 0)
-                                    <span class="text-amber-700">· Pfand {{ number_format((float) $chip->deposit, 2, ',', '.') }} €</span>
-                                @endif
                                 @if ($chip->lent_at)
                                     <span class="text-xs text-amber-600">· ausgegeben {{ $chip->lent_at->format('d.m.Y') }}</span>
                                 @endif
@@ -141,14 +138,14 @@
                         <div class="flex items-center gap-3">
                             @if ($chip->isSchool())
                                 <form method="POST" action="{{ route('module.schulkantine.eaters.chip.return', $chip) }}"
-                                      onsubmit="return confirm('Schul-Chip zurücknehmen? Die Pfand-Rückgabe erscheint in der Abrechnung dieses Monats.')">
+                                      onsubmit="return confirm('Schul-Chip zurücknehmen?')">
                                     @csrf
                                     <button type="submit" class="text-xs font-medium text-amber-700 hover:text-amber-900">zurücknehmen</button>
                                 </form>
                             @endif
                             @darfRoute('module.schulkantine.eaters.chip.remove')
                             <form method="POST" action="{{ route('module.schulkantine.eaters.chip.remove', $chip) }}"
-                                  onsubmit="return confirm('Chip endgültig entfernen (ohne Pfand-Buchung)?')">
+                                  onsubmit="return confirm('Chip endgültig entfernen?')">
                                 @csrf @method('DELETE')
                                 <button type="submit" class="text-xs font-medium text-gray-400 hover:text-red-600">entfernen</button>
                             </form>
@@ -249,11 +246,6 @@
                                 Ausgeben
                             </button>
                         </div>
-                        <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-700">
-                            <input type="checkbox" name="nfc_deposit" value="1" checked
-                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                            <span><strong>5 € Pfand</strong> berechnen (Ausgabe-Monat zählt für die Abrechnung) – für selbst mitgebrachte Chips ausschalten</span>
-                        </label>
                     </form>
                     <p class="mt-1 text-xs" :class="ok ? 'text-green-600' : 'text-gray-500'" x-text="msg"></p>
                 </div>

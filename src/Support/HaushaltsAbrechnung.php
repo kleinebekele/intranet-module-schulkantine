@@ -15,7 +15,7 @@ use Intranet\Modules\Schulkantine\Models\Settlement;
  *
  * Quellen je Esser und Monat:
  *  - Einzelposten aus dem Intranet (BillingService::detailsForUser) – Menüs, OGS-Tage,
- *    No-Shows, Spontankäufe, Pfand. Gibt es sie, sind sie der Betrag.
+ *    No-Shows, Spontankäufe. Gibt es sie, sind sie der Betrag.
  *  - Abrechnung aus Linear (kantine_linear_charges, nachts importiert; ab 2026, auch
  *    aus dem alten Menü&Serve) – Betrag ohne Einzelposten, dazu der Zahlungsstand.
  *  - Sonst: keine Daten (das alte System hat nur die Abrechnungen ab 2026 geliefert).
@@ -196,14 +196,12 @@ class HaushaltsAbrechnung
         $ok = fn ($datum) => Carbon::parse($datum)->gte($ab);
         $d['menu'] = array_values(array_filter($d['menu'], fn ($r) => $ok($r['date'])));
         $d['spontan'] = array_values(array_filter($d['spontan'], fn ($r) => $ok($r['date'])));
-        $d['chips'] = array_values(array_filter($d['chips'], fn ($r) => $ok($r['date'])));
         $d['ogs']['dates'] = array_values(array_filter($d['ogs']['dates'], fn ($r) => $ok($r['date'])));
         $d['ogs']['days'] = count($d['ogs']['dates']);
         $d['ogs']['total'] = $d['ogs']['days'] * (float) $d['ogs']['price'];
         $d['menu_total'] = round(array_sum(array_column($d['menu'], 'price')), 2);
         $d['spontan_total'] = round(array_sum(array_column($d['spontan'], 'price')), 2);
-        $d['pfand_net'] = round(array_sum(array_column($d['chips'], 'amount')), 2);
-        $d['total'] = round($d['menu_total'] + $d['ogs']['total'] + $d['spontan_total'] + $d['pfand_net'], 2);
+        $d['total'] = round($d['menu_total'] + $d['ogs']['total'] + $d['spontan_total'], 2);
 
         return $d;
     }
@@ -247,7 +245,7 @@ class HaushaltsAbrechnung
 
     /**
      * Alle kostenpflichtigen Posten einer Zelle, nach Datum: Menüs/Gerichte (mit
-     * No-Show), OGS-Tage, Spontankäufe, Chip-Pfand. Leer, wenn es keine Einzelposten gibt.
+     * No-Show), OGS-Tage, Spontankäufe. Leer, wenn es keine Einzelposten gibt.
      *
      * @return list<array{datum: Carbon, was: string, hinweis: ?string, betrag: float}>
      */
@@ -275,9 +273,6 @@ class HaushaltsAbrechnung
         }
         foreach ($d['spontan'] as $s) {
             $posten[] = ['datum' => Carbon::parse($s['date']), 'was' => $s['dish'], 'hinweis' => 'spontan an der Ausgabe', 'betrag' => (float) $s['price']];
-        }
-        foreach ($d['chips'] as $c) {
-            $posten[] = ['datum' => Carbon::parse($c['date']), 'was' => 'Chip-Pfand '.($c['type'] === 'aus' ? 'Ausgabe' : 'Rückgabe'), 'hinweis' => null, 'betrag' => (float) $c['amount']];
         }
         usort($posten, fn ($a, $b) => $a['datum'] <=> $b['datum']);
 

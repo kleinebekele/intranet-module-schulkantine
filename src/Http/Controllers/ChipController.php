@@ -11,9 +11,9 @@ use Intranet\Modules\Schulkantine\Support\Access;
 /**
  * Self-Service für NFC-Chips: JEDER eingeloggte Nutzer verwaltet die Chips seines
  * Haushalts (sich selbst + seine Kinder). Eltern können BELIEBIG VIELE eigene
- * Chips registrieren (ohne Pfand) und wieder entfernen.
+ * Chips registrieren und wieder entfernen.
  *
- * Ein von der Schule ausgegebener Chip (mit Pfand) erscheint hier nur LESBAR –
+ * Ein von der Schule ausgegebener Chip erscheint hier nur LESBAR –
  * zurücknehmen kann ihn ausschließlich die Schule (EaterController).
  *
  * Wer Erziehungsberechtigte hat (Kind mit eigenem Konto), sieht seine Chips nur –
@@ -24,7 +24,7 @@ use Intranet\Modules\Schulkantine\Support\Access;
  */
 class ChipController
 {
-    /** Einen weiteren EIGENEN Chip registrieren (kein Pfand). */
+    /** Einen weiteren EIGENEN Chip registrieren. */
     public function register(Request $request, User $user)
     {
         abort_unless(self::eigeneChips(), 403, 'Eigene Chips sind abgeschaltet – Chips gibt die Schule aus.');
@@ -51,7 +51,6 @@ class ChipController
             'user_id' => $user->id,
             'uid' => $uid,
             'source' => NfcChip::SOURCE_ELTERN,
-            'deposit' => 0.0,
         ]);
 
         return back()->with('status', 'Eigener Chip für „'.$user->name.'" registriert.');

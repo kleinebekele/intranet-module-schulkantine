@@ -79,12 +79,12 @@ eingerichtet ist.
 
 rollen: admin
 
-Ein Schul-Chip wird einer Person zugeordnet und kann mit **Pfand** ausgegeben werden. Für die
-Abrechnung zählt der Monat: Ausgabe belastet, Rückgabe schreibt gut.
+Ein Schul-Chip wird einer Person zugeordnet und ausgegeben. Chip-Pfand rechnet die
+Buchhaltung außerhalb des Intranets ab – das Intranet hält nur fest, wer welchen Chip hat.
 
-Nehmen Sie einen Chip deshalb über **Zurückgeben** aus dem Verkehr und nicht über Löschen –
-sonst fehlt die Gutschrift. Ist ein Chip **verloren**, gibt es kein Pfand zurück. Löschen ist
+Nehmen Sie einen Chip über **Zurückgeben** bzw. **verloren** aus dem Verkehr und nicht über
+Löschen – so bleibt nachvollziehbar, wann er ausgegeben und zurückgegeben wurde. Löschen ist
 für Fälle gedacht, in denen ein Chip versehentlich angelegt wurde.
 
 Eine Person kann mehrere Chips haben. Eigene Chips, die Eltern selbst registriert haben,
-stehen hier nur zur Ansicht und tragen kein Pfand.
+stehen hier nur zur Ansicht.

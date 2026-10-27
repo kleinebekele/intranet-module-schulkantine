@@ -17,7 +17,7 @@ use Intranet\Modules\Schulkantine\Support\XlsxSchreiber;
  * Auswertung & Abrechnung (Phase 5). Nur für Administratoren.
  *
  * Das Modul rechnet nicht selbst ab – es liefert je Monat eine saubere
- * Aufstellung je Person (Menü, OGS, Spontankauf, Chip-Pfand) für die externe
+ * Aufstellung je Person (Menü, OGS, Spontankauf) für die externe
  * Abrechnung: als Bildschirm-Liste, als CSV (Import) und als PDF (Ausdruck).
  * „Als bezahlt markieren" hält den Bezahlt-Status je Person & Monat fest.
  */
@@ -258,7 +258,7 @@ class ReportController
     {
         $kopf = ['Name', 'E-Mail', 'Haushalt', 'Gruppe',
             'Menü (€)', 'Menü Anzahl', 'OGS (€)', 'OGS Tage',
-            'Spontan (€)', 'Spontan Anzahl', 'Pfand (€)', 'No-Shows',
+            'Spontan (€)', 'Spontan Anzahl', 'No-Shows',
             'Summe (€)', 'Bezahlt'];
         $zeilen = [];
         foreach ($report['households'] as $hh) {
@@ -269,7 +269,7 @@ class ReportController
                     (float) $l['menu_total'], (int) $l['menu_count'],
                     (float) $l['ogs_total'], (int) $l['ogs_days'],
                     (float) $l['spontan_total'], (int) $l['spontan_count'],
-                    (float) $l['pfand_net'], (int) $l['no_show_count'],
+                    (int) $l['no_show_count'],
                     (float) $l['total'],
                     $m['paid'] ? 'ja' : 'offen',
                 ];

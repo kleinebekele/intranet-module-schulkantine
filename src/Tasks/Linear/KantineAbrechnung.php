@@ -49,7 +49,7 @@ class KantineAbrechnung extends EkkonTask
             'label' => 'Frühestens um (HH:MM) am letzten Mensatag',
             'standard' => LinearExport::SENDEZEIT,
             'hilfe' => 'Gesendet wird nach dem Abbestellschluss, aber nicht vor dieser Uhrzeit – damit spontane '
-                .'Abholungen und Chip-Pfand des letzten Tages noch in der Abrechnung sind.',
+                .'Abholungen des letzten Tages noch in der Abrechnung sind.',
         ],
         'ab_monat' => [
             'typ' => 'text',

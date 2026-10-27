@@ -11,17 +11,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Ein NFC-Chip eines Essers. Ein Esser kann mehrere haben (eigene + Schul-Chip).
  * Die UID wird normalisiert gespeichert (Kleinbuchstaben, nur Buchstaben/Ziffern).
  *
- * Herkunft & Pfand:
- *  - source 'eltern'  eigener Chip, kein Pfand, von Eltern verwaltbar.
- *  - source 'schule'  Schul-Chip → Pfand (Standard 5,00 €); Ausgabe/Rückgabe nur
- *                     durch die Verwaltung. In der Elternansicht nur lesbar.
+ * Herkunft:
+ *  - source 'eltern'  eigener Chip, von Eltern verwaltbar.
+ *  - source 'schule'  Schul-Chip; Ausgabe/Rückgabe nur durch die Verwaltung.
+ *                     In der Elternansicht nur lesbar.
  *
- * Lebenszyklus (für die Abrechnung):
- *  - lent_at      Ausgabe-Datum (Pfand fällt in diesem Monat an).
- *  - returned_at  Rückgabe-Datum (Rückgabe in diesem Monat); danach INAKTIV
- *                 (zählt nicht mehr bei der Essensausgabe).
- *  - lost_at      Chip verloren: ebenfalls inaktiv (returned_at gesetzt), aber das Pfand
- *                 wird NICHT erstattet.
+ * Chip-Pfand rechnet die Buchhaltung außerhalb des Intranets ab. Die alte Spalte
+ * `deposit` bleibt in der Tabelle, wird aber nicht mehr beschrieben oder gelesen.
+ *
+ * Lebenszyklus:
+ *  - lent_at      Ausgabe-Datum.
+ *  - returned_at  Rückgabe-Datum; danach INAKTIV (zählt nicht mehr bei der Essensausgabe).
+ *  - lost_at      Chip verloren: ebenfalls inaktiv (returned_at gesetzt).
  *
  * OGS-Kinder bekommen bewusst KEINEN Chip.
  */
@@ -33,14 +34,10 @@ class NfcChip extends Model
 
     public const SOURCE_SCHULE = 'schule';
 
-    /** Standard-Pfand für einen Schul-Chip. */
-    public const SCHULE_DEPOSIT = 5.00;
-
     protected $fillable = [
         'uid',
         'user_id',
         'source',
-        'deposit',
         'lent_at',
         'returned_at',
         'lost_at',
@@ -49,7 +46,6 @@ class NfcChip extends Model
     protected function casts(): array
     {
         return [
-            'deposit' => 'decimal:2',
             'lent_at' => 'date',
             'returned_at' => 'date',
             'lost_at' => 'date',

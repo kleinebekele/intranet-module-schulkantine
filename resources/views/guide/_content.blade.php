@@ -186,9 +186,9 @@ php artisan kantine:seed-ogs-testkinder --remove</pre>
     <li>Übersicht mit Gruppe, Info (z. B. Klasse), <strong>Vertrag</strong> (blau = aus Linear,
         gelb = Testvertrag), Verträglichkeiten und Chip. Der Suchfilter bleibt beim Bearbeiten erhalten.</li>
     <li><strong>Bearbeiten:</strong> Allergien und Diäten, Essensvertrag (siehe Abschnitt 4), Schul-Chips.</li>
-    <li><strong>Schul-Chips</strong> mit oder ohne Pfand ausgeben (Chip am USB- oder COM-Leser einlesen).
-        <em>Zurücknehmen</em> schreibt das Pfand gut, <em>verloren</em> ohne Erstattung, <em>entfernen</em>
-        nur bei Fehleingaben. OGS-Kinder brauchen keinen Chip.</li>
+    <li><strong>Schul-Chips</strong> ausgeben (Chip am USB- oder COM-Leser einlesen).
+        <em>Zurücknehmen</em> und <em>verloren</em> deaktivieren den Chip, <em>entfernen</em>
+        nur bei Fehleingaben. Chip-Pfand rechnet die Buchhaltung außerhalb des Intranets ab. OGS-Kinder brauchen keinen Chip.</li>
     <li><strong>Infos</strong> (z. B. Klasse) kommen aus einer CSV in <code>storage/app/kantinen-import</code>
         (<code>externe_id;Info</code>), stündlich oder per Knopf „Infos importieren". Wer fehlt, behält
         seine Info; leere zweite Spalte löscht sie.</li>
@@ -232,8 +232,8 @@ php artisan kantine:seed-ogs-testkinder --remove</pre>
 <h3>5.10 Abrechnung</h3>
 <ul>
     <li>„<strong>Auswertung</strong>" (Verwaltung) und „<strong>Meine Abrechnung</strong>" (Eltern):
-        Menü-Bestellungen (Preis zum Bestellzeitpunkt), OGS-Tage × OGS-Preis, spontane Abholungen und
-        Chip-Pfand. No-Shows werden berechnet, rechtzeitig Abbestelltes nicht.</li>
+        Menü-Bestellungen (Preis zum Bestellzeitpunkt), OGS-Tage × OGS-Preis und spontane Abholungen.
+        No-Shows werden berechnet, rechtzeitig Abbestelltes nicht.</li>
     <li>Export als CSV und PDF. Bezahlt wird extern; es gibt bewusst keinen Knopf „bezahlt".</li>
     <li>Eine Übergabe der Abrechnung an Linear gibt es noch nicht.</li>
 </ul>
@@ -329,7 +329,7 @@ php artisan kantine:import-infos
 
 # Chip-Codes aus dem Altsystem (CSV: AdrNr;Code) – ohne --live nur Probelauf
 php artisan kantine:import-chips datei.csv
-php artisan kantine:import-chips datei.csv --live [--quelle=eltern] [--pfand]
+php artisan kantine:import-chips datei.csv --live [--quelle=eltern]
 
 # Testdaten
 php artisan kantine:seed-testusers
