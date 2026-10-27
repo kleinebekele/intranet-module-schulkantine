@@ -305,8 +305,13 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                     <input type="hidden" name="date" value="{{ $dateStr }}">
                                                     <input type="hidden" name="attend" value="{{ $attends ? '1' : '0' }}">
                                                     <label class="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm {{ $attends ? 'border-green-300 bg-green-50 text-green-800' : 'border-gray-200 text-gray-700' }} {{ $editable ? 'cursor-pointer' : 'opacity-60' }}">
+                                                        {{-- Abmelden nach Bestellfrist: erst nachfragen (wie bei Menüs), bei „Abbrechen" Haken zurück. --}}
                                                         <input type="checkbox" @checked($attends) @disabled(! $editable)
-                                                               onchange="this.form.attend.value = this.checked ? '1' : '0'; this.form.requestSubmit();"
+                                                               @if ($attends && ! $day['canOrder'])
+                                                                   onchange="const cb = this; (window.bestaetige ? window.bestaetige('Wirklich abmelden? Die Bestellfrist für diesen Tag ist vorbei – danach kann nicht mehr neu angemeldet werden.', {titel: 'Abmelden', knopf: 'Abmelden'}) : Promise.resolve(true)).then(ok => { if (! ok) { cb.checked = true; return; } cb.form.attend.value = '0'; cb.form.requestSubmit(); });"
+                                                               @else
+                                                                   onchange="this.form.attend.value = this.checked ? '1' : '0'; this.form.requestSubmit();"
+                                                               @endif
                                                                class="rounded border-gray-300 text-green-600 focus:ring-green-500">
                                                         <span class="font-medium">isst an diesem Tag</span>
                                                     </label>
