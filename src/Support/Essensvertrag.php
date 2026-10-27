@@ -81,8 +81,8 @@ class Essensvertrag
      */
     public static function hinweisFuerMich(bool $mitKindern): string
     {
-        return 'Für dich selbst liegt kein Essensvertrag vor. Den brauchst du nur, wenn du selbst in der Mensa '
-            .'essen möchtest – dann bitte im Sekretariat nachfragen.'
-            .($mitKindern ? ' Für deine Kinder kannst du oben ganz normal bestellen.' : '');
+        return 'Für Sie selbst liegt kein Essensvertrag vor. Diesen benötigen Sie nur, wenn Sie selbst in der Mensa '
+            .'essen möchten – dann wenden Sie sich bitte an das Sekretariat.'
+            .($mitKindern ? ' Für Ihre Kinder können Sie oben ganz normal bestellen.' : '');
     }
 }

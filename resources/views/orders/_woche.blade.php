@@ -351,7 +351,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                             'clickable' => ! $gast && $menuClickable,
                                                         ];
                                                     @endphp
-                                                    <form method="POST" action="{{ route($routen['bestellen']) }}" @if ($isMenuOrdered && ! $day['canOrder'] && $menuClickable) data-bestaetigen="Wirklich abbestellen? Die Bestellfrist für diesen Tag ist vorbei – du kannst danach nicht mehr neu bestellen." data-titel="Abbestellen" data-knopf="Abbestellen" @endif>
+                                                    <form method="POST" action="{{ route($routen['bestellen']) }}" @if ($isMenuOrdered && ! $day['canOrder'] && $menuClickable) data-bestaetigen="Wirklich abbestellen? Die Bestellfrist für diesen Tag ist vorbei – danach kann nicht mehr neu bestellt werden." data-titel="Abbestellen" data-knopf="Abbestellen" @endif>
                                                         @csrf
                                                         <input type="hidden" name="eater_id" value="{{ $eater->id }}">
                                                         <input type="hidden" name="date" value="{{ $dateStr }}">
@@ -486,7 +486,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                         ? 'border-color: '.$catColor.'; box-shadow: 0 0 0 2px '.$catColor.'59;'
                                                                         : '';
                                                                 @endphp
-                                                                <form method="POST" action="{{ route($routen['bestellen']) }}" class="relative" @if ($isSel && ! $day['canOrder'] && $clickable) data-bestaetigen="Wirklich abbestellen? Die Bestellfrist für diesen Tag ist vorbei – du kannst danach nicht mehr neu bestellen." data-titel="Abbestellen" data-knopf="Abbestellen" @endif>
+                                                                <form method="POST" action="{{ route($routen['bestellen']) }}" class="relative" @if ($isSel && ! $day['canOrder'] && $clickable) data-bestaetigen="Wirklich abbestellen? Die Bestellfrist für diesen Tag ist vorbei – danach kann nicht mehr neu bestellt werden." data-titel="Abbestellen" data-knopf="Abbestellen" @endif>
                                                                     @csrf
                                                                     <input type="hidden" name="eater_id" value="{{ $eater->id }}">
                                                                     <input type="hidden" name="date" value="{{ $dateStr }}">
