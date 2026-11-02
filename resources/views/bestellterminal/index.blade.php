@@ -140,17 +140,16 @@
 
     {{-- Kopfzeile: feste Höhe; ausgetauscht werden nur Name und Kosten-Kachel. --}}
     <header class="relative flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-4 py-3 sm:px-6" style="height: 88px">
-        <div class="flex items-center gap-3">
-            <x-module-icon name="restaurant" class="text-3xl text-indigo-600" />
-            <div>
-                <div class="text-lg font-semibold text-gray-800">Essen bestellen</div>
-                <div class="text-sm text-gray-500" id="kopf-name">
-                    @if ($besteller)
-                        Angemeldet: <span class="font-semibold text-gray-800">{{ $besteller->name }}</span>
-                    @else
-                        Bestell-Terminal der Mensa
-                    @endif
-                </div>
+        {{-- Links nur der Name des Angemeldeten – groß, damit man auf einen Blick sieht, wer
+             dran ist. Breite begrenzt, damit er nicht unter den mittigen Knopf läuft. --}}
+        <div class="flex min-w-0 items-center gap-3" style="max-width: calc(50% - 8.5rem)">
+            <x-module-icon name="restaurant" class="shrink-0 text-3xl text-indigo-600" />
+            <div class="min-w-0" id="kopf-name">
+                @if ($besteller)
+                    <div class="truncate text-3xl font-extrabold leading-tight text-gray-900">{{ $besteller->name }}</div>
+                @else
+                    <div class="truncate text-lg font-semibold text-gray-500">Bestell-Terminal der Mensa</div>
+                @endif
             </div>
         </div>
 
