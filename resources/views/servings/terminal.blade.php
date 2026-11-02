@@ -1285,7 +1285,10 @@
                                                     'border-red-300 bg-red-100 text-red-600': tileState(group.category_id, dish.id)==='declined',
                                                     'border-gray-300 bg-white text-gray-400 hover:border-indigo-400': tileState(group.category_id, dish.id)==='selectable'
                                                 }">
-                                            <span class="text-3xl" x-text="['taken','alt'].includes(tileState(group.category_id, dish.id)) ? '✓' : (tileState(group.category_id, dish.id)==='declined' ? '✗' : '○')"></span>
+                                            {{-- Kein Haken bei „ausgeben": der sähe nach „schon ausgegeben" aus –
+                                                 dass bestellt ist, zeigt der grüne Hintergrund. --}}
+                                            <span x-show="!['taken','alt'].includes(tileState(group.category_id, dish.id))" class="text-3xl"
+                                                  x-text="tileState(group.category_id, dish.id)==='declined' ? '✗' : '○'"></span>
                                             <span x-text="tileState(group.category_id, dish.id)==='taken' ? 'ausgeben' : (tileState(group.category_id, dish.id)==='alt' ? 'Alternative' : (tileState(group.category_id, dish.id)==='declined' ? 'nein' : 'wählen'))"></span>
                                         </button>
                                     </div>
