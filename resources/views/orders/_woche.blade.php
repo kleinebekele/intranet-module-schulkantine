@@ -391,8 +391,12 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                 <span class="text-4xl leading-none" title="{{ $menuArten($md) }}">{{ \Intranet\Modules\Schulkantine\Support\Symbolbild::html($menuSymbole($md), $menuArten($md)) }}</span>
                                                             </div>
                                                             @unless ($gast)
-                                                                <div data-kachel-status class="mt-3 rounded-lg py-3 text-center text-lg font-semibold
-                                                                            {{ $isMenuOrdered ? 'bg-emerald-600 text-white' : ($menuClickable ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-500') }}">
+                                                                {{-- Immer zwei Zeilen hoch: „Bestellt – antippen zum Abbestellen" bricht um,
+                                                                     „Bestellen" nicht – sonst springt die Kachel beim Umschalten. --}}
+                                                                <div data-kachel-status class="mt-3 rounded-lg px-2 text-center text-lg font-semibold
+                                                                            {{ $isMenuOrdered ? 'bg-emerald-600 text-white' : ($menuClickable ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-500') }}"
+                                                                     style="min-height: 5rem; display: flex; align-items: center; justify-content: center;">
+                                                                    <span>
                                                                     @if ($isMenuOrdered)
                                                                         {!! $haken !!} Bestellt{{ $menuClickable ? ' – antippen zum Abbestellen' : '' }}
                                                                     @elseif ($menuClickable)
@@ -400,6 +404,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                     @else
                                                                         Bestellfrist abgelaufen
                                                                     @endif
+                                                                    </span>
                                                                 </div>
                                                             @endunless
                                                             @else
@@ -548,8 +553,11 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                             </div>
                                                                         </div>
                                                                         @if ($terminal && ! $gast)
-                                                                            <div data-kachel-status class="border-t py-2.5 text-center text-base font-semibold
-                                                                                        {{ $isSel ? 'border-green-600 bg-green-600 text-white' : ($clickable ? 'border-indigo-100 bg-indigo-50 text-indigo-800' : 'border-gray-100 bg-gray-100 text-gray-500') }}">
+                                                                            {{-- Feste Höhe für zwei Zeilen, damit die Kachel beim Umschalten nicht springt. --}}
+                                                                            <div data-kachel-status class="border-t px-2 text-center text-base font-semibold
+                                                                                        {{ $isSel ? 'border-green-600 bg-green-600 text-white' : ($clickable ? 'border-indigo-100 bg-indigo-50 text-indigo-800' : 'border-gray-100 bg-gray-100 text-gray-500') }}"
+                                                                                 style="min-height: 4.25rem; display: flex; align-items: center; justify-content: center;">
+                                                                                <span>
                                                                                 @if ($isSel)
                                                                                     {!! $haken !!} Bestellt{{ $clickable ? ' – antippen zum Abbestellen' : '' }}
                                                                                 @elseif ($clickable)
@@ -557,6 +565,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                                 @else
                                                                                     Bestellfrist abgelaufen
                                                                                 @endif
+                                                                                </span>
                                                                             </div>
                                                                         @endif
                                                                         </button>
