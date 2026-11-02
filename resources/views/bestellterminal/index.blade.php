@@ -128,6 +128,8 @@
                 </dd>
                 <dt class="text-gray-500">Eingaben seit Start</dt>
                 <dd class="break-all font-mono text-sm" x-text="diagEreignisse"></dd>
+                <dt class="text-gray-500">Browser</dt>
+                <dd class="break-all font-mono text-xs" x-text="diagBrowser"></dd>
             </dl>
             <form class="mt-5 flex gap-2 border-t border-gray-100 pt-4" @submit.prevent="diagTestanmeldung()">
                 <input type="text" x-model="diagUid" placeholder="Chipnummer für Testanmeldung"
@@ -295,6 +297,7 @@
             diagUid: '',
             diagBestellung: null,
             diagEreignisse: '',
+            diagBrowser: '',
             serialBuf: '',
 
             init() {
@@ -505,6 +508,9 @@
                 this.diagEreignisse = 'pointerdown ' + z.pointerdown + ' · mousedown ' + z.mousedown + ' · touchstart ' + z.touchstart
                     + ' · pointerup ' + z.pointerup + ' · mouseup ' + z.mouseup + ' · click ' + z.click
                     + ' · runter→click ' + (z.runterBisClick || '–');
+                const marken = ((navigator.userAgentData && navigator.userAgentData.brands) || []).map(b => b.brand + ' ' + b.version).join(', ');
+                this.diagBrowser = (window.kantineLangsam ? 'Sofort-Rückmeldung AN' : 'Sofort-Rückmeldung aus')
+                    + ' · Speicher ' + (navigator.deviceMemory ?? '?') + ' GB · ' + navigator.userAgent + (marken ? ' · ' + marken : '');
                 this.diag = true;
                 this.diagRest = 60;
                 clearInterval(this.diagUhr);

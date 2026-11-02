@@ -780,8 +780,15 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
         //     kleines festes Schild – kein halbdurchsichtiger Vollbild-Schleier und keine
         //     Animation, die die Kiste zusätzlich ausbremsen.
         // Nur Bestell-Terminal und nur Windows NT 5.x – überall sonst ist die Antwort sofort da.
-        const nurTerminal = @js(str_starts_with($routen['bestellen'], 'kantine.bestellterminal.'))
-            && (/Windows NT 5\./.test(navigator.userAgent) || /[?&]langsam=an/.test(location.search)); // ?langsam=an zum Ausprobieren
+        // Erkennung der Kiste: Supermium gibt sich nicht unbedingt als XP aus, darum auch
+        // Browsername „Supermium" oder ≤ 1 GB Arbeitsspeicher (XP-Kiste: 480 MB).
+        // ?langsam=an zum Ausprobieren auf anderen Rechnern.
+        const langsamesGeraet = /Windows NT 5\.|Supermium/i.test(navigator.userAgent)
+            || ((navigator.userAgentData && navigator.userAgentData.brands) || []).some(b => /Supermium/i.test(b.brand))
+            || (navigator.deviceMemory !== undefined && navigator.deviceMemory <= 1)
+            || /[?&]langsam=an/.test(location.search);
+        window.kantineLangsam = langsamesGeraet;
+        const nurTerminal = @js(str_starts_with($routen['bestellen'], 'kantine.bestellterminal.')) && langsamesGeraet;
         let laeuft = false;
         let faenger = null;
         let markiert = null, markTimer = null;
