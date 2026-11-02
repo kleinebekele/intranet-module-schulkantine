@@ -498,6 +498,8 @@
                         this.servedOnLoad = true;
                         const key = this.unitKeyOf(d);
                         this.choice[key] = d.declined ? 'declined' : (d.alternative ? 'alternative' : this.orderMeta[key].orderedDishId);
+                        // Gebuchter Stand – solange er gilt, zeigt die Kachel „✓ ausgegeben".
+                        this.orderMeta[key].gebucht = this.choice[key];
                     });
                 }
                 (data.walkin || []).forEach(w => {
@@ -546,6 +548,13 @@
                 if (ch === 'alternative') return dishId === ordered ? 'alt' : 'selectable';
                 if (ch === dishId) return dishId === ordered ? 'taken' : 'alt';
                 return 'selectable';
+            },
+            // Schon ausgegeben (gebuchter Stand unverändert)? Dann Haken + „ausgegeben".
+            tileGebucht(groupKey, dishId) {
+                const unit = this.person && this.person.hasOrder ? this.unitFor(groupKey, dishId) : null;
+                if (!unit || !['taken', 'alt'].includes(this.tileState(groupKey, dishId))) return false;
+                const g = this.orderMeta[unit].gebucht;
+                return g !== undefined && g !== 'declined' && g === this.choice[unit];
             },
             tileClickable(catId) {
                 return this.person && this.person.hasOrder && this.catOrdered(catId) && !this.busy;
@@ -1285,11 +1294,11 @@
                                                     'border-red-300 bg-red-100 text-red-600': tileState(group.category_id, dish.id)==='declined',
                                                     'border-gray-300 bg-white text-gray-400 hover:border-indigo-400': tileState(group.category_id, dish.id)==='selectable'
                                                 }">
-                                            {{-- Kein Haken bei „ausgeben": der sähe nach „schon ausgegeben" aus –
-                                                 dass bestellt ist, zeigt der grüne Hintergrund. --}}
-                                            <span x-show="!['taken','alt'].includes(tileState(group.category_id, dish.id))" class="text-3xl"
-                                                  x-text="tileState(group.category_id, dish.id)==='declined' ? '✗' : '○'"></span>
-                                            <span x-text="tileState(group.category_id, dish.id)==='taken' ? 'ausgeben' : (tileState(group.category_id, dish.id)==='alt' ? 'Alternative' : (tileState(group.category_id, dish.id)==='declined' ? 'nein' : 'wählen'))"></span>
+                                            {{-- Haken nur, wenn schon ausgegeben (gebucht). Vorher steht nur
+                                                 „ausgeben" – dass bestellt ist, zeigt der grüne Hintergrund. --}}
+                                            <span x-show="tileGebucht(group.category_id, dish.id) || !['taken','alt'].includes(tileState(group.category_id, dish.id))" class="text-3xl"
+                                                  x-text="tileGebucht(group.category_id, dish.id) ? '✓' : (tileState(group.category_id, dish.id)==='declined' ? '✗' : '○')"></span>
+                                            <span x-text="tileState(group.category_id, dish.id)==='taken' ? (tileGebucht(group.category_id, dish.id) ? 'ausgegeben' : 'ausgeben') : (tileState(group.category_id, dish.id)==='alt' ? 'Alternative' : (tileState(group.category_id, dish.id)==='declined' ? 'nein' : 'wählen'))"></span>
                                         </button>
                                     </div>
                                 </template>
