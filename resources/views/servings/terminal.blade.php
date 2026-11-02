@@ -242,6 +242,12 @@
                 return m;
             },
             get hasWalkin() { return Object.values(this.walkinQty).some(q => q > 0); },
+            // Vorbestelltes der Person (Preis wie bestellt) – wird auch bei „nicht
+            // genommen" berechnet, gehört also immer in die Tagessumme.
+            get bestellSumme() {
+                if (!this.person || !this.person.hasOrder) return 0;
+                return (this.person.dishes || []).reduce((s, d) => s + (d.price || 0), 0);
+            },
             get extrasTotal() {
                 let sum = this.nachschlagTotal;
                 for (const [id, q] of Object.entries(this.walkinQty)) sum += (this.walkinPrices[id] || 0) * q;
@@ -1411,8 +1417,8 @@
                     </div>
                     <div class="flex items-center gap-5">
                         <div class="text-right">
-                            <div class="text-[11px] uppercase tracking-wide text-gray-400">Gesamt (nur Extras)</div>
-                            <div class="text-3xl font-extrabold text-gray-900" x-text="euro(extrasTotal)"></div>
+                            <div class="text-[11px] uppercase tracking-wide text-gray-400">Gesamt heute (Bestellung + Extras)</div>
+                            <div class="text-3xl font-extrabold text-gray-900" x-text="euro(bestellSumme + extrasTotal)"></div>
                         </div>
                         <button @click="commit()" :disabled="busy || !hasSomething"
                                 class="rounded-2xl bg-green-600 px-8 py-4 text-xl font-bold text-white shadow hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-40">✓ Bestätigen</button>
