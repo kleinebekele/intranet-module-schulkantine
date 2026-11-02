@@ -822,8 +822,27 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             if (faenger && faenger.parentNode) faenger.parentNode.removeChild(faenger);
         }
 
+        // Messung rund ums Antippen (für die F10-Diagnose): wie spät das Antippen bei uns
+        // ankommt, wie lange bis zum Absenden, und ob die Seite im Leerlauf ruckelt
+        // (größte Verspätung eines 200-ms-Takts in den letzten 10 s).
+        let tippen = null;
+        const takte = [];
+        if (nurTerminal) {
+            let letzter = performance.now();
+            setInterval(() => {
+                const jetzt = performance.now();
+                takte.push([jetzt, jetzt - letzter - 200]);
+                letzter = jetzt;
+                while (takte.length && takte[0][0] < jetzt - 10000) takte.shift();
+            }, 200);
+        }
+        const ruckler = () => Math.round(takte.reduce((m, t) => Math.max(m, t[1]), 0) / 100) / 10;
+
         if (nurTerminal) {
             const antippen = function (e) {
+                if (! tippen || performance.now() - tippen.t > 5000) {
+                    tippen = { t: performance.now(), verzug: Math.max(0, Math.round((performance.now() - e.timeStamp) / 100) / 10), ruckler: ruckler() };
+                }
                 // Info-Knopf in der Kachel öffnet nur Details – keine Markierung.
                 if (laeuft || (e.target instanceof Element && e.target.closest('[role=button]'))) return;
                 const knopf = e.target instanceof Element ? e.target.closest('#orders-content button[type=submit]') : null;
@@ -849,6 +868,12 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             const t0 = performance.now();
             const zeiten = { zeit: new Date().toLocaleTimeString('de-DE') };
             const sek = t => Math.round((performance.now() - t) / 100) / 10;
+            if (tippen) {
+                zeiten.eingabe = tippen.verzug;           // Antippen → bei uns angekommen
+                zeiten.bisSenden = sek(tippen.t);         // erstes Antippen → Absenden
+                zeiten.ruckler = tippen.ruckler;          // Ruckeln im Leerlauf davor
+                tippen = null;
+            }
             const merken = () => { try { sessionStorage.setItem('kantine.bestellZeiten', JSON.stringify(zeiten)); } catch (x) {} };
             try {
                 const res = await fetch(action, {
@@ -875,7 +900,10 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                     }
                     // Alpine richtet den neuen Inhalt in Mikroaufgaben ein – danach messen.
                     await new Promise(r => setTimeout(r, 0));
-                    zeiten.einsetzen = sek(t);
+                    zeiten.einsetzen = sek(t); t = performance.now();
+                    // Bis der neue Stand wirklich auf dem Bildschirm ist (nächstes Bild + danach).
+                    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+                    zeiten.zeichnen = sek(t);
                     zeiten.gesamt = sek(t0);
                     merken();
                     freigeben();

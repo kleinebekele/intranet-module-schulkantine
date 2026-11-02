@@ -118,7 +118,8 @@
                     <template x-if="diagBestellung">
                         <div class="font-mono">
                             <div><span x-text="diagBestellung.zeit"></span> · gesamt <span class="font-semibold" x-text="diagBestellung.gesamt + ' s'"></span></div>
-                            <div x-text="'Server ' + diagBestellung.server + ' s · Laden ' + (diagBestellung.laden ?? '–') + ' s · Lesen ' + (diagBestellung.lesen ?? '–') + ' s · Einsetzen ' + (diagBestellung.einsetzen ?? '–') + ' s'"></div>
+                            <div x-text="'Tippen ' + (diagBestellung.eingabe ?? '–') + ' s · bis Senden ' + (diagBestellung.bisSenden ?? '–') + ' s · Ruckler ' + (diagBestellung.ruckler ?? '–') + ' s'"></div>
+                            <div x-text="'Server ' + diagBestellung.server + ' s · Laden ' + (diagBestellung.laden ?? '–') + ' s · Lesen ' + (diagBestellung.lesen ?? '–') + ' s · Einsetzen ' + (diagBestellung.einsetzen ?? '–') + ' s · Zeichnen ' + (diagBestellung.zeichnen ?? '–') + ' s'"></div>
                             <div class="break-all text-gray-500" x-text="diagBestellung.status"></div>
                             <div class="break-all font-semibold text-red-700" x-show="diagBestellung.fehler" x-text="diagBestellung.fehler"></div>
                         </div>
