@@ -841,13 +841,15 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
         if (nurTerminal) {
             const antippen = function (e) {
                 if (! tippen || performance.now() - tippen.t > 5000) {
-                    tippen = { t: performance.now(), verzug: Math.max(0, Math.round((performance.now() - e.timeStamp) / 100) / 10), ruckler: ruckler() };
+                    tippen = { t: performance.now(), art: e.type, verzug: Math.max(0, Math.round((performance.now() - e.timeStamp) / 100) / 10), ruckler: ruckler() };
                 }
                 // Info-Knopf in der Kachel öffnet nur Details – keine Markierung.
                 if (laeuft || (e.target instanceof Element && e.target.closest('[role=button]'))) return;
                 const knopf = e.target instanceof Element ? e.target.closest('#orders-content button[type=submit]') : null;
                 if (knopf && ! knopf.disabled) markieren(knopf);
             };
+            // Welches davon der Touch-Treiber der XP-Kiste liefert, zeigt die F10-Diagnose.
+            document.addEventListener('pointerdown', antippen, true);
             document.addEventListener('mousedown', antippen, true);
             document.addEventListener('touchstart', antippen, true);
         }
@@ -870,6 +872,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             const sek = t => Math.round((performance.now() - t) / 100) / 10;
             if (tippen) {
                 zeiten.eingabe = tippen.verzug;           // Antippen → bei uns angekommen
+                zeiten.art = tippen.art;                  // erstes Ereignis (pointerdown/mousedown/touchstart)
                 zeiten.bisSenden = sek(tippen.t);         // erstes Antippen → Absenden
                 zeiten.ruckler = tippen.ruckler;          // Ruckeln im Leerlauf davor
                 tippen = null;
@@ -902,7 +905,8 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                     await new Promise(r => setTimeout(r, 0));
                     zeiten.einsetzen = sek(t); t = performance.now();
                     // Bis der neue Stand wirklich auf dem Bildschirm ist (nächstes Bild + danach).
-                    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+                    // Höchstens 1 s warten: ein verdecktes Fenster zeichnet gar nicht, das Freigeben darf daran nie hängen.
+                    await new Promise(r => { requestAnimationFrame(() => setTimeout(r, 0)); setTimeout(r, 1000); });
                     zeiten.zeichnen = sek(t);
                     zeiten.gesamt = sek(t0);
                     merken();
