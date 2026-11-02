@@ -126,6 +126,8 @@
                     </template>
                     <span x-show="! diagBestellung">noch nichts</span>
                 </dd>
+                <dt class="text-gray-500">Eingaben seit Start</dt>
+                <dd class="break-all font-mono text-sm" x-text="diagEreignisse"></dd>
             </dl>
             <form class="mt-5 flex gap-2 border-t border-gray-100 pt-4" @submit.prevent="diagTestanmeldung()">
                 <input type="text" x-model="diagUid" placeholder="Chipnummer für Testanmeldung"
@@ -252,6 +254,16 @@
 @includeIf('layouts.dialog')
 @include('schulkantine::partials.chip-bedienung')
 <script>
+    // Diagnose: welche Eingabe-Ereignisse kommen überhaupt an (Touch-Treiber der XP-Kiste)?
+    // Zählt je Art und merkt den Abstand zum folgenden click.
+    window.kantineEreignisse = { pointerdown: 0, mousedown: 0, touchstart: 0, pointerup: 0, mouseup: 0, click: 0, letzteRunter: null, runterBisClick: null };
+    ['pointerdown', 'mousedown', 'touchstart', 'pointerup', 'mouseup', 'click'].forEach(art => window.addEventListener(art, (e) => {
+        const z = window.kantineEreignisse;
+        z[art]++;
+        if (art === 'pointerdown' || art === 'mousedown' || art === 'touchstart') z.letzteRunter = performance.now();
+        if (art === 'click' && z.letzteRunter !== null) z.runterBisClick = Math.round(performance.now() - z.letzteRunter) + ' ms';
+    }, { capture: true, passive: true }));
+
     // Offene COM-Anschlüsse (bewusst außerhalb von Alpine, s. serialConnect).
     const offenePorts = new Set();
     document.addEventListener('alpine:init', () => {
@@ -282,6 +294,7 @@
             diagLetzte: null,
             diagUid: '',
             diagBestellung: null,
+            diagEreignisse: '',
             serialBuf: '',
 
             init() {
@@ -488,6 +501,10 @@
             },
             diagOeffnen() {
                 try { this.diagBestellung = JSON.parse(sessionStorage.getItem('kantine.bestellZeiten') || 'null'); } catch (e) {}
+                const z = window.kantineEreignisse || {};
+                this.diagEreignisse = 'pointerdown ' + z.pointerdown + ' · mousedown ' + z.mousedown + ' · touchstart ' + z.touchstart
+                    + ' · pointerup ' + z.pointerup + ' · mouseup ' + z.mouseup + ' · click ' + z.click
+                    + ' · runter→click ' + (z.runterBisClick || '–');
                 this.diag = true;
                 this.diagRest = 60;
                 clearInterval(this.diagUhr);
