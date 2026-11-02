@@ -768,37 +768,67 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
      Bestell-Bereich austauschen. Die Scrollposition bleibt so erhalten.
      Fällt JS aus, senden die Formulare ganz normal (Server-Redirect). --}}
 @once
-    <style>@keyframes kantine-dreh { to { transform: rotate(360deg); } }</style>
     <script>
     (function () {
         const ziele = @js([route($routen['bestellen']), route($routen['abo'])]);
 
-        // Auf langsamen Geräten (XP-Terminal) tippen die Kinder sonst mehrfach, weil
-        // nichts passiert: sofort abdunkeln + Lade-Kreisel, weitere Klicks prallen am
-        // Schleier ab und weitere Sendungen werden verworfen, bis die Antwort da ist.
-        // Inline-Stile statt Tailwind, damit der Schleier ohne Klassen-Build sicher steht.
-        // Nur auf dem Bestell-Terminal (Kiosk) und dort nur im Supermium der XP-Kiste
-        // (Windows NT 5.x) – überall sonst ist die Antwort ohnehin sofort da.
+        // Auf der XP-Kiste (Supermium ohne GPU, alles in Software gezeichnet) kommt sonst
+        // lange kein Feedback und die Kinder tippen mehrfach. Darum:
+        //  1. schon beim Antippen (mousedown/touchstart, nicht erst beim Absenden) die
+        //     getippte Kachel gelb färben – ein kleiner Bereich, billig neu zu zeichnen;
+        //  2. beim Absenden einen UNSICHTBAREN Klick-Fänger über alles legen plus ein
+        //     kleines festes Schild – kein halbdurchsichtiger Vollbild-Schleier und keine
+        //     Animation, die die Kiste zusätzlich ausbremsen.
+        // Nur Bestell-Terminal und nur Windows NT 5.x – überall sonst ist die Antwort sofort da.
         const nurTerminal = @js(str_starts_with($routen['bestellen'], 'kantine.bestellterminal.'))
-            && /Windows NT 5\./.test(navigator.userAgent);
+            && (/Windows NT 5\./.test(navigator.userAgent) || /[?&]langsam=an/.test(location.search)); // ?langsam=an zum Ausprobieren
         let laeuft = false;
-        let schleier = null;
+        let faenger = null;
+        let markiert = null, markTimer = null;
+
+        function markieren(knopf) {
+            entmarkieren();
+            markiert = knopf;
+            knopf.style.transition = 'none';
+            knopf.style.background = '#fde68a';
+            knopf.style.borderColor = '#d97706';
+            // Kommt kein Absenden (Finger weggezogen), Markierung wieder lösen.
+            markTimer = setTimeout(() => { if (! laeuft) entmarkieren(); }, 3000);
+        }
+        function entmarkieren() {
+            clearTimeout(markTimer);
+            if (markiert) {
+                markiert.style.background = '';
+                markiert.style.borderColor = '';
+                markiert = null;
+            }
+        }
         function sperren() {
             laeuft = true;
-            if (! schleier) {
-                schleier = document.createElement('div');
-                schleier.style.cssText = 'position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:rgba(17,24,39,.45);cursor:wait';
-                schleier.innerHTML = '<div style="display:flex;align-items:center;gap:16px;border-radius:16px;background:#fff;padding:20px 32px;font-size:24px;font-weight:700;color:#111827;box-shadow:0 10px 25px rgba(0,0,0,.3)">'
-                    + '<span style="display:inline-block;width:40px;height:40px;border-radius:50%;border:5px solid #c7d2fe;border-top-color:#4f46e5;animation:kantine-dreh .8s linear infinite"></span>'
-                    + 'Einen Moment …</div>';
-                // Klicks auf den Schleier verschlucken (nichts dahinter auslösen).
-                schleier.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); }, true);
+            if (! faenger) {
+                faenger = document.createElement('div');
+                faenger.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:90;cursor:wait';
+                faenger.innerHTML = '<div style="position:absolute;top:96px;left:50%;margin-left:-160px;width:320px;padding:14px 0;text-align:center;border:4px solid #d97706;border-radius:16px;background:#fde68a;font-size:26px;font-weight:800;color:#111827">Einen Moment …</div>';
+                // Klicks auf den Fänger verschlucken (nichts dahinter auslösen).
+                faenger.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); }, true);
             }
-            document.body.appendChild(schleier);
+            document.body.appendChild(faenger);
         }
         function freigeben() {
             laeuft = false;
-            if (schleier && schleier.parentNode) schleier.parentNode.removeChild(schleier);
+            entmarkieren();
+            if (faenger && faenger.parentNode) faenger.parentNode.removeChild(faenger);
+        }
+
+        if (nurTerminal) {
+            const antippen = function (e) {
+                // Info-Knopf in der Kachel öffnet nur Details – keine Markierung.
+                if (laeuft || (e.target instanceof Element && e.target.closest('[role=button]'))) return;
+                const knopf = e.target instanceof Element ? e.target.closest('#orders-content button[type=submit]') : null;
+                if (knopf && ! knopf.disabled) markieren(knopf);
+            };
+            document.addEventListener('mousedown', antippen, true);
+            document.addEventListener('touchstart', antippen, true);
         }
 
         document.addEventListener('submit', async function (e) {
