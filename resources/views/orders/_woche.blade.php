@@ -37,15 +37,15 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
     {{-- Erfolgsmeldungen zeigt das App-Layout bereits global; hier nur Fehler.
          Das Terminal hat kein App-Layout und zeigt sie deshalb hier ($statusZeigen). --}}
     @if ($terminal)
-        {{-- Terminal: Meldungen schweben unten und verschwinden von selbst (reines CSS – wirkt auch,
+        {{-- Terminal: Meldungen schweben oben an der Stelle des „Einen Moment"-Schilds und verschwinden von selbst (reines CSS – wirkt auch,
              wenn dieser Bereich per JS ausgetauscht wird). Nichts verschiebt die Seite. --}}
         @if (($statusZeigen ?? false) && session('status'))
-            <div class="kantine-toast fixed inset-x-0 bottom-20 z-40 flex justify-center px-4" style="animation: kantine-toast-weg 4s forwards">
+            <div class="kantine-toast fixed inset-x-0 z-40 flex justify-center px-4" style="top: 96px; animation: kantine-toast-weg 4s forwards">
                 <div class="rounded-2xl bg-emerald-600 px-6 py-3 text-lg font-semibold text-white shadow-xl">{{ session('status') }}</div>
             </div>
         @endif
         @if ($errors->any())
-            <div class="kantine-toast fixed inset-x-0 bottom-20 z-40 flex justify-center px-4" style="animation: kantine-toast-weg 8s forwards">
+            <div class="kantine-toast fixed inset-x-0 z-40 flex justify-center px-4" style="top: 96px; animation: kantine-toast-weg 8s forwards">
                 <div class="rounded-2xl bg-red-600 px-6 py-3 text-lg font-semibold text-white shadow-xl">{{ $errors->first() }}</div>
             </div>
         @endif
