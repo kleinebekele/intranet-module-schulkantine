@@ -112,6 +112,19 @@
                     </template>
                     <span x-show="! diagLetzte">noch nichts</span>
                 </dd>
+                {{-- Wo eine Bestellung ihre Zeit verbringt (gemessen nur auf der XP-Kiste). --}}
+                <dt class="text-gray-500">Letzte Bestellung</dt>
+                <dd class="text-sm">
+                    <template x-if="diagBestellung">
+                        <div class="font-mono">
+                            <div><span x-text="diagBestellung.zeit"></span> · gesamt <span class="font-semibold" x-text="diagBestellung.gesamt + ' s'"></span></div>
+                            <div x-text="'Server ' + diagBestellung.server + ' s · Laden ' + (diagBestellung.laden ?? '–') + ' s · Lesen ' + (diagBestellung.lesen ?? '–') + ' s · Einsetzen ' + (diagBestellung.einsetzen ?? '–') + ' s'"></div>
+                            <div class="break-all text-gray-500" x-text="diagBestellung.status"></div>
+                            <div class="break-all font-semibold text-red-700" x-show="diagBestellung.fehler" x-text="diagBestellung.fehler"></div>
+                        </div>
+                    </template>
+                    <span x-show="! diagBestellung">noch nichts</span>
+                </dd>
             </dl>
             <form class="mt-5 flex gap-2 border-t border-gray-100 pt-4" @submit.prevent="diagTestanmeldung()">
                 <input type="text" x-model="diagUid" placeholder="Chipnummer für Testanmeldung"
@@ -267,6 +280,7 @@
             diagUhr: null,
             diagLetzte: null,
             diagUid: '',
+            diagBestellung: null,
             serialBuf: '',
 
             init() {
@@ -290,7 +304,7 @@
                 ['pointerdown', 'keydown', 'scroll', 'wheel'].forEach(ev =>
                     window.addEventListener(ev, () => { this.rest = this.leerlauf; ruhe = 0; }, { passive: true }));
                 setInterval(() => {
-                    if (this.busy || this.abgemeldet) return;
+                    if (this.busy || this.abgemeldet || window.kantineBestellungLaeuft) return;
                     if (this.angemeldet) {
                         this.rest = Math.max(0, this.rest - 1);
                         if (this.rest === 0) this.abmelden();
@@ -472,6 +486,7 @@
                 if (uid) this.anmelden(uid);
             },
             diagOeffnen() {
+                try { this.diagBestellung = JSON.parse(sessionStorage.getItem('kantine.bestellZeiten') || 'null'); } catch (e) {}
                 this.diag = true;
                 this.diagRest = 60;
                 clearInterval(this.diagUhr);

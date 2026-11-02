@@ -805,6 +805,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
         }
         function sperren() {
             laeuft = true;
+            window.kantineBestellungLaeuft = true; // hält die Abmelde-Uhr des Terminals an
             if (! faenger) {
                 faenger = document.createElement('div');
                 faenger.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:90;cursor:wait';
@@ -816,6 +817,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
         }
         function freigeben() {
             laeuft = false;
+            window.kantineBestellungLaeuft = false;
             entmarkieren();
             if (faenger && faenger.parentNode) faenger.parentNode.removeChild(faenger);
         }
@@ -843,6 +845,11 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             if (!live) { form.submit(); return; }
 
             if (nurTerminal) sperren();
+            // Messung je Abschnitt (Sekunden), fürs Terminal in der F10-Diagnose zu sehen.
+            const t0 = performance.now();
+            const zeiten = { zeit: new Date().toLocaleTimeString('de-DE') };
+            const sek = t => Math.round((performance.now() - t) / 100) / 10;
+            const merken = () => { try { sessionStorage.setItem('kantine.bestellZeiten', JSON.stringify(zeiten)); } catch (x) {} };
             try {
                 const res = await fetch(action, {
                     method: 'POST',
@@ -850,8 +857,14 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                     headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
                     credentials: 'same-origin',
                 });
-                const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+                zeiten.server = sek(t0);
+                zeiten.status = res.status + ' ' + (res.url || '').replace(location.origin, '');
+                let t = performance.now();
+                const html = await res.text();
+                zeiten.laden = sek(t); t = performance.now();
+                const doc = new DOMParser().parseFromString(html, 'text/html');
                 const fresh = doc.getElementById('orders-content');
+                zeiten.lesen = sek(t); t = performance.now();
                 if (fresh) {
                     live.innerHTML = fresh.innerHTML;
                     // Monats-Summe oben (außerhalb #orders-content) mitziehen.
@@ -860,11 +873,24 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                     if (freshTotal && liveTotal) {
                         liveTotal.textContent = freshTotal.textContent;
                     }
+                    // Alpine richtet den neuen Inhalt in Mikroaufgaben ein – danach messen.
+                    await new Promise(r => setTimeout(r, 0));
+                    zeiten.einsetzen = sek(t);
+                    zeiten.gesamt = sek(t0);
+                    merken();
                     freigeben();
+                    // Wartezeit zählt nicht als Untätigkeit (Abmelde-Uhr des Terminals zurücksetzen).
+                    window.dispatchEvent(new Event('pointerdown'));
                 } else {
+                    zeiten.gesamt = sek(t0);
+                    zeiten.fehler = 'kein Bestellbereich in der Antwort – Seite neu geladen';
+                    merken();
                     window.location.reload();
                 }
             } catch (err) {
+                zeiten.gesamt = sek(t0);
+                zeiten.fehler = String(err && err.message ? err.message : err);
+                merken();
                 window.location.reload();
             }
         });
