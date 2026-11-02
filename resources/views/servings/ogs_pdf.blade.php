@@ -4,24 +4,27 @@
     <meta charset="utf-8">
     <title>OGS-Sammelliste {{ $date->format('d.m.Y') }}</title>
     <style>
+        @page { margin: 28px 32px; }
         * { font-family: DejaVu Sans, sans-serif; }
         body { margin: 0; color: #1f2937; font-size: 12px; }
-        .head { border-bottom: 2px solid #4f46e5; padding-bottom: 8px; margin-bottom: 16px; }
-        .head h1 { margin: 0 0 2px; font-size: 20px; color: #111827; }
-        .head .sub { font-size: 12px; color: #6b7280; }
-        .meta { font-size: 11px; color: #6b7280; margin-bottom: 14px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
-        th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
-             color: #6b7280; border-bottom: 1px solid #d1d5db; padding: 6px 8px; }
-        td { padding: 7px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
-        td.num { width: 28px; text-align: right; color: #9ca3af; }
+        .head { border-bottom: 2px solid #4f46e5; padding-bottom: 6px; margin-bottom: 10px; }
+        .head h1 { margin: 0 0 2px; font-size: 18px; color: #111827; }
+        .head .sub { font-size: 11px; color: #6b7280; }
+        .count { font-size: 12px; margin-bottom: 8px; color: #6b7280; }
+        .count strong { font-size: 15px; color: #111827; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: .04em;
+             color: #6b7280; border-bottom: 1px solid #d1d5db; padding: 4px 4px; }
+        td { padding: 4px 4px; border-bottom: 1px solid #ececec; vertical-align: top; }
+        td.num { width: 20px; text-align: right; color: #9ca3af; font-size: 10px; padding-top: 5px; }
+        td.klasse { width: 30px; white-space: nowrap; }
         td.name { font-weight: bold; }
-        td.warn { color: #b91c1c; font-size: 11px; }
-        td.check { width: 60px; text-align: center; color: #9ca3af; }
+        td.check { width: 16px; text-align: center; color: #9ca3af; font-size: 13px; padding-top: 2px; }
+        td.luecke, th.luecke { width: 14px; border: 0; }
+        .warn { color: #b91c1c; font-size: 9.5px; font-weight: normal; }
         .empty { color: #6b7280; font-style: italic; padding: 10px 0; }
-        .count { font-size: 13px; margin-bottom: 12px; }
-        .count strong { font-size: 16px; }
-        .foot { margin-top: 22px; font-size: 10px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+        .foot { margin-top: 10px; font-size: 9px; color: #9ca3af; }
+        .umbruch { page-break-after: always; }
     </style>
 </head>
 <body>
@@ -30,39 +33,78 @@
         <div class="sub">{{ ucfirst($date->isoFormat('dddd')) }}, {{ $date->format('d.m.Y') }} &nbsp;·&nbsp; Saison „{{ $season->name }}"</div>
     </div>
 
-    <div class="meta">Kinder, die heute ein OGS-Essen bekommen (Abo minus Abbestellungen bzw. Einzelbestellung).</div>
-
-    <div class="count">Heute essende OGS-Kinder: <strong>{{ $eaters->count() }}</strong></div>
+    <div class="count">Heute essende OGS-Kinder: <strong>{{ $eaters->count() }}</strong> &nbsp;·&nbsp; sortiert nach Klasse, Nachname</div>
 
     @if ($eaters->isEmpty())
         <p class="empty">Heute isst kein OGS-Kind.</p>
     @else
-        <table>
-            <thead>
-                <tr>
-                    <th></th>
-                    <th>Name</th>
-                    <th>Verträglichkeiten</th>
-                    <th style="text-align:center;">Abgeholt</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach ($eaters as $i => $e)
+        {{-- Zweispaltig für möglichst wenig Seiten. dompdf kennt keine CSS-Spalten und bricht
+             verschachtelte Tabellen schlecht um – daher je Seite EINE flache Tabelle: links die
+             ersten n, rechts die nächsten n Kinder (Lesefolge spaltenweise). Eine Tabellenzeile
+             ist so hoch wie ihr höherer Eintrag; ein Verträglichkeits-Hinweis macht sie ~1,6-mal
+             so hoch. Platz je Seite in einfachen Zeilen (erste Seite mit Kopf etwas weniger). --}}
+        @php
+            $hoehe = fn ($e) => $e && ($e['allergens'] || $e['diets']) ? 1.6 : 1;
+            $liste = $eaters->values()->map(fn ($e, $i) => ['nr' => $i + 1] + $e)->all();
+            $seiten = [];
+            $pos = 0;
+            while ($pos < count($liste)) {
+                $platz = $seiten === [] ? 35 : 39;
+                $rest = count($liste) - $pos;
+                $passt = function (int $n) use ($liste, $pos, $hoehe, $platz) {
+                    $summe = 0;
+                    for ($z = 0; $z < $n; $z++) {
+                        $summe += max($hoehe($liste[$pos + $z] ?? null), $hoehe($liste[$pos + $n + $z] ?? null));
+                    }
+
+                    return $summe <= $platz;
+                };
+                // Kleinstes n, das den Rest aufnimmt (gleichmäßige letzte Seite), sonst das größte, das passt.
+                $n = 1;
+                while ($n * 2 < $rest && $passt($n + 1)) {
+                    $n++;
+                }
+                $seiten[] = [array_slice($liste, $pos, $n), array_slice($liste, $pos + $n, $n)];
+                $pos += 2 * $n;
+            }
+        @endphp
+        @foreach ($seiten as [$links, $rechts])
+            <table @class(['umbruch' => ! $loop->last])>
+                <thead>
                     <tr>
-                        <td class="num">{{ $i + 1 }}.</td>
-                        <td class="name">{{ $e['user']->name }}</td>
-                        <td class="warn">
-                            @if ($e['allergens'] || $e['diets'])
-                                ⚠️
-                                @if ($e['allergens']) Allergien: {{ implode(', ', $e['allergens']) }}.@endif
-                                @if ($e['diets']) Diäten: {{ implode(', ', $e['diets']) }}.@endif
-                            @endif
-                        </td>
-                        <td class="check">☐</td>
+                        @foreach ([0, 1] as $s)
+                            @if ($s === 1)<th class="luecke"></th>@endif
+                            <th></th><th>Kl.</th><th>Name</th><th>✓</th>
+                        @endforeach
                     </tr>
-                @endforeach
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @for ($z = 0; $z < max(count($links), count($rechts)); $z++)
+                        <tr>
+                            @foreach ([$links[$z] ?? null, $rechts[$z] ?? null] as $s => $e)
+                                @if ($s === 1)<td class="luecke"></td>@endif
+                                @if ($e)
+                                    <td class="num">{{ $e['nr'] }}.</td>
+                                    <td class="klasse">{{ $e['klasse'] ?? '–' }}</td>
+                                    <td class="name">
+                                        {{ $e['sortName'] }}
+                                        @if ($e['allergens'] || $e['diets'])
+                                            <div class="warn">⚠
+                                                @if ($e['allergens']) Allergien: {{ implode(', ', $e['allergens']) }}.@endif
+                                                @if ($e['diets']) Diäten: {{ implode(', ', $e['diets']) }}.@endif
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td class="check">☐</td>
+                                @else
+                                    <td style="border:0"></td><td style="border:0"></td><td style="border:0"></td><td style="border:0"></td>
+                                @endif
+                            @endforeach
+                        </tr>
+                    @endfor
+                </tbody>
+            </table>
+        @endforeach
     @endif
 
     <div class="foot">

@@ -968,12 +968,48 @@ class ServingController
             ->pluck('user_id')
             ->flip();
 
-        return $attending->map(fn (User $u) => [
-            'user' => $u,
-            'served' => $servedIds->has($u->id),
-            'allergens' => $u->kantineAllergens->pluck('name')->all(),
-            'diets' => $u->kantineDiets->pluck('name')->all(),
-        ])->values();
+        $attending->loadMissing('roles');
+
+        // Nach Klasse (natürlich: 2a vor 10a, ohne Klasse ans Ende), dann Nachname, Vorname.
+        return $attending->map(function (User $u) use ($servedIds) {
+            [$vorname, $nachname] = self::namensteile($u->name);
+
+            return [
+                'user' => $u,
+                'klasse' => self::klasse($u),
+                'sortName' => $nachname !== '' ? $nachname.', '.$vorname : $vorname,
+                'served' => $servedIds->has($u->id),
+                'allergens' => $u->kantineAllergens->pluck('name')->all(),
+                'diets' => $u->kantineDiets->pluck('name')->all(),
+            ];
+        })->sort(function ($a, $b) {
+            if (($a['klasse'] === null) !== ($b['klasse'] === null)) {
+                return $a['klasse'] === null ? 1 : -1;
+            }
+
+            return strnatcasecmp((string) $a['klasse'], (string) $b['klasse'])
+                ?: strcmp(self::sortierbar($a['sortName']), self::sortierbar($b['sortName']));
+        })->values();
+    }
+
+    /**
+     * Vor- und Nachname aus dem Anzeigenamen „Vorname(n) Nachname" – das letzte Wort
+     * gilt als Nachname (Linear liefert die Namen in dieser Form).
+     *
+     * @return array{0: string, 1: string}
+     */
+    private static function namensteile(string $name): array
+    {
+        $teile = preg_split('/\s+/u', trim($name)) ?: [];
+        $nachname = count($teile) > 1 ? array_pop($teile) : '';
+
+        return [implode(' ', $teile), $nachname];
+    }
+
+    /** Umlaut-tolerant vergleichbar (Ä wie A, ß wie ss) – unabhängig von der Server-Locale. */
+    private static function sortierbar(string $text): string
+    {
+        return strtr(mb_strtolower($text), ['ä' => 'a', 'ö' => 'o', 'ü' => 'u', 'ß' => 'ss', 'é' => 'e', 'è' => 'e']);
     }
 
     // ----------------------------------------------------------------- Helfer

@@ -55,7 +55,7 @@
                                class="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800">
                                 <x-module-icon name="download" class="text-base" /> Mengen-PDF
                             </a>
-                            <a x-show="tab === 'details'" x-cloak href="{{ route('module.schulkantine.servings.ogs.pdf', ['date' => $date->toDateString()]) }}"
+                            <a href="{{ route('module.schulkantine.servings.ogs.pdf', ['date' => $date->toDateString()]) }}"
                                class="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800">
                                 <x-module-icon name="download" class="text-base" /> OGS-Sammelliste-PDF
                             </a>
@@ -219,7 +219,8 @@
                                     @foreach ($ogsRows as $i => $e)
                                         <li class="flex items-center gap-3 px-4 py-2.5">
                                             <span class="w-6 shrink-0 text-right text-xs text-gray-400">{{ $i + 1 }}.</span>
-                                            <span class="font-medium text-gray-800">{{ $e['user']->name }}</span>
+                                            <span class="w-12 shrink-0 text-xs text-gray-500">{{ $e['klasse'] ?? '–' }}</span>
+                                            <span class="font-medium text-gray-800">{{ $e['sortName'] }}</span>
                                             @if ($e['allergens'] || $e['diets'])
                                                 <span class="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700"
                                                       title="{{ trim(($e['allergens'] ? 'Allergien: '.implode(', ', $e['allergens']).'. ' : '').($e['diets'] ? 'Diäten: '.implode(', ', $e['diets']).'.' : '')) }}">
