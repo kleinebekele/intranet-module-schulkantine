@@ -231,9 +231,14 @@
 
             // ---- Preis-Helfer ----
             euro(v) { return (Math.round(v * 100) / 100).toFixed(2).replace('.', ',') + ' €'; },
+            // Preis für die gestempelte Person (z. B. Lehrerpreis), sonst der Standardpreis.
+            preisVon(dish) {
+                const p = this.person && this.person.preise ? this.person.preise[dish.id] : undefined;
+                return p !== undefined ? p : dish.price;
+            },
             get walkinPrices() {
                 const m = {};
-                this.walkinGroups.forEach(g => g.dishes.forEach(d => { m[d.id] = d.price; }));
+                this.walkinGroups.forEach(g => g.dishes.forEach(d => { m[d.id] = this.preisVon(d); }));
                 return m;
             },
             get hasWalkin() { return Object.values(this.walkinQty).some(q => q > 0); },
@@ -1268,7 +1273,7 @@
                                         <div class="flex min-w-0 flex-1 flex-col justify-center">
                                             <span class="flex flex-wrap items-baseline gap-x-2 text-xl font-bold leading-tight text-gray-800">
                                                 <span @click="openDishModal(dish)" class="cursor-pointer" x-text="dish.name"></span>
-                                                <span @click="openDishModal(dish)" class="cursor-pointer whitespace-nowrap text-base font-semibold text-gray-500" x-text="euro(dish.price)"></span>
+                                                <span @click="openDishModal(dish)" class="cursor-pointer whitespace-nowrap text-base font-semibold text-gray-500" x-text="euro(preisVon(dish))"></span>
                                                 <span x-show="dishWarn(dish)" x-cloak class="shrink-0 rounded-md bg-yellow-100 px-1.5 text-sm font-bold text-yellow-800">⚠ nicht geeignet</span>
                                             </span>
                                             {{-- Menü: seine Gerichte klein darunter --}}
@@ -1355,7 +1360,7 @@
                                             </div>
                                             <div class="flex min-w-0 flex-1 flex-col justify-center pr-1">
                                                 <span class="text-lg font-semibold leading-tight text-gray-800" x-text="dish.name"></span>
-                                                <span class="mt-0.5 text-base font-medium text-gray-500" x-text="euro(dish.price)"></span>
+                                                <span class="mt-0.5 text-base font-medium text-gray-500" x-text="euro(preisVon(dish))"></span>
                                                 <span x-show="dishWarn(dish)" x-cloak class="mt-0.5 text-xs font-bold text-yellow-700">⚠ nicht geeignet</span>
                                             </div>
                                         </div>
@@ -1364,7 +1369,7 @@
                                         <div class="min-w-[6.5rem] whitespace-nowrap text-lg font-bold"
                                              :class="walkinQty[dish.id] ? 'text-gray-900' : 'text-gray-300'">
                                             <span x-text="walkinQty[dish.id] || 0"></span>×
-                                            <span class="text-sm font-medium" x-text="euro((walkinQty[dish.id] || 0) * dish.price)"></span>
+                                            <span class="text-sm font-medium" x-text="euro((walkinQty[dish.id] || 0) * preisVon(dish))"></span>
                                         </div>
                                     </div>
                                 </template>
@@ -1757,7 +1762,7 @@
                         <template x-if="!modalDish.photo"><x-schulkantine::dish-placeholder /></template>
                     </div>
                     <div class="min-w-0 flex-1">
-                        <div class="text-xl font-bold text-gray-800" x-text="euro(modalDish.price)"></div>
+                        <div class="text-xl font-bold text-gray-800" x-text="euro(preisVon(modalDish))"></div>
                         <template x-if="modalDish.inhalt && modalDish.inhalt.length">
                             <ul class="mt-2 list-inside list-disc text-base text-gray-700">
                                 <template x-for="n in modalDish.inhalt" :key="n"><li x-text="n"></li></template>

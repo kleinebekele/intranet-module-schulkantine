@@ -438,6 +438,8 @@ class ServingController
             'warn' => collect($dishes)->contains(fn ($d) => ! empty($d['allergenHits']) || ! empty($d['dietHits'])),
             // Wochenbudget – nur, wenn die Eltern die Anzeige an der Ausgabe eingeschaltet haben.
             'budget' => $this->budgetAnzeige($eater, $date),
+            // Preise dieser Person je Terminal-Kachel (Lehrer zahlen mehr als Schüler).
+            'preise' => $this->terminalPreise($season, $eater, $date),
         ];
     }
 
@@ -680,6 +682,35 @@ class ServingController
             'user_id' => $eater->id, 'woche' => $woche->toDateString(), 'tag' => $date->toDateString(),
             'budget' => $budget, 'genutzt' => $nachher, 'ueber' => round($nachher - $budget, 2),
         ]];
+    }
+
+    /**
+     * Preise einer Person für alle Kacheln des Tages: Menüs ('md<id>') nach dem
+     * Linear-Preis der Person, Gerichte (id) nach ihrem Vertragspreis.
+     *
+     * @return array<string, float>
+     */
+    private function terminalPreise(Season $season, User $eater, Carbon $date): array
+    {
+        $preise = [];
+        $menuDays = MenuDay::where('season_id', $season->id)->whereDate('date', $date->toDateString())
+            ->with(['template', 'slots.dish'])->get();
+        foreach ($menuDays as $md) {
+            $preise['md'.$md->id] = \Intranet\Modules\Schulkantine\Support\LinearPreise::menuPreis($md, $eater);
+            foreach ($md->slots as $slot) {
+                if ($slot->dish) {
+                    $preise[$slot->dish->id] = $slot->dish->preisFuer($eater);
+                }
+            }
+        }
+        Menu::where('season_id', $season->id)->whereDate('date', $date->toDateString())->with('dish')->get()
+            ->each(function (Menu $m) use (&$preise, $eater) {
+                if ($m->dish) {
+                    $preise[$m->dish->id] = $m->dish->preisFuer($eater);
+                }
+            });
+
+        return $preise;
     }
 
     /** @return array{betrag: float, genutzt: float, rest: float, offen: bool}|null */
