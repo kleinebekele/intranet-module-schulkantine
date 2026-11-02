@@ -777,6 +777,8 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
         // nichts passiert: sofort abdunkeln + Lade-Kreisel, weitere Klicks prallen am
         // Schleier ab und weitere Sendungen werden verworfen, bis die Antwort da ist.
         // Inline-Stile statt Tailwind, damit der Schleier ohne Klassen-Build sicher steht.
+        // Nur auf dem Bestell-Terminal (Kiosk), nicht unter „Essen bestellen" im Intranet.
+        const nurTerminal = @js(str_starts_with($routen['bestellen'], 'kantine.bestellterminal.'));
         let laeuft = false;
         let schleier = null;
         function sperren() {
@@ -808,7 +810,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             const live = document.getElementById('orders-content');
             if (!live) { form.submit(); return; }
 
-            sperren();
+            if (nurTerminal) sperren();
             try {
                 const res = await fetch(action, {
                     method: 'POST',
