@@ -1246,10 +1246,9 @@
                             <legend class="px-1.5 text-sm font-bold uppercase tracking-wide" :style="group.color ? ('color:' + group.color) : ''" x-text="group.category"></legend>
                             <div class="space-y-3">
                                 <template x-for="dish in group.dishes" :key="dish.id">
-                                    {{-- Ganze Kachel öffnet das Detail-Modal; die Auswahl läuft
-                                         über den eigenen Button rechts (@click.stop). --}}
-                                    <div @click="openDishModal(dish)"
-                                         class="flex w-full cursor-pointer items-stretch gap-4 rounded-2xl border-2 p-3 text-left transition"
+                                    {{-- Infos zum Gericht/Menü über Bild, Name oder Preis; die Zahlen
+                                         öffnen die Personenliste, rechts läuft die Auswahl. --}}
+                                    <div class="flex w-full items-stretch gap-4 rounded-2xl border-2 p-3 text-left transition"
                                          :class="{
                                                 'border-green-500 bg-green-50 ring-2 ring-green-300': tileState(group.category_id, dish.id)==='taken',
                                                 'border-amber-500 bg-amber-50 ring-2 ring-amber-300': tileState(group.category_id, dish.id)==='alt',
@@ -1258,7 +1257,7 @@
                                                 'border-gray-200 bg-white': tileState(group.category_id, dish.id)==='idle'
                                             }">
                                         {{-- Bild oder Platzhalter + ⚠️ bei Unverträglichkeit --}}
-                                        <div class="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-gray-50">
+                                        <div @click="openDishModal(dish)" class="relative h-24 w-24 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-black/5 bg-gray-50">
                                             <template x-if="dish.photo"><img :src="dish.photo" alt="" class="h-24 w-24 object-cover"></template>
                                             <template x-if="!dish.photo"><x-schulkantine::dish-placeholder /></template>
                                             <div x-show="dishWarn(dish)" x-cloak
@@ -1267,17 +1266,17 @@
                                         {{-- Inhalt --}}
                                         <div class="flex min-w-0 flex-1 flex-col">
                                             {{-- Zähler-Streifen: Tipp auf eine Zahl zeigt die Personen dahinter. --}}
-                                            <div class="mb-1.5 flex items-center gap-2 font-bold">
-                                                <button type="button" @click.stop="openPeople(dish, 'ordered')" title="Wer hat bestellt?"
-                                                        class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-gray-100 px-2 text-base text-gray-700 hover:ring-2 hover:ring-gray-400" x-text="dish.ordered"></button>
-                                                <button type="button" @click.stop="openPeople(dish, 'open')" title="Wer ist noch offen?"
-                                                        class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-amber-100 px-2 text-base text-amber-700 hover:ring-2 hover:ring-amber-400" x-text="dish.open"></button>
-                                                <button type="button" @click.stop="openPeople(dish, 'served')" title="Wer hat schon bekommen?"
-                                                        class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-green-100 px-2 text-base text-green-700 hover:ring-2 hover:ring-green-400" x-text="dish.served"></button>
-                                                <span class="ml-auto text-base font-semibold text-gray-500" x-text="euro(dish.price)"></span>
+                                            <div class="mb-2 flex items-center gap-2 font-bold">
+                                                <button type="button" @click="openPeople(dish, 'ordered')" title="Wer hat bestellt?"
+                                                        class="inline-flex h-12 min-w-14 items-center justify-center rounded-xl border-2 border-gray-300 bg-gray-100 px-3 text-xl text-gray-700 shadow-sm active:bg-gray-200" x-text="dish.ordered"></button>
+                                                <button type="button" @click="openPeople(dish, 'open')" title="Wer ist noch offen?"
+                                                        class="inline-flex h-12 min-w-14 items-center justify-center rounded-xl border-2 border-amber-300 bg-amber-100 px-3 text-xl text-amber-700 shadow-sm active:bg-amber-200" x-text="dish.open"></button>
+                                                <button type="button" @click="openPeople(dish, 'served')" title="Wer hat schon bekommen?"
+                                                        class="inline-flex h-12 min-w-14 items-center justify-center rounded-xl border-2 border-green-300 bg-green-100 px-3 text-xl text-green-700 shadow-sm active:bg-green-200" x-text="dish.served"></button>
                                             </div>
-                                            <span class="flex items-center gap-2 text-xl font-bold leading-tight text-gray-800">
-                                                <span x-text="dish.name"></span>
+                                            <span class="flex flex-wrap items-baseline gap-x-2 text-xl font-bold leading-tight text-gray-800">
+                                                <span @click="openDishModal(dish)" class="cursor-pointer" x-text="dish.name"></span>
+                                                <span @click="openDishModal(dish)" class="cursor-pointer whitespace-nowrap text-base font-semibold text-gray-500" x-text="euro(dish.price)"></span>
                                                 <span x-show="dishWarn(dish)" x-cloak class="shrink-0 rounded-md bg-yellow-100 px-1.5 text-sm font-bold text-yellow-800">⚠ nicht geeignet</span>
                                             </span>
                                             {{-- Menü: seine Gerichte klein darunter --}}
@@ -1630,7 +1629,7 @@
          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
          @click.self="peopleModal = null" @keydown.escape.window="peopleModal = null">
         <template x-if="peopleModal">
-            <div class="flex max-h-full w-full max-w-2xl flex-col rounded-2xl bg-white p-5 shadow-2xl">
+            <div class="flex max-h-full w-full max-w-5xl flex-col rounded-2xl bg-white p-5 shadow-2xl">
                 <div class="mb-3 flex items-start justify-between gap-3">
                     <h3 class="text-xl font-bold text-gray-800">
                         <span x-text="peopleModal.name"></span>
@@ -1638,9 +1637,11 @@
                     </h3>
                     <button @click="peopleModal = null" class="shrink-0 rounded-lg px-3 py-1 text-xl text-gray-400 hover:bg-gray-100">✕</button>
                 </div>
+                {{-- Zweispaltig (spaltenweise alphabetisch), erst danach scrollt die Liste. --}}
                 <div class="min-h-0 flex-1 overflow-y-auto">
+                    <div class="columns-2 gap-6">
                     <template x-for="(p, i) in peopleModal.liste" :key="p.id">
-                        <div class="flex items-center gap-3 px-3 py-2 text-lg" :class="i % 2 ? 'bg-gray-50' : ''">
+                        <div class="flex break-inside-avoid items-center gap-3 border-b border-gray-100 px-3 py-2 text-lg">
                             <span class="w-6 shrink-0 text-center"
                                   :class="{ 'text-green-600': p.status === 'served', 'text-amber-500': p.status === 'open', 'text-red-600': p.status === 'declined' }"
                                   x-text="p.status === 'served' ? '✓' : (p.status === 'declined' ? '✗' : '○')"></span>
@@ -1648,6 +1649,7 @@
                             <span class="shrink-0 rounded-full bg-indigo-100 px-3 py-0.5 text-base font-semibold text-indigo-700" x-show="p.klasse" x-text="p.klasse"></span>
                         </div>
                     </template>
+                    </div>
                     <div x-show="!peopleModal.liste.length" class="py-8 text-center text-gray-400">Niemand.</div>
                 </div>
             </div>
