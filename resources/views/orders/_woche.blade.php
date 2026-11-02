@@ -67,7 +67,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
         <div class="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
             <div class="justify-self-start">
                 @if ($canPrev)
-                    <a href="{{ route($routen['woche'], ['week' => $prevWeek]) }}"
+                    <a data-wochenwechsel href="{{ route($routen['woche'], ['week' => $prevWeek]) }}"
                        class="inline-flex items-center gap-1 border border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 {{ $t('rounded-lg px-3 py-2 text-sm', 'rounded-xl px-6 py-4 text-lg shadow-sm') }}">‹<span class="hidden sm:inline"> Vorige Woche</span></a>
                 @endif
             </div>
@@ -77,7 +77,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             </div>
             <div class="justify-self-end">
                 @if ($canNext)
-                    <a href="{{ route($routen['woche'], ['week' => $nextWeek]) }}"
+                    <a data-wochenwechsel href="{{ route($routen['woche'], ['week' => $nextWeek]) }}"
                        class="inline-flex items-center gap-1 border border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 {{ $t('rounded-lg px-3 py-2 text-sm', 'rounded-xl px-6 py-4 text-lg shadow-sm') }}"><span class="hidden sm:inline">Nächste Woche </span>›</a>
                 @endif
             </div>
@@ -873,13 +873,24 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                 }
                 // Info-Knopf in der Kachel öffnet nur Details – keine Markierung.
                 if (laeuft || (e.target instanceof Element && e.target.closest('[role=button]'))) return;
-                const knopf = e.target instanceof Element ? e.target.closest('#orders-content button[type=submit]') : null;
+                const knopf = e.target instanceof Element ? e.target.closest('#orders-content button[type=submit], #orders-content a[data-wochenwechsel]') : null;
                 if (knopf && ! knopf.disabled) markieren(knopf);
             };
             // Welches davon der Touch-Treiber der XP-Kiste liefert, zeigt die F10-Diagnose.
             document.addEventListener('pointerdown', antippen, true);
             document.addEventListener('mousedown', antippen, true);
             document.addEventListener('touchstart', antippen, true);
+
+            // Wochenwechsel lädt die ganze Seite neu – bis die neue da ist, Schild zeigen und
+            // weitere Klicks abfangen. Falls die Seite doch nicht wechselt, nach 20 s freigeben.
+            document.addEventListener('click', function (e) {
+                const link = e.target instanceof Element ? e.target.closest('#orders-content a[data-wochenwechsel]') : null;
+                if (! link || e.defaultPrevented) return;
+                if (laeuft) { e.preventDefault(); return; }
+                if (markiert !== link) markieren(link);
+                sperren();
+                setTimeout(freigeben, 20000);
+            }, true);
         }
 
         document.addEventListener('submit', async function (e) {
