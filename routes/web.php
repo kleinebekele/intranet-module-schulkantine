@@ -140,6 +140,7 @@ Route::middleware(['web', 'auth', AlsPerson::class])
         Route::get('ausgabe-terminal/uebersicht', [ServingController::class, 'terminalOverview'])->name('servings.terminal.overview');
         Route::get('ausgabe/mengen', [ServingController::class, 'quantities'])->name('servings.quantities');
         Route::get('ausgabe/mengen/pdf', [ServingController::class, 'mengenPdf'])->name('servings.mengen.pdf');
+        Route::get('ausgabe/besteller/pdf', [ServingController::class, 'bestellerPdf'])->name('servings.besteller.pdf');
         Route::get('ausgabe/no-shows', [ServingController::class, 'noShows'])->name('servings.noshows');
         Route::post('ausgabe/abhaken', [ServingController::class, 'toggle'])->name('servings.toggle');
         Route::post('ausgabe/lookup', [ServingController::class, 'lookup'])->name('servings.lookup');

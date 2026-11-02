@@ -209,9 +209,10 @@ php artisan kantine:seed-ogs-testkinder --remove</pre>
 
 <h3>5.7 Ausgabe-Übersicht</h3>
 <ul>
-    <li>Tab „<strong>Ausgabe Übersicht</strong>": Mengen je Gericht (Mengen-PDF), No-Shows, OGS-Zahl.</li>
+    <li>Tab „<strong>Ausgabe Übersicht</strong>": Mengen je Gericht, No-Shows, OGS-Zahl.</li>
     <li>Tab „<strong>Details</strong>": jeder Esser einzeln, dazu die <strong>OGS-Sammelliste</strong>
-        (auch als PDF).</li>
+        (auch als PDF). Die Besteller stehen mit Klasse (bzw. Lehrer/Mitarbeiter) als
+        <strong>Besteller-Liste-PDF</strong> bereit – zum Abhaken auf Papier, falls Scanner oder Terminal ausfallen.</li>
 </ul>
 
 <h3>5.8 Ausgabe-Terminal (Kellner)</h3>

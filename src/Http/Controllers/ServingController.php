@@ -35,6 +35,7 @@ use Intranet\Modules\Schulkantine\Support\OgsAttendance;
  *  - destroy()      Eine Ausgabe-Zeile entfernen (v. a. spontane Abholung).
  *  - quantities()   Mengenplanung je Gericht + No-Shows („bestellt, nicht geholt").
  *  - ogsPdf()       OGS-Sammelliste als PDF (heute essende OGS-Kinder, zum Drucken).
+ *  - bestellerPdf() Besteller des Tagesmenüs als PDF (Notfall-Liste, gleiche Form).
  *
  * Zugriff über die Betriebs-Rollen (siehe Support\Access).
  */
@@ -938,14 +939,64 @@ class ServingController
         $date = $this->resolveDate($request, $season);
         abort_unless($season->isOpenOn($date), 422, 'An diesem Tag hat die Mensa nicht geöffnet.');
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulkantine::servings.ogs_pdf', [
+        $eintraege = $this->ogsEatersDetailed($season, $date)->map(fn ($e) => [
+            'klasse' => $e['klasse'],
+            'sortName' => $e['sortName'],
+            'zeilen' => ($e['allergens'] || $e['diets']) ? [['text' => '⚠ '.trim(
+                ($e['allergens'] ? 'Allergien: '.implode(', ', $e['allergens']).'. ' : '')
+                .($e['diets'] ? 'Diäten: '.implode(', ', $e['diets']).'.' : '')
+            ), 'warn' => true]] : [],
+        ]);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulkantine::servings.liste_pdf', [
+            'titel' => 'OGS-Sammelliste',
+            'zaehler' => 'Heute essende OGS-Kinder',
+            'leer' => 'Heute isst kein OGS-Kind.',
+            'hinweis' => 'Bis zur Abbestell-Frist kann sich die Liste noch ändern.',
             'season' => $season,
             'date' => $date,
-            'eaters' => $this->ogsEatersDetailed($season, $date),
+            'eintraege' => $eintraege,
             'generatedAt' => Carbon::now(),
         ])->setPaper('a4', 'portrait');
 
         return $pdf->download('ogs-sammelliste-'.$date->toDateString().'.pdf');
+    }
+
+    /**
+     * Besteller-Liste als PDF – gleiche Form wie die OGS-Sammelliste (Klasse, Name,
+     * Kästchen), je Person die bestellten Gerichte. Notfall-Papier, falls Scanner oder
+     * Terminal ausfallen: abhaken und später am Terminal nachtragen.
+     */
+    public function bestellerPdf(Request $request)
+    {
+        $user = $request->user();
+        abort_unless(Access::canViewServings($user), 403, 'Kein Zugriff auf die Besteller-Liste.');
+
+        $season = Season::where('is_active', true)->firstOrFail();
+        $date = $this->resolveDate($request, $season);
+        abort_unless($season->isOpenOn($date), 422, 'An diesem Tag hat die Mensa nicht geöffnet.');
+
+        $eintraege = collect($this->menuRows($season, $date))->map(fn ($r) => [
+            'klasse' => $r['klasse'],
+            'sortName' => $r['sortName'],
+            'zeilen' => array_values(array_filter([
+                ['text' => $r['dishes']->map(fn ($d) => $d['dish']?->name ?? '—')->implode(', '), 'warn' => false],
+                $r['warn'] ? ['text' => '⚠ Verträglichkeit: '.$r['dishes']->flatMap(fn ($d) => array_merge($d['allergenHits'], $d['dietHits']))->unique()->implode(', '), 'warn' => true] : null,
+            ])),
+        ]);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulkantine::servings.liste_pdf', [
+            'titel' => 'Besteller-Liste Tagesmenü',
+            'zaehler' => 'Besteller heute',
+            'leer' => 'Für diesen Tag liegen keine Menü-Bestellungen vor.',
+            'hinweis' => 'Notfall-Liste: abhaken und später am Ausgabe-Terminal nachtragen.',
+            'season' => $season,
+            'date' => $date,
+            'eintraege' => $eintraege,
+            'generatedAt' => Carbon::now(),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download('besteller-'.$date->toDateString().'.pdf');
     }
 
     /**
@@ -972,24 +1023,46 @@ class ServingController
 
         // Nach Klasse (natürlich: 2a vor 10a, ohne Klasse ans Ende), dann Nachname, Vorname.
         return $attending->map(function (User $u) use ($servedIds) {
-            [$vorname, $nachname] = self::namensteile($u->name);
-
             return [
                 'user' => $u,
                 'klasse' => self::klasse($u),
-                'sortName' => $nachname !== '' ? $nachname.', '.$vorname : $vorname,
+                'sortName' => self::sortName($u),
                 'served' => $servedIds->has($u->id),
                 'allergens' => $u->kantineAllergens->pluck('name')->all(),
                 'diets' => $u->kantineDiets->pluck('name')->all(),
             ];
-        })->sort(function ($a, $b) {
-            if (($a['klasse'] === null) !== ($b['klasse'] === null)) {
-                return $a['klasse'] === null ? 1 : -1;
-            }
+        })->sort([self::class, 'nachKlasseUndName'])->values();
+    }
 
-            return strnatcasecmp((string) $a['klasse'], (string) $b['klasse'])
-                ?: strcmp(self::sortierbar($a['sortName']), self::sortierbar($b['sortName']));
-        })->values();
+    /**
+     * Sortierung der Listen: nach Klasse (natürlich: 2a vor 10a; Lehrer, Mitarbeiter …
+     * folgen als Text nach den Klassen, ohne Angabe ganz ans Ende), dann Nachname, Vorname.
+     */
+    public static function nachKlasseUndName(array $a, array $b): int
+    {
+        if (($a['klasse'] === null) !== ($b['klasse'] === null)) {
+            return $a['klasse'] === null ? 1 : -1;
+        }
+
+        return strnatcasecmp((string) $a['klasse'], (string) $b['klasse'])
+            ?: strcmp(self::sortierbar($a['sortName']), self::sortierbar($b['sortName']));
+    }
+
+    /** Name in der Form „Nachname, Vorname" für Listen. */
+    private static function sortName(User $user): string
+    {
+        [$vorname, $nachname] = self::namensteile($user->name);
+
+        return $nachname !== '' ? $nachname.', '.$vorname : $vorname;
+    }
+
+    /** Klasse eines Schülers – sonst, was die Person ist (Lehrer, Mitarbeiter, Info-Text …). */
+    private static function klasseOderRolle(User $user, ?CustomerGroup $group): ?string
+    {
+        $label = self::klasse($user) ?? self::personLabel($user, $group);
+        $label = trim(preg_replace('/^Klasse\s+/u', '', $label));
+
+        return $label === '' || $label === '–' ? null : $label;
     }
 
     /**
@@ -1030,20 +1103,11 @@ class ServingController
 
         $userIds = $orders->pluck('user_id')->unique();
         $users = User::whereIn('id', $userIds)
-            ->with(['kantineAllergens', 'kantineDiets', 'roles'])
+            ->with(['kantineAllergens', 'kantineDiets', 'roles', 'kantineInfo'])
             ->get();
 
         $servedUserIds = $this->servedUserIds($season, $date, $userIds);
         $groups = CustomerGroup::all()->keyBy('role_id');
-
-        // Reihenfolge wie auf „Essen bestellen": Kinder zuerst, Erwachsene zuletzt.
-        // Global heißt das nach Gruppen-Priorität (OGS → Schüler → Sonstige),
-        // dann alphabetisch. Auf dem Tagesmenü-Tab kommen so Schüler vor Sonstige.
-        $priority = array_flip(CustomerGroup::ROLE_PRIORITY);
-        $users = $users->sortBy([
-            fn (User $u) => $this->groupPriority($u, $priority),
-            fn (User $u) => mb_strtolower($u->name),
-        ])->values();
 
         $rows = [];
         foreach ($users as $eater) {
@@ -1067,9 +1131,12 @@ class ServingController
                 ];
             })->values();
 
+            $group = CustomerGroup::forUser($eater, $groups);
             $rows[] = [
                 'user' => $eater,
-                'group' => CustomerGroup::forUser($eater, $groups)?->name,
+                'group' => $group?->name,
+                'klasse' => self::klasseOderRolle($eater, $group),
+                'sortName' => self::sortName($eater),
                 'served' => $servedUserIds->has($eater->id),
                 'dishes' => $dishes,
                 'warn' => $dishes->contains(fn ($d) => $d['allergenHits'] || $d['dietHits']),
@@ -1078,24 +1145,10 @@ class ServingController
             ];
         }
 
+        // Wie die OGS-Sammelliste: Klasse, dann Nachname, Vorname (Erwachsene nach den Klassen).
+        usort($rows, [self::class, 'nachKlasseUndName']);
+
         return $rows;
-    }
-
-    /**
-     * Sortier-Priorität eines Essers anhand seiner Gruppen-Rolle
-     * (OGS → Schüler → Sonstige). Niedriger = weiter oben. Wer keine der
-     * Gruppen-Rollen hat, landet ganz unten.
-     */
-    private function groupPriority(User $user, array $priority): int
-    {
-        $roleIds = $user->roles->pluck('role_id');
-        foreach ($priority as $roleId => $rank) {
-            if ($roleIds->contains($roleId)) {
-                return $rank;
-            }
-        }
-
-        return count($priority);
     }
 
     /** IDs der Esser, die an dem Tag bereits (vorbestellt) ausgegeben wurden. */

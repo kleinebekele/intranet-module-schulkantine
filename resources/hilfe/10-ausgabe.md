@@ -20,8 +20,7 @@ rollen: kantine_koch, kantine_kellner, admin
 
 Der erste Tab zeigt die Zahlen des Tages:
 
-- **Mengen je Gericht** – bestellt, ausgegeben, spontan und noch offen. Die reine
-  Kochmenge gibt es zusätzlich als **Mengen-PDF** für die Küche.
+- **Mengen je Gericht** – bestellt, ausgegeben, spontan und noch offen.
 - **Bestellt, aber nicht abgeholt** (No-Shows) – wo Essen übrig geblieben ist. Bezahlt
   wird es trotzdem; die Liste ist Rückmeldung, kein Mahnwerkzeug.
 - **OGS-Essen** – wie viele OGS-Kinder heute essen und wie viele schon ausgegeben sind.
@@ -35,8 +34,11 @@ rollen: kantine_koch, kantine_kellner, kantine_ogs_betreuer, admin
 
 Der zweite Tab listet **jeden Esser einzeln** – getrennt nach **Tagesmenü** und **OGS**:
 
-- Im Tagesmenü steht je Person, was sie bestellt hat, samt Kennzeichnung und einer Warnung,
-  wenn ein Gericht nicht zu ihren hinterlegten Verträglichkeiten passt.
+- Im Tagesmenü steht je Person – sortiert nach Klasse, dann Nachname; bei Erwachsenen steht
+  statt der Klasse „Lehrer", „Mitarbeiter" usw. – was sie bestellt hat, samt einer Warnung,
+  wenn ein Gericht nicht zu ihren hinterlegten Verträglichkeiten passt. Als
+  **Besteller-Liste-PDF** gibt es sie in derselben Form wie die OGS-Sammelliste: Fallen
+  Scanner oder Terminal aus, wird auf Papier abgehakt und später am Terminal nachgetragen.
 - Die **OGS-Sammelliste** zeigt, welche Kinder heute ein OGS-Essen bekommen. Zum Mitnehmen
   und Abhaken auf Papier gibt es sie als **OGS-Sammelliste-PDF**.
 

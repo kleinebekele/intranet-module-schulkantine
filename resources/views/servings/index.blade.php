@@ -51,10 +51,12 @@
                                     class="rounded-md px-3 py-1.5 font-medium">Details</button>
                         </div>
                         <div class="flex items-center gap-4">
-                            <a x-show="tab === 'overview'" href="{{ route('module.schulkantine.servings.mengen.pdf', ['date' => $date->toDateString()]) }}"
-                               class="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800">
-                                <x-module-icon name="download" class="text-base" /> Mengen-PDF
-                            </a>
+                            @if (\Intranet\Modules\Schulkantine\Support\Access::canViewServings(auth()->user()))
+                                <a href="{{ route('module.schulkantine.servings.besteller.pdf', ['date' => $date->toDateString()]) }}"
+                                   class="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800">
+                                    <x-module-icon name="download" class="text-base" /> Besteller-Liste-PDF
+                                </a>
+                            @endif
                             <a href="{{ route('module.schulkantine.servings.ogs.pdf', ['date' => $date->toDateString()]) }}"
                                class="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800">
                                 <x-module-icon name="download" class="text-base" /> OGS-Sammelliste-PDF
@@ -169,10 +171,8 @@
                                     @foreach ($menuRows as $row)
                                         <div class="px-4 py-3">
                                             <div class="flex flex-wrap items-center gap-2">
-                                                <span class="font-semibold text-gray-800">{{ $row['user']->name }}</span>
-                                                @if ($row['group'])
-                                                    <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">{{ $row['group'] }}</span>
-                                                @endif
+                                                <span class="w-20 shrink-0 text-xs text-gray-500">{{ $row['klasse'] ?? '–' }}</span>
+                                                <span class="font-semibold text-gray-800">{{ $row['sortName'] }}</span>
                                                 @if ($row['warn'])
                                                     <span class="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">⚠️ Verträglichkeiten prüfen</span>
                                                 @endif
