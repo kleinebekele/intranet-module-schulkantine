@@ -1672,6 +1672,9 @@ class ServingController
         if (! $season->isOpenOn($date)) {
             return $fail('An diesem Tag hat die Mensa nicht geöffnet.');
         }
+        if ($date->gt(Carbon::today())) {
+            return $fail('Künftige Tage sind gesperrt – gebucht wird erst am Ausgabetag.');
+        }
 
         $menu = $data['menu'] ?? [];
         $walkinIn = $data['walkin'] ?? [];
@@ -1849,6 +1852,9 @@ class ServingController
 
         if (! $season->isOpenOn($date)) {
             return $fail('An diesem Tag hat die Mensa nicht geöffnet.');
+        }
+        if ($date->gt(Carbon::today())) {
+            return $fail('Künftige Tage sind gesperrt – gebucht wird erst am Ausgabetag.');
         }
         if (CustomerGroup::forUser($eater)?->ordering_mode !== CustomerGroup::MODE_JA_NEIN) {
             return $fail($eater->name.' gehört nicht zur OGS-Gruppe (ja/nein).');

@@ -321,7 +321,8 @@
             // Offene Transaktion? Je nach Einstellung automatisch buchen oder nur warnen.
             // Gibt true zurück, wenn die nächste Person geladen werden darf.
             async guardPending() {
-                if (!this.person || !this.hasSomething) return true;
+                // Künftiger Tag: es wird ohnehin nichts gebucht – einfach weiter zur nächsten Person.
+                if (!this.person || !this.hasSomething || this.isFuture) return true;
                 if (this.autoFinish) return await this.commit(true);
                 this.banner = { ok:false, text:'Erst „Bestaetigen" oder „Abbrechen" – dann die naechste Person.' };
                 return false;
@@ -637,6 +638,7 @@
             },
             gotoToday() { window.location = this.urls.base + '#' + this.hashForMode(this.mode); },
             get isToday() { return this.date === this.today; },
+            get isFuture() { return this.date > this.today; },
             back() { this.resetSelection(); this.banner = null; }, // zurueck = frischer Stempel-Zustand
 
             toggleAutoFinish() {
@@ -689,6 +691,7 @@
 
             async commit(silent = false, budgetUeberschreiten = false) {
                 if (!this.person) return false;
+                if (this.isFuture) { this.banner = { ok:false, text:'Künftige Tage sind gesperrt – gebucht wird erst am Ausgabetag.' }; return false; }
                 if (this.busy) return false;
                 this.busy = true;
                 try {
@@ -1420,7 +1423,10 @@
                             <div class="text-[11px] uppercase tracking-wide text-gray-400">Gesamt heute (Bestellung + Extras)</div>
                             <div class="text-3xl font-extrabold text-gray-900" x-text="euro(bestellSumme + extrasTotal)"></div>
                         </div>
-                        <button @click="commit()" :disabled="busy || !hasSomething"
+                        {{-- Künftige Tage: nichts buchen (Ausgabe gibt es erst am Tag selbst). --}}
+                        <div x-show="isFuture" x-cloak
+                             class="rounded-2xl bg-gray-300 px-8 py-4 text-xl font-bold text-gray-600">🔒 gesperrt</div>
+                        <button x-show="!isFuture" @click="commit()" :disabled="busy || !hasSomething"
                                 class="rounded-2xl bg-green-600 px-8 py-4 text-xl font-bold text-white shadow hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-40">✓ Bestätigen</button>
                     </div>
                 </div>
