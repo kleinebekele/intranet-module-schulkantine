@@ -40,12 +40,12 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
         {{-- Terminal: Meldungen schweben oben an der Stelle des „Einen Moment"-Schilds und verschwinden von selbst (reines CSS – wirkt auch,
              wenn dieser Bereich per JS ausgetauscht wird). Nichts verschiebt die Seite. --}}
         @if (($statusZeigen ?? false) && session('status'))
-            <div class="kantine-toast fixed inset-x-0 z-40 flex justify-center px-4" style="top: 96px; animation: kantine-toast-weg 4s forwards">
+            <div class="kantine-toast fixed inset-x-0 z-40 flex justify-center px-4" style="top: 11px; pointer-events: none; animation: kantine-toast-weg 4s forwards">
                 <div class="rounded-2xl bg-emerald-600 px-6 py-3 text-lg font-semibold text-white shadow-xl">{{ session('status') }}</div>
             </div>
         @endif
         @if ($errors->any())
-            <div class="kantine-toast fixed inset-x-0 z-40 flex justify-center px-4" style="top: 96px; animation: kantine-toast-weg 8s forwards">
+            <div class="kantine-toast fixed inset-x-0 z-40 flex justify-center px-4" style="top: 11px; pointer-events: none; animation: kantine-toast-weg 8s forwards">
                 <div class="rounded-2xl bg-red-600 px-6 py-3 text-lg font-semibold text-white shadow-xl">{{ $errors->first() }}</div>
             </div>
         @endif
@@ -391,7 +391,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                 <span class="text-4xl leading-none" title="{{ $menuArten($md) }}">{{ \Intranet\Modules\Schulkantine\Support\Symbolbild::html($menuSymbole($md), $menuArten($md)) }}</span>
                                                             </div>
                                                             @unless ($gast)
-                                                                <div class="mt-3 rounded-lg py-3 text-center text-lg font-semibold
+                                                                <div data-kachel-status class="mt-3 rounded-lg py-3 text-center text-lg font-semibold
                                                                             {{ $isMenuOrdered ? 'bg-emerald-600 text-white' : ($menuClickable ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-500') }}">
                                                                     @if ($isMenuOrdered)
                                                                         {!! $haken !!} Bestellt{{ $menuClickable ? ' – antippen zum Abbestellen' : '' }}
@@ -548,7 +548,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                                                             </div>
                                                                         </div>
                                                                         @if ($terminal && ! $gast)
-                                                                            <div class="border-t py-2.5 text-center text-base font-semibold
+                                                                            <div data-kachel-status class="border-t py-2.5 text-center text-base font-semibold
                                                                                         {{ $isSel ? 'border-green-600 bg-green-600 text-white' : ($clickable ? 'border-indigo-100 bg-indigo-50 text-indigo-800' : 'border-gray-100 bg-gray-100 text-gray-500') }}">
                                                                                 @if ($isSel)
                                                                                     {!! $haken !!} Bestellt{{ $clickable ? ' – antippen zum Abbestellen' : '' }}
@@ -799,6 +799,15 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             knopf.style.transition = 'none';
             knopf.style.background = '#fde68a';
             knopf.style.borderColor = '#d97706';
+            // Die Leiste unten in der Kachel hat eine eigene Farbe – sie selbst gelb machen und
+            // „Einen Moment …" hineinschreiben, sonst sieht man die Markierung kaum.
+            const leiste = knopf.querySelector('[data-kachel-status]');
+            if (leiste) {
+                leiste.dataset.vorher = leiste.innerHTML;
+                leiste.style.background = '#fbbf24';
+                leiste.style.color = '#111827';
+                leiste.textContent = 'Einen Moment …';
+            }
             // Kommt kein Absenden (Finger weggezogen), Markierung wieder lösen.
             markTimer = setTimeout(() => { if (! laeuft) entmarkieren(); }, 3000);
         }
@@ -807,6 +816,13 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             if (markiert) {
                 markiert.style.background = '';
                 markiert.style.borderColor = '';
+                const leiste = markiert.querySelector('[data-kachel-status]');
+                if (leiste && leiste.dataset.vorher !== undefined) {
+                    leiste.innerHTML = leiste.dataset.vorher;
+                    leiste.style.background = '';
+                    leiste.style.color = '';
+                    delete leiste.dataset.vorher;
+                }
                 markiert = null;
             }
         }
@@ -816,7 +832,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             if (! faenger) {
                 faenger = document.createElement('div');
                 faenger.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:90;cursor:wait';
-                faenger.innerHTML = '<div style="position:absolute;top:96px;left:50%;margin-left:-160px;width:320px;padding:14px 0;text-align:center;border:4px solid #d97706;border-radius:16px;background:#fde68a;font-size:26px;font-weight:800;color:#111827">Einen Moment …</div>';
+                faenger.innerHTML = '<div style="position:absolute;top:11px;left:50%;margin-left:-160px;width:320px;padding:14px 0;text-align:center;border:4px solid #d97706;border-radius:16px;background:#fde68a;font-size:26px;font-weight:800;color:#111827">Einen Moment …</div>';
                 // Klicks auf den Fänger verschlucken (nichts dahinter auslösen).
                 faenger.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); }, true);
             }
