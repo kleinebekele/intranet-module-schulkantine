@@ -777,6 +777,15 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
      Bestell-Bereich austauschen. Die Scrollposition bleibt so erhalten.
      Fällt JS aus, senden die Formulare ganz normal (Server-Redirect). --}}
 @once
+    <style>
+        /* Getippte Kachel: Leiste gelb, alter Text nur unsichtbar (bleibt im DOM), darüber „Einen Moment …". */
+        [data-kachel-status][data-moment] { position: relative; background: #fbbf24 !important; }
+        [data-kachel-status][data-moment] > * { visibility: hidden; }
+        [data-kachel-status][data-moment]::after {
+            content: 'Einen Moment …'; position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+            display: flex; align-items: center; justify-content: center; color: #111827;
+        }
+    </style>
     <script>
     (function () {
         const ziele = @js([route($routen['bestellen']), route($routen['abo'])]);
@@ -803,13 +812,10 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             knopf.style.borderColor = '#d97706';
             // Die Leiste unten in der Kachel hat eine eigene Farbe – sie selbst gelb machen und
             // „Einen Moment …" hineinschreiben, sonst sieht man die Markierung kaum.
+            // Nur per CSS (data-moment): NICHTS aus dem DOM nehmen – entfernt man das Element unter
+            // dem Finger zwischen Herunterdrücken und Loslassen, verwirft der Browser den Klick.
             const leiste = knopf.querySelector('[data-kachel-status]');
-            if (leiste) {
-                leiste.dataset.vorher = leiste.innerHTML;
-                leiste.style.background = '#fbbf24';
-                leiste.style.color = '#111827';
-                leiste.textContent = 'Einen Moment …';
-            }
+            if (leiste) leiste.setAttribute('data-moment', '');
             // Kommt kein Absenden (Finger weggezogen), Markierung wieder lösen.
             markTimer = setTimeout(() => { if (! laeuft) entmarkieren(); }, 3000);
         }
@@ -819,12 +825,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                 markiert.style.background = '';
                 markiert.style.borderColor = '';
                 const leiste = markiert.querySelector('[data-kachel-status]');
-                if (leiste && leiste.dataset.vorher !== undefined) {
-                    leiste.innerHTML = leiste.dataset.vorher;
-                    leiste.style.background = '';
-                    leiste.style.color = '';
-                    delete leiste.dataset.vorher;
-                }
+                if (leiste) leiste.removeAttribute('data-moment');
                 markiert = null;
             }
         }
