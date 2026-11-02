@@ -61,58 +61,88 @@ class ServingController
             return view('schulkantine::servings.index', ['season' => null]);
         }
 
+        // Die ganze Kalenderwoche des gewählten Tages, ein Öffnungstag unter dem anderen.
         $date = $this->resolveDate($request, $season);
-        $open = $season->isOpenOn($date);
-
-        // Übersicht (Tab 1): Mengen je Gericht, No-Shows, OGS-Zahl.
-        // Details (Tab 2): jeder Esser einzeln – Tagesmenü und OGS getrennt.
-        $noShowGroups = [];
-        $menuByDish = [];
-        $ogsQuant = $this->emptyOgs();
-        $menuRows = [];
-        $ogsRows = [];
-
-        if ($open) {
-            $quant = $this->quantitiesData($season, $date);
-            $menuByDish = $quant['menuByDish'];
-            $ogsQuant = $quant['ogs'];
-
-            // No-Shows je Esser gruppiert (Person → Gerichte), damit die Liste kurz bleibt;
-            // mit Klasse und sortiert wie die übrigen Listen.
-            $groups = CustomerGroup::all()->keyBy('role_id');
-            foreach ($quant['noShows'] as $ns) {
-                $u = $ns['user'];
-                $key = $u?->id ?? 0;
-                if (! isset($noShowGroups[$key])) {
-                    $u?->loadMissing(['roles', 'kantineInfo']);
-                    $noShowGroups[$key] = [
-                        'klasse' => $u ? self::klasseOderRolle($u, CustomerGroup::forUser($u, $groups)) : null,
-                        'sortName' => $u ? self::sortName($u) : 'Unbekannt',
-                        'dishes' => [],
-                    ];
-                }
-                $noShowGroups[$key]['dishes'][] = $ns['dish'];
+        $monday = $date->copy()->startOfWeek(Carbon::MONDAY);
+        $days = [];
+        for ($i = 0; $i < 7; $i++) {
+            $d = $monday->copy()->addDays($i);
+            if ($season->isOpenOn($d)) {
+                $days[] = $this->ausgabeTag($season, $d);
             }
-            usort($noShowGroups, [self::class, 'nachKlasseUndName']);
-
-            $menuRows = $this->menuRows($season, $date);
-            $ogsRows = $this->ogsEatersDetailed($season, $date);
         }
 
         return view('schulkantine::servings.index', [
             'season' => $season,
             'date' => $date,
-            'open' => $open,
-            'menuByDish' => $menuByDish,
-            'noShowGroups' => $noShowGroups,
-            'noShowCount' => count($noShowGroups),
-            'ogsQuant' => $ogsQuant,
-            'menuRows' => $menuRows,
-            'ogsRows' => $ogsRows,
-            'closedReason' => $open ? null : $this->closedReason($season, $date),
-        ] + $this->dayNav($season, $date, []));
+            'monday' => $monday,
+            'days' => $days,
+            'prevWeek' => $this->wocheMitOeffnung($season, $monday, -1),
+            'nextWeek' => $this->wocheMitOeffnung($season, $monday, 1),
+            'thisWeek' => $monday->isSameDay(Carbon::today()->startOfWeek(Carbon::MONDAY)),
+        ]);
     }
 
+    /**
+     * Alle Daten eines Öffnungstags für die Ausgabe-Übersicht: Übersicht (Mengen je
+     * Menü/Gericht, No-Shows, OGS-Zahl) und Details (jeder Esser einzeln).
+     *
+     * @return array<string, mixed>
+     */
+    private function ausgabeTag(Season $season, Carbon $date): array
+    {
+        $quant = $this->quantitiesData($season, $date);
+
+        // No-Shows je Esser gruppiert (Person → Posten), damit die Liste kurz bleibt;
+        // mit Klasse und sortiert wie die übrigen Listen.
+        $noShowGroups = [];
+        $groups = CustomerGroup::all()->keyBy('role_id');
+        foreach ($quant['noShows'] as $ns) {
+            $u = $ns['user'];
+            $key = $u?->id ?? 0;
+            if (! isset($noShowGroups[$key])) {
+                $u?->loadMissing(['roles', 'kantineInfo']);
+                $noShowGroups[$key] = [
+                    'klasse' => $u ? self::klasseOderRolle($u, CustomerGroup::forUser($u, $groups)) : null,
+                    'sortName' => $u ? self::sortName($u) : 'Unbekannt',
+                    'dishes' => [],
+                ];
+            }
+            $noShowGroups[$key]['dishes'][] = $ns['dish'];
+        }
+        usort($noShowGroups, [self::class, 'nachKlasseUndName']);
+
+        return [
+            'date' => $date,
+            'isToday' => $date->isToday(),
+            // Erst ab dem Ausgabetag gibt es „nicht abgeholt" – davor ist alles noch offen.
+            'begonnen' => $date->lte(Carbon::today()),
+            'menuByDish' => $quant['menuByDish'],
+            'noShowGroups' => $noShowGroups,
+            'ogsQuant' => $quant['ogs'],
+            'menuRows' => $this->menuRows($season, $date),
+            'ogsRows' => $this->ogsEatersDetailed($season, $date),
+        ];
+    }
+
+    /** Erster Öffnungstag der nächsten Woche (Richtung ±1) mit Öffnungstagen, sonst null. */
+    private function wocheMitOeffnung(Season $season, Carbon $monday, int $richtung): ?string
+    {
+        for ($w = 1; $w <= 10; $w++) {
+            $mo = $monday->copy()->addWeeks($richtung * $w);
+            if ($mo->copy()->addDays(6)->lt($season->start_date) || $mo->gt($season->end_date)) {
+                return null;
+            }
+            for ($i = 0; $i < 7; $i++) {
+                $d = $mo->copy()->addDays($i);
+                if ($season->isOpenOn($d)) {
+                    return $d->toDateString();
+                }
+            }
+        }
+
+        return null;
+    }
     /**
      * Einen Esser für einen Tag als „ausgegeben" abhaken – oder das Abhaken
      * wieder zurücknehmen (Umschalter). Legt je aktiver Vorbestellung eine
@@ -1128,7 +1158,7 @@ class ServingController
         $season = Season::where('is_active', true)->firstOrFail();
         $eater = User::findOrFail($data['eater_id']);
         $date = Carbon::parse($data['date'])->startOfDay();
-        $zurueck = redirect()->route('module.schulkantine.servings.index', ['date' => $date->toDateString()]);
+        $zurueck = redirect()->to(route('module.schulkantine.servings.index', ['date' => $date->toDateString()]).'#tag-'.$date->toDateString());
 
         if (! $season->isOpenOn($date)) {
             return $zurueck->withErrors(['ogs' => 'An diesem Tag hat die Mensa nicht geöffnet.']);
@@ -1170,7 +1200,7 @@ class ServingController
         \Intranet\Modules\Schulkantine\Support\MensaAudit::schreiben('kantine.abbestellt',
             'OGS-Nachtrag entfernt: '.$eater->name.' am '.$date->format('d.m.Y'), $eater, ['Tag' => $date->format('d.m.Y')]);
 
-        return redirect()->route('module.schulkantine.servings.index', ['date' => $date->toDateString()])
+        return redirect()->to(route('module.schulkantine.servings.index', ['date' => $date->toDateString()]).'#tag-'.$date->toDateString())
             ->with('status', 'Entfernt: '.$eater->name.' am '.$date->format('d.m.Y').'.');
     }
 
