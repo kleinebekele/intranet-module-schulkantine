@@ -1342,9 +1342,9 @@
                                     <div class="flex items-center justify-center gap-8">
                                         <button type="button" @click.stop="walkinMinus(dish.id)" :disabled="!walkinQty[dish.id]"
                                                 class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-4xl font-bold text-gray-700 shadow-sm disabled:opacity-30">−</button>
-                                        {{-- Artikel-Kachel wie links: klickbar fürs Detail-Modal, Bild + Name + Preis, ⚠️ bei Konflikt. --}}
-                                        <div @click="openDishModal(dish)"
-                                             class="flex w-[19rem] cursor-pointer items-stretch gap-3 rounded-2xl border-2 bg-white p-2 shadow-sm"
+                                        {{-- Artikel-Kachel: Tipp zählt eins hoch (wie „+"), Bild + Name + Preis, ⚠️ bei Konflikt. --}}
+                                        <div @click="walkinPlus(dish.id)"
+                                             class="flex w-[19rem] cursor-pointer select-none items-stretch gap-3 rounded-2xl border-2 bg-white p-2 shadow-sm active:bg-indigo-50"
                                              :class="walkinQty[dish.id] ? 'border-indigo-400 ring-2 ring-indigo-200' : 'border-gray-200'">
                                             <div class="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-gray-50">
                                                 <template x-if="dish.photo"><img :src="dish.photo" alt="" class="h-20 w-20 object-cover"></template>
@@ -1381,7 +1381,8 @@
                     <div class="flex items-center justify-center gap-8">
                         <button type="button" @click="nachschlagMinus()" :disabled="nachschlagTotal <= 0"
                                 class="step-btn flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-4xl font-bold text-gray-700 shadow-sm disabled:opacity-30">−</button>
-                        <div class="flex w-[19rem] items-center justify-center rounded-2xl border-2 bg-amber-50 p-2 shadow-sm"
+                        {{-- Münze: Tipp zählt 50 ct hoch (wie „+"). --}}
+                        <div @click="nachschlagPlus()" class="flex w-[19rem] cursor-pointer select-none items-center justify-center rounded-2xl border-2 bg-amber-50 p-2 shadow-sm active:bg-amber-100"
                              :class="nachschlagTotal > 0 ? 'border-amber-400 ring-2 ring-amber-200' : 'border-amber-200'">
                             <div class="h-20 w-20"><x-schulkantine::coin value="50c" /></div>
                         </div>
