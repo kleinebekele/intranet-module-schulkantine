@@ -2161,12 +2161,22 @@ class ServingController
     /** Walk-in-Gerichte des Tages, gruppiert (rechte Terminal-Spalte oben). */
     private function terminalWalkinGroups(Season $season, Carbon $date): Collection
     {
+        // Auch Gerichte aus Menüs, deren Kategorie spontan erlaubt ist (z. B. die
+        // Nachspeise des Tagesmenüs) – so wird das Gericht gebucht statt eines Betrags.
+        $menueGerichte = MenuDay::where('season_id', $season->id)
+            ->whereDate('date', $date->toDateString())
+            ->with(collect($this->terminalDishRelations())->map(fn ($r) => 'slots.'.$r)->all())
+            ->orderBy('id')
+            ->get()
+            ->flatMap(fn (MenuDay $md) => $md->slots->sortBy('position')->map(fn ($s) => $s->dish));
+
         return Menu::where('season_id', $season->id)
             ->whereDate('date', $date->toDateString())
             ->with($this->terminalDishRelations())
             ->orderBy('sort_order')->orderBy('id')
             ->get()
             ->map(fn (Menu $m) => $m->dish)
+            ->concat($menueGerichte)
             ->filter(fn (?Dish $d) => $d && $d->category && $d->category->allows_walkin)
             ->unique('id')
             ->groupBy(fn (Dish $d) => $d->category?->name ?? 'Ohne Kategorie')
