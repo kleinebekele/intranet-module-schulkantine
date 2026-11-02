@@ -768,9 +768,35 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
      Bestell-Bereich austauschen. Die Scrollposition bleibt so erhalten.
      Fällt JS aus, senden die Formulare ganz normal (Server-Redirect). --}}
 @once
+    <style>@keyframes kantine-dreh { to { transform: rotate(360deg); } }</style>
     <script>
     (function () {
         const ziele = @js([route($routen['bestellen']), route($routen['abo'])]);
+
+        // Auf langsamen Geräten (XP-Terminal) tippen die Kinder sonst mehrfach, weil
+        // nichts passiert: sofort abdunkeln + Lade-Kreisel, weitere Klicks prallen am
+        // Schleier ab und weitere Sendungen werden verworfen, bis die Antwort da ist.
+        // Inline-Stile statt Tailwind, damit der Schleier ohne Klassen-Build sicher steht.
+        let laeuft = false;
+        let schleier = null;
+        function sperren() {
+            laeuft = true;
+            if (! schleier) {
+                schleier = document.createElement('div');
+                schleier.style.cssText = 'position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:rgba(17,24,39,.45);cursor:wait';
+                schleier.innerHTML = '<div style="display:flex;align-items:center;gap:16px;border-radius:16px;background:#fff;padding:20px 32px;font-size:24px;font-weight:700;color:#111827;box-shadow:0 10px 25px rgba(0,0,0,.3)">'
+                    + '<span style="display:inline-block;width:40px;height:40px;border-radius:50%;border:5px solid #c7d2fe;border-top-color:#4f46e5;animation:kantine-dreh .8s linear infinite"></span>'
+                    + 'Einen Moment …</div>';
+                // Klicks auf den Schleier verschlucken (nichts dahinter auslösen).
+                schleier.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); }, true);
+            }
+            document.body.appendChild(schleier);
+        }
+        function freigeben() {
+            laeuft = false;
+            if (schleier && schleier.parentNode) schleier.parentNode.removeChild(schleier);
+        }
+
         document.addEventListener('submit', async function (e) {
             const form = e.target;
             if (!(form instanceof HTMLFormElement)) return;
@@ -778,9 +804,11 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             if (! ziele.includes(action.split('?')[0])) return;
 
             e.preventDefault();
+            if (laeuft) return;
             const live = document.getElementById('orders-content');
             if (!live) { form.submit(); return; }
 
+            sperren();
             try {
                 const res = await fetch(action, {
                     method: 'POST',
@@ -798,6 +826,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                     if (freshTotal && liveTotal) {
                         liveTotal.textContent = freshTotal.textContent;
                     }
+                    freigeben();
                 } else {
                     window.location.reload();
                 }
