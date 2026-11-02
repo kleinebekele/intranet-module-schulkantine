@@ -592,12 +592,12 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
 
             @if ($gast)
             <p class="mt-4 text-xs text-gray-400">
-                Auf ein Gericht tippen = Details mit Allergenen und Zusatzstoffen. Zum Bestellen den Chip an den Leser halten.
+                Auf ein Gericht tippen = Details mit Allergenen und Zusatzstoffen. Zum Bestellen den Chip an den Leser halten.<span class="kantine-version"></span>
             </p>
             @else
             <p class="mt-4 text-xs text-gray-400">
                 Auf eine Gericht-Karte tippen = auswählen (erneut tippen = abwählen). Grün umrandete Tage sind bereits bestellt.
-                Bestellschluss ist der vorige Werktag; Abbestellen ist am Tag selbst bis zur eingestellten Uhrzeit möglich.
+                Bestellschluss ist der vorige Werktag; Abbestellen ist am Tag selbst bis zur eingestellten Uhrzeit möglich.<span class="kantine-version"></span>
             </p>
             @endif
         @endif

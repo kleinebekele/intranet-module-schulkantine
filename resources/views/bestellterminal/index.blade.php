@@ -40,6 +40,24 @@
             || /[?&]langsam=an/.test(location.search);
         if (window.kantineLangsam) document.documentElement.classList.add('kantine-leicht');
     </script>
+    {{-- Modulversion beim LADEN der Seite (nicht beim Austausch nach der Anmeldung): zeigt, welcher
+         Stand auf der Kiste wirklich läuft. Per CSS-Variable, damit sie auch im ausgetauschten
+         Inhalt (.kantine-version) erscheint. --}}
+    @php
+        try {
+            $modulVersion = \Composer\InstalledVersions::getPrettyVersion('do1emu/module-schulkantine') ?? '?';
+        } catch (\Throwable $e) {
+            $modulVersion = '?';
+        }
+        if (preg_match('/^\d/', $modulVersion)) {
+            $modulVersion = 'v'.$modulVersion;
+        }
+    @endphp
+    <script>
+        window.kantineVersion = @js($modulVersion);
+        document.documentElement.style.setProperty('--kantine-version', JSON.stringify(' · Version ' + window.kantineVersion));
+    </script>
+    <style>.kantine-version::after { content: var(--kantine-version, ''); }</style>
 </head>
 <body class="min-h-full select-none bg-gray-100 font-sans antialiased text-gray-800" oncontextmenu="return false">
     {{-- Rechter Rand in Prozent für Terminals mit Sichtblende (z. B. ?rand=20). Gemerkt für dieses
@@ -527,7 +545,7 @@
                     + ' · pointerup ' + z.pointerup + ' · mouseup ' + z.mouseup + ' · click ' + z.click
                     + ' · runter→click ' + (z.runterBisClick || '–');
                 const marken = ((navigator.userAgentData && navigator.userAgentData.brands) || []).map(b => b.brand + ' ' + b.version).join(', ');
-                this.diagBrowser = (window.kantineLangsam ? 'Sofort-Rückmeldung AN' : 'Sofort-Rückmeldung aus')
+                this.diagBrowser = 'Version ' + window.kantineVersion + ' · ' + (window.kantineLangsam ? 'Sofort-Rückmeldung AN' : 'Sofort-Rückmeldung aus')
                     + ' · Speicher ' + (navigator.deviceMemory ?? '?') + ' GB · ' + navigator.userAgent + (marken ? ' · ' + marken : '');
                 this.diag = true;
                 this.diagRest = 60;
