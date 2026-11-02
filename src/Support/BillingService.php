@@ -115,7 +115,9 @@ class BillingService
             }
         }
 
-        // 4) No-Shows (nur informativ): verbindliche Menü-Bestellung ohne Ausgabe.
+        // 4) No-Shows (nur informativ): verbindliche Menü-Bestellung ohne Ausgabe an einem
+        //    VERGANGENEN Tag; ein Menü zählt je Esser und Tag einmal. OGS hat keine No-Shows
+        //    (dort wird nicht erfasst, wer isst).
         $servedOrderIds = Serving::where('season_id', $season->id)
             ->where('spontaneous', false)
             ->whereNotNull('order_id')
@@ -125,10 +127,12 @@ class BillingService
             ->where('status', Order::STATUS_ORDERED)
             ->whereNotNull('category_id')
             ->whereBetween('date', [$from, $to])
-            ->get(['id', 'user_id']);
-        foreach ($menuOrders as $o) {
-            if (! $servedOrderIds->has($o->id) && isset($lines[$o->user_id])) {
-                $lines[$o->user_id]['no_show_count']++;
+            ->whereDate('date', '<', Carbon::today()->toDateString())
+            ->get(['id', 'user_id', 'menu_day_id']);
+        foreach ($menuOrders->groupBy(fn ($o) => $o->menu_day_id ? $o->user_id.'|'.$o->menu_day_id : 'o'.$o->id) as $gruppe) {
+            $uid = $gruppe->first()->user_id;
+            if (! $gruppe->contains(fn ($o) => $servedOrderIds->has($o->id)) && isset($lines[$uid])) {
+                $lines[$uid]['no_show_count']++;
             }
         }
 
@@ -222,6 +226,15 @@ class BillingService
                 'reason' => $declined?->decline_reason,
             ];
         }
+
+        // No-Show erst, wenn der Tag vorbei ist – heute und künftige Tage sind noch offen.
+        $heute = Carbon::today();
+        foreach ($menu as &$zeile) {
+            if ($zeile['outcome'] === 'none' && $zeile['date']->gte($heute)) {
+                $zeile['outcome'] = 'pending';
+            }
+        }
+        unset($zeile);
 
         // Nach Datum sortieren; bei gleichem Tag Menüs zuerst.
         usort($menu, function ($a, $b) {
