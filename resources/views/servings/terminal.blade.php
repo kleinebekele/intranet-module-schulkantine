@@ -1210,7 +1210,7 @@
         {{-- ---------- LINKS: Menüs (1/3) ---------- --}}
         {{-- Hat die gestempelte Person bestellt, wird die ganze linke Seite grün. --}}
         <section class="flex w-1/2 min-w-0 flex-col border-r border-gray-300 transition-colors xl:w-1/3"
-                 :class="person && person.hasOrder && !isOgs ? 'bg-green-200' : 'bg-white'">
+                 :class="person && !isOgs ? (person.hasOrder ? 'bg-green-200' : 'bg-red-200') : 'bg-white'">
             <div class="flex items-center justify-between border-b border-gray-200 px-4 py-2">
                 <div class="flex items-center gap-3">
                     <h2 class="text-lg font-bold text-gray-700">Menüs</h2>
@@ -1231,10 +1231,11 @@
             <div class="relative flex-1 p-3" :class="(person && !person.hasOrder) ? 'overflow-hidden' : 'overflow-y-auto'">
                 {{-- Sperr-Overlay, wenn Person ohne Vorbestellung --}}
                 <div x-show="person && !person.hasOrder" x-cloak
-                     class="absolute inset-0 z-20 flex items-center justify-center bg-gray-100/80 backdrop-blur-[1px]">
-                    <div class="rounded-xl bg-white px-6 py-4 text-center shadow">
-                        <div class="text-lg font-bold text-gray-700">Keine Vorbestellung</div>
-                        <div class="mt-1 text-sm text-gray-500">Ausgabe nur über die rechte Seite.</div>
+                     class="absolute inset-0 z-20 flex items-center justify-center bg-red-200/80 backdrop-blur-[1px]">
+                    {{-- Deutlich rot, damit es sich klar vom Leerlauf (niemand gestempelt) abhebt. --}}
+                    <div class="rounded-2xl bg-red-600 px-8 py-5 text-center text-white shadow-lg">
+                        <div class="text-2xl font-extrabold">Keine Vorbestellung</div>
+                        <div class="mt-1 text-base font-medium text-red-100">Ausgabe nur über die rechte Seite.</div>
                     </div>
                 </div>
 
