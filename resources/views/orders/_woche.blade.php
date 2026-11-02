@@ -780,15 +780,8 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
         //     kleines festes Schild – kein halbdurchsichtiger Vollbild-Schleier und keine
         //     Animation, die die Kiste zusätzlich ausbremsen.
         // Nur Bestell-Terminal und nur Windows NT 5.x – überall sonst ist die Antwort sofort da.
-        // Erkennung der Kiste: Supermium gibt sich nicht unbedingt als XP aus, darum auch
-        // Browsername „Supermium" oder ≤ 1 GB Arbeitsspeicher (XP-Kiste: 480 MB).
-        // ?langsam=an zum Ausprobieren auf anderen Rechnern.
-        const langsamesGeraet = /Windows NT 5\.|Supermium/i.test(navigator.userAgent)
-            || ((navigator.userAgentData && navigator.userAgentData.brands) || []).some(b => /Supermium/i.test(b.brand))
-            || (navigator.deviceMemory !== undefined && navigator.deviceMemory <= 1)
-            || /[?&]langsam=an/.test(location.search);
-        window.kantineLangsam = langsamesGeraet;
-        const nurTerminal = @js(str_starts_with($routen['bestellen'], 'kantine.bestellterminal.')) && langsamesGeraet;
+        // Erkennung der Kiste steht im Kopf des Bestell-Terminals (window.kantineLangsam).
+        const nurTerminal = @js(str_starts_with($routen['bestellen'], 'kantine.bestellterminal.')) && !! window.kantineLangsam;
         let laeuft = false;
         let faenger = null;
         let markiert = null, markTimer = null;
@@ -831,6 +824,8 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
             window.kantineBestellungLaeuft = true; // hält die Abmelde-Uhr des Terminals an
             if (! faenger) {
                 faenger = document.createElement('div');
+                // Klassen fixed inset-0: so greift auch der rechte Rand (?rand) des Terminals.
+                faenger.className = 'fixed inset-0';
                 faenger.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:90;cursor:wait';
                 faenger.innerHTML = '<div style="position:absolute;top:11px;left:50%;margin-left:-160px;width:320px;padding:14px 0;text-align:center;border:4px solid #d97706;border-radius:16px;background:#fde68a;font-size:26px;font-weight:800;color:#111827">Einen Moment …</div>';
                 // Klicks auf den Fänger verschlucken (nichts dahinter auslösen).

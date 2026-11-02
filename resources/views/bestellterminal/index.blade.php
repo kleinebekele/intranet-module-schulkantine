@@ -21,7 +21,25 @@
         [role="dialog"] button[x-ref="ok"] { background-color: #dc2626 !important; font-weight: 700; }
         [role="dialog"] button[x-ref="ok"]:hover { background-color: #b91c1c !important; }
         [role="dialog"] button:not([x-ref="ok"]) { background-color: #f3f4f6; color: #374151; }
+        /* Leicht-Modus für schwache Kisten (XP + Supermium ohne GPU): keine Schatten, Ringe und
+           Übergänge – die kosten beim Neuzeichnen in Software spürbar Zeit. Animationen bleiben,
+           die Meldungen blenden sich darüber aus. */
+        .kantine-leicht *, .kantine-leicht *::before, .kantine-leicht *::after {
+            transition: none !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+            backdrop-filter: none !important;
+        }
     </style>
+    {{-- Schwache Kiste erkennen (Supermium meldet sich als Windows 10, darum auch über den
+         Browsernamen oder ≤ 1 GB Speicher; ?langsam=an zum Ausprobieren). Gilt für die ganze Seite. --}}
+    <script>
+        window.kantineLangsam = /Windows NT 5\.|Supermium/i.test(navigator.userAgent)
+            || ((navigator.userAgentData && navigator.userAgentData.brands) || []).some(function (b) { return /Supermium/i.test(b.brand); })
+            || (navigator.deviceMemory !== undefined && navigator.deviceMemory <= 1)
+            || /[?&]langsam=an/.test(location.search);
+        if (window.kantineLangsam) document.documentElement.classList.add('kantine-leicht');
+    </script>
 </head>
 <body class="min-h-full select-none bg-gray-100 font-sans antialiased text-gray-800" oncontextmenu="return false">
     {{-- Rechter Rand in Prozent für Terminals mit Sichtblende (z. B. ?rand=20). Gemerkt für dieses
