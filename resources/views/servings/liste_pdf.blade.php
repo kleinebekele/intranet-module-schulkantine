@@ -37,7 +37,7 @@
         <div class="sub">{{ ucfirst($date->isoFormat('dddd')) }}, {{ $date->format('d.m.Y') }} &nbsp;·&nbsp; Saison „{{ $season->name }}"</div>
     </div>
 
-    <div class="count">{{ $zaehler }}: <strong>{{ $eintraege->count() }}</strong> &nbsp;·&nbsp; sortiert nach Klasse, Nachname</div>
+    <div class="count">{{ $zaehler }}: <strong>{{ $eintraege->count() }}</strong> &nbsp;·&nbsp; {{ $sortierung ?? 'sortiert nach Klasse, Nachname' }}</div>
 
     @if ($eintraege->isEmpty())
         <p class="empty">{{ $leer }}</p>

@@ -994,10 +994,12 @@ class ServingController
                 ['text' => $r['dishes']->map(fn ($d) => $d['dish']?->name ?? '—')->implode(', '), 'warn' => false],
                 $r['warn'] ? ['text' => '⚠ Verträglichkeit: '.$r['dishes']->flatMap(fn ($d) => array_merge($d['allergenHits'], $d['dietHits']))->unique()->implode(', '), 'warn' => true] : null,
             ])),
-        ]);
+        ])->sort(fn ($a, $b) => strcmp(self::sortierbar($a['sortName']), self::sortierbar($b['sortName']))
+            ?: strnatcasecmp((string) $a['klasse'], (string) $b['klasse']))->values();
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulkantine::servings.liste_pdf', [
             'titel' => 'Besteller-Liste Tagesmenü',
+            'sortierung' => 'alphabetisch nach Nachname, Vorname',
             'zaehler' => 'Besteller heute',
             'leer' => 'Für diesen Tag liegen keine Menü-Bestellungen vor.',
             'hinweis' => 'Notfall-Liste: abhaken und später am Ausgabe-Terminal nachtragen.',
