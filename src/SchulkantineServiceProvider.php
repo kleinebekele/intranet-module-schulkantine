@@ -123,7 +123,9 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
             ->item('guide', 'Anleitung', 'module.schulkantine.guide.index', icon: 'book', adminsOnly: true)
             // Zugriffsstufen, wo die Regel aus Anfrageart/Routenname nicht passt
             // (MODULES.md im Core, „Zugriffsstufen").
-            ->lesend('servings.lookup', 'servings.lookup-eater', 'servings.terminal.search') // suchen nur
+            ->lesend('servings.lookup', 'servings.lookup-eater', 'servings.terminal.search', 'servings.ogs.search') // suchen nur
+            // OGS nachtragen: OGS-Betreuer sehen die Ausgabe nur lesend – das Recht prüft der Controller.
+            ->lesend('servings.ogs.add', 'servings.ogs.remove')
             ->stufe(Zugriffsstufe::Verwalten, 'seasons.import', 'eaters.chip.issue', 'chips.register', 'seasons.menueserve.buchungen.uebernehmen', 'seasons.menueserve.ogs.angleichen', 'seasons.menueserve.ogs.abos', 'eaters.als') // legen an
             ->stufe(Zugriffsstufe::Bearbeiten, 'dishes.photo.delete') // Teil von „Gericht bearbeiten"
             // Bereiche, die auf der Seite eines anderen Menüpunkts gepflegt werden –

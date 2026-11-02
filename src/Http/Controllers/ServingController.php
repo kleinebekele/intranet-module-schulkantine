@@ -1067,17 +1067,111 @@ class ServingController
 
         $attending->loadMissing('roles');
 
+        // Nachgetragen = ausdrücklich angemeldet, ohne dass das Abo den Tag abdeckt.
+        $abos = Subscription::where('season_id', $season->id)->whereIn('user_id', $attending->pluck('id'))->get()->keyBy('user_id');
+        $einzeln = Order::where('season_id', $season->id)->whereNull('category_id')
+            ->whereDate('date', $date->toDateString())->where('status', Order::STATUS_ORDERED)
+            ->whereIn('user_id', $attending->pluck('id'))->pluck('user_id')->flip();
+        $nachgetragen = fn (User $u) => $einzeln->has($u->id)
+            && ! (($abo = $abos->get($u->id)) && $abo->active && $abo->eatsWeekday($date->dayOfWeekIso));
+
         // Nach Klasse (natürlich: 2a vor 10a, ohne Klasse ans Ende), dann Nachname, Vorname.
-        return $attending->map(function (User $u) use ($servedIds) {
+        return $attending->map(function (User $u) use ($servedIds, $nachgetragen) {
             return [
                 'user' => $u,
                 'klasse' => self::klasse($u),
                 'sortName' => self::sortName($u),
+                'nachgetragen' => $nachgetragen($u),
                 'served' => $servedIds->has($u->id),
                 'allergens' => $u->kantineAllergens->pluck('name')->all(),
                 'diets' => $u->kantineDiets->pluck('name')->all(),
             ];
         })->sort([self::class, 'nachKlasseUndName'])->values();
+    }
+
+    /**
+     * OGS-Kind suchen, um es nachzutragen (OGS-Betreuer): alle Kinder der OGS-Gruppe
+     * nach Namensteil, mit Klasse. Antwort als JSON.
+     */
+    public function ogsSuchen(Request $request)
+    {
+        abort_unless(Access::canViewOgsList($request->user()), 403, 'Kein Zugriff auf die OGS-Liste.');
+
+        $q = trim((string) $request->input('q', ''));
+        if (mb_strlen($q) < 2) {
+            return response()->json(['results' => []]);
+        }
+        $ogsRoleIds = CustomerGroup::where('ordering_mode', CustomerGroup::MODE_JA_NEIN)->pluck('role_id');
+
+        $users = User::where('name', 'like', '%'.$q.'%')
+            ->whereHas('roles', fn ($r) => $r->whereIn('roles.role_id', $ogsRoleIds))
+            ->with('roles')->orderBy('name')->limit(10)->get();
+
+        return response()->json(['results' => $users->map(fn (User $u) => [
+            'id' => $u->id, 'name' => self::sortName($u), 'klasse' => self::klasse($u),
+        ])->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values()]);
+    }
+
+    /**
+     * Ein OGS-Kind für einen Tag nachtragen, das ohne Anmeldung zum Essen kam (auch
+     * rückwirkend). Legt die Anmeldung an – damit steht es auf der Sammelliste und
+     * der Tag wird abgerechnet. Abbestellungen des Tages fallen dabei weg.
+     */
+    public function ogsNachtragen(Request $request)
+    {
+        abort_unless(Access::canViewOgsList($request->user()), 403, 'Kein Zugriff auf die OGS-Liste.');
+
+        $data = $request->validate([
+            'eater_id' => ['required', 'integer', 'exists:users,id'],
+            'date' => ['required', 'date'],
+        ]);
+        $season = Season::where('is_active', true)->firstOrFail();
+        $eater = User::findOrFail($data['eater_id']);
+        $date = Carbon::parse($data['date'])->startOfDay();
+        $zurueck = redirect()->route('module.schulkantine.servings.index', ['date' => $date->toDateString()]);
+
+        if (! $season->isOpenOn($date)) {
+            return $zurueck->withErrors(['ogs' => 'An diesem Tag hat die Mensa nicht geöffnet.']);
+        }
+        if (CustomerGroup::forUser($eater)?->ordering_mode !== CustomerGroup::MODE_JA_NEIN) {
+            return $zurueck->withErrors(['ogs' => $eater->name.' gehört nicht zur OGS.']);
+        }
+        if ($this->isOgsAttending($season, $eater, $date)) {
+            return $zurueck->with('status', $eater->name.' steht am '.$date->format('d.m.Y').' schon auf der OGS-Liste.');
+        }
+
+        DB::transaction(function () use ($season, $eater, $date) {
+            Order::where('season_id', $season->id)->where('user_id', $eater->id)->whereNull('category_id')
+                ->whereDate('date', $date->toDateString())->delete();
+            Order::create(['season_id' => $season->id, 'user_id' => $eater->id,
+                'date' => $date->toDateString(), 'status' => Order::STATUS_ORDERED]);
+        });
+        \Intranet\Modules\Schulkantine\Support\MensaAudit::schreiben('kantine.bestellt',
+            'OGS-Essen nachgetragen: '.$eater->name.' am '.$date->format('d.m.Y'), $eater, ['Tag' => $date->format('d.m.Y')]);
+
+        return $zurueck->with('status', 'Nachgetragen: '.$eater->name.' isst am '.$date->format('d.m.Y').' mit.');
+    }
+
+    /** Ein nachgetragenes OGS-Kind wieder von der Liste des Tages nehmen. */
+    public function ogsNachtragEntfernen(Request $request)
+    {
+        abort_unless(Access::canViewOgsList($request->user()), 403, 'Kein Zugriff auf die OGS-Liste.');
+
+        $data = $request->validate([
+            'eater_id' => ['required', 'integer', 'exists:users,id'],
+            'date' => ['required', 'date'],
+        ]);
+        $season = Season::where('is_active', true)->firstOrFail();
+        $eater = User::findOrFail($data['eater_id']);
+        $date = Carbon::parse($data['date'])->startOfDay();
+
+        Order::where('season_id', $season->id)->where('user_id', $eater->id)->whereNull('category_id')
+            ->whereDate('date', $date->toDateString())->where('status', Order::STATUS_ORDERED)->delete();
+        \Intranet\Modules\Schulkantine\Support\MensaAudit::schreiben('kantine.abbestellt',
+            'OGS-Nachtrag entfernt: '.$eater->name.' am '.$date->format('d.m.Y'), $eater, ['Tag' => $date->format('d.m.Y')]);
+
+        return redirect()->route('module.schulkantine.servings.index', ['date' => $date->toDateString()])
+            ->with('status', 'Entfernt: '.$eater->name.' am '.$date->format('d.m.Y').'.');
     }
 
     /**

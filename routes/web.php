@@ -152,6 +152,10 @@ Route::middleware(['web', 'auth', AlsPerson::class])
         // OGS-Sammelliste als PDF – OGS-Betreuer/Betrieb (Zugriff im Controller geprüft).
         // Die Bildschirm-Liste steckt im Details-Tab der Ausgabe-Übersicht.
         Route::get('ogs-sammelliste/pdf', [ServingController::class, 'ogsPdf'])->name('servings.ogs.pdf');
+        // OGS-Kinder nachtragen, die ohne Anmeldung zum Essen kamen (OGS-Betreuer).
+        Route::post('ogs-sammelliste/suchen', [ServingController::class, 'ogsSuchen'])->name('servings.ogs.search');
+        Route::post('ogs-sammelliste/nachtragen', [ServingController::class, 'ogsNachtragen'])->name('servings.ogs.add');
+        Route::post('ogs-sammelliste/entfernen', [ServingController::class, 'ogsNachtragEntfernen'])->name('servings.ogs.remove');
 
         // Auswertung & Abrechnung (Phase 5) – nur Admin (im Controller geprüft).
         Route::get('auswertung', [ReportController::class, 'index'])->name('reports.index');

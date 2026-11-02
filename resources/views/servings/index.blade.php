@@ -225,8 +225,51 @@
                         <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
                             <div class="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-2">
                                 <span class="text-sm font-semibold text-gray-700">OGS-Sammelliste</span>
-                                <span class="rounded-full bg-indigo-100 px-2.5 py-0.5 text-sm font-semibold text-indigo-800">{{ $ogsRows->count() }}</span>
+                                <div class="flex items-center gap-3">
+                                    @if (\Intranet\Modules\Schulkantine\Support\Access::canViewOgsList(auth()->user()))
+                                        <button type="button" @click="$dispatch('ogs-nachtragen')"
+                                                class="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700">+ Kind nachtragen</button>
+                                    @endif
+                                    <span class="rounded-full bg-indigo-100 px-2.5 py-0.5 text-sm font-semibold text-indigo-800">{{ $ogsRows->count() }}</span>
+                                </div>
                             </div>
+                            @error('ogs')
+                                <div class="border-b border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">{{ $message }}</div>
+                            @enderror
+                            {{-- Nachtragen: Kind kam ohne Anmeldung zum Essen (auch rückwirkend) – danach
+                                 steht es auf der Liste und der Tag wird abgerechnet. --}}
+                            @if (\Intranet\Modules\Schulkantine\Support\Access::canViewOgsList(auth()->user()))
+                                <div x-data="{ offen: false, q: '', treffer: [], laedt: false,
+                                               async suchen() {
+                                                   if (this.q.trim().length < 2) { this.treffer = []; return; }
+                                                   this.laedt = true;
+                                                   const r = await fetch(@js(route('module.schulkantine.servings.ogs.search')), { method: 'POST',
+                                                       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': @js(csrf_token()) },
+                                                       body: JSON.stringify({ q: this.q }) });
+                                                   this.treffer = (await r.json()).results || [];
+                                                   this.laedt = false;
+                                               } }"
+                                     @ogs-nachtragen.window="offen = ! offen; $nextTick(() => $refs.feld && $refs.feld.focus())"
+                                     x-show="offen" x-cloak class="border-b border-indigo-100 bg-indigo-50/50 px-4 py-3">
+                                    <div class="text-sm font-medium text-gray-700">Kind nachtragen für {{ $date->isoFormat('dd, D.M.Y') }}</div>
+                                    <input type="text" x-ref="feld" x-model="q" @input.debounce.250ms="suchen()" placeholder="Name eingeben …"
+                                           class="mt-2 w-full max-w-md rounded-lg border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <div class="mt-2 flex flex-wrap gap-2">
+                                        <template x-for="t in treffer" :key="t.id">
+                                            <form method="POST" action="{{ route('module.schulkantine.servings.ogs.add') }}">
+                                                @csrf
+                                                <input type="hidden" name="date" value="{{ $date->toDateString() }}">
+                                                <input type="hidden" name="eater_id" :value="t.id">
+                                                <button type="submit" class="rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-sm hover:border-indigo-500 hover:bg-indigo-50">
+                                                    <span class="font-medium text-gray-800" x-text="t.name"></span>
+                                                    <span x-show="t.klasse" class="ml-1 text-xs text-gray-500" x-text="t.klasse"></span>
+                                                </button>
+                                            </form>
+                                        </template>
+                                        <span x-show="q.trim().length >= 2 && ! laedt && ! treffer.length" class="text-sm text-gray-400">Kein OGS-Kind gefunden.</span>
+                                    </div>
+                                </div>
+                            @endif
                             @if ($ogsRows->isEmpty())
                                 <p class="px-4 py-6 text-center text-sm text-gray-500">Heute isst kein OGS-Kind (kein aktives Abo, keine Bestellung).</p>
                             @else
@@ -241,6 +284,19 @@
                                                       title="{{ trim(($e['allergens'] ? 'Allergien: '.implode(', ', $e['allergens']).'. ' : '').($e['diets'] ? 'Diäten: '.implode(', ', $e['diets']).'.' : '')) }}">
                                                     ⚠️ Verträglichkeiten
                                                 </span>
+                                            @endif
+                                            @if ($e['nachgetragen'])
+                                                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">nachgetragen</span>
+                                                @if (\Intranet\Modules\Schulkantine\Support\Access::canViewOgsList(auth()->user()))
+                                                    <form method="POST" action="{{ route('module.schulkantine.servings.ogs.remove') }}"
+                                                          data-bestaetigen="{{ $e['sortName'] }} am {{ $date->format('d.m.Y') }} wieder von der OGS-Liste nehmen?"
+                                                          data-titel="Nachtrag entfernen" data-knopf="Entfernen">
+                                                        @csrf
+                                                        <input type="hidden" name="date" value="{{ $date->toDateString() }}">
+                                                        <input type="hidden" name="eater_id" value="{{ $e['user']->id }}">
+                                                        <button type="submit" class="text-xs text-gray-400 hover:text-red-600">entfernen</button>
+                                                    </form>
+                                                @endif
                                             @endif
                                             @if ($e['served'])
                                                 <span class="ml-auto text-xs font-medium text-green-700">✓ ausgegeben</span>
