@@ -40,6 +40,22 @@ class Essensvertrag
     }
 
     /**
+     * Schränkt eine Benutzer-Abfrage auf Personen mit Essensvertrag ein (gleiche
+     * Regel wie hat(): Linear-Rolle oder Testvertrag; ohne Verträge keine Sperre).
+     */
+    public static function nurMitVertrag(\Illuminate\Database\Eloquent\Builder $abfrage): \Illuminate\Database\Eloquent\Builder
+    {
+        if (! self::aktiv()) {
+            return $abfrage;
+        }
+        $test = Schema::hasTable('kantine_test_contracts') ? TestVertrag::pluck('user_id') : collect();
+
+        return $abfrage->where(fn ($w) => $w
+            ->whereHas('roles', fn ($r) => $r->where('roles.role_id', 'like', self::PRAEFIX.'%'))
+            ->orWhere(fn ($t) => $t->whereIn('users.id', $test)->where(fn ($e) => $e->whereNull('externe_id')->orWhere('externe_id', ''))));
+    }
+
+    /**
      * Vertragsarten des Essers: aus Linear (Rollen) plus ggf. Testvertrag.
      *
      * @return list<int>

@@ -1508,10 +1508,10 @@ class ServingController
     }
 
     /**
-     * Live-Suche fürs Terminal: bis zu 3 Personen zu einem Namensteil, mit Gruppe
+     * Live-Suche fürs Terminal: bis zu 6 Personen zu einem Namensteil, mit Gruppe
      * (als „Klasse"). Zwei Modi:
-     *  - Vorbesteller (Standard): Esser MIT Menü-Bestellung; OGS-Kinder (ja/nein)
-     *    sind ausgenommen (haben keine Chips, laufen nicht über den Menü-Fluss).
+     *  - Vorbesteller (Standard): Schüler mit Essensvertrag; `alle` = alle mit
+     *    Vertrag, `ogs` = zusätzlich die OGS-Kinder.
      *  - OGS (mode=ogs): genau die HEUTE essenden OGS-Kinder (damit sie sich per
      *    Suche schnell finden und direkt abhaken lassen).
      * Antwort als JSON.
@@ -1558,33 +1558,32 @@ class ServingController
             array_keys(self::PERSONEN_RANG), array_values(self::PERSONEN_RANG),
         )).' ELSE 9 END';
 
-        // Standard: nur, wer für den Tag bestellt hat – ohne OGS. Knöpfe am Terminal
-        // blenden OGS-Kinder (`ogs`) bzw. alle Personen (`alle`) dazu.
-        try {
-            $tag = Carbon::parse((string) $request->input('date'))->toDateString();
-        } catch (\Exception $e) {
-            $tag = Carbon::today()->toDateString();
-        }
-        $alle = $request->boolean('alle');
-        $mitOgs = $request->boolean('ogs');
+        // Fast alle Esser sind Kinder: Standard sind darum Schüler mit Essensvertrag
+        // (ob bestellt oder nicht). `alle` nimmt Lehrer/Mitarbeiter/Eltern mit Vertrag
+        // dazu, `ogs` die OGS-Kinder – sonst wird z. B. „Micha" endlos lang.
         $istOgs = fn ($r) => $r->whereIn('roles.role_id', $ogsRoleIds);
+        $treffer = function (bool $alle, bool $mitOgs) use ($q, $istOgs) {
+            $abfrage = User::where('name', 'like', '%'.$q.'%');
+            $abfrage->where(function ($w) use ($alle, $mitOgs, $istOgs) {
+                $w->where(function ($v) use ($alle, $istOgs) {
+                    \Intranet\Modules\Schulkantine\Support\Essensvertrag::nurMitVertrag($v->whereDoesntHave('roles', $istOgs));
+                    if (! $alle) {
+                        $v->whereHas('roles', fn ($r) => $r->where('roles.role_id', 'student'));
+                    }
+                });
+                if ($mitOgs) {
+                    $w->orWhereHas('roles', $istOgs);
+                }
+            });
 
-        $basis = User::where('name', 'like', '%'.$q.'%');
-        $abfrage = (clone $basis);
-        if (! $alle) {
-            $bestellerIds = Order::whereDate('date', $tag)->whereNotNull('category_id')
-                ->where('status', Order::STATUS_ORDERED)->distinct()->pluck('user_id');
-            $abfrage->where(fn ($w) => $w->whereIn('users.id', $bestellerIds)
-                ->when($mitOgs, fn ($w) => $w->orWhereHas('roles', $istOgs)));
-        }
-        if (! $mitOgs) {
-            $abfrage->whereDoesntHave('roles', $istOgs);
-        }
+            return $abfrage;
+        };
+        $abfrage = $treffer($request->boolean('alle'), $request->boolean('ogs'));
         // Gesamtzahl mitgeben: sieht man mehr als die sechs Angezeigten, weiß
         // man am Terminal, dass weiter eingeschränkt werden muss. „weitere" = Treffer,
-        // die erst mit OGS/Alle sichtbar würden.
+        // die erst mit „Alle"/„OGS" sichtbar würden.
         $gesamt = (clone $abfrage)->count();
-        $weitere = max(0, (clone $basis)->count() - $gesamt);
+        $weitere = max(0, $treffer(true, true)->count() - $gesamt);
 
         $users = $abfrage
             ->with(['roles', 'kantineInfo'])

@@ -1493,10 +1493,10 @@
                 <h3 class="text-lg font-bold text-gray-800">
                     Person suchen
                     <span x-show="mode !== 'ogs'" class="ml-2 text-sm font-medium text-gray-400"
-                          x-text="searchAlle ? (searchOgs ? '· alle Personen' : '· alle ohne OGS') : (searchOgs ? '· Besteller des Tages + OGS' : '· nur Besteller des Tages')"></span>
+                          x-text="(searchAlle ? '· alle mit Essensvertrag' : '· Schüler mit Essensvertrag') + (searchOgs ? ' + OGS' : '')"></span>
                 </h3>
                 <div class="flex items-center gap-2">
-                    {{-- Standard: nur, wer für den Tag bestellt hat (ohne OGS). --}}
+                    {{-- Standard: Schüler mit Essensvertrag; „Alle" = auch Lehrer/Mitarbeiter/Eltern mit Vertrag. --}}
                     <template x-if="mode !== 'ogs'">
                         <div class="flex items-center gap-2">
                             @if ($hasOgs)
@@ -1508,7 +1508,7 @@
                             <button type="button" @click="toggleSearchFilter('alle')"
                                     class="rounded-xl border-2 px-4 py-2 text-base font-semibold"
                                     :class="searchAlle ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-indigo-200 bg-white text-indigo-700'">
-                                <span x-text="searchAlle ? '☑' : '☐'"></span> Alle Ergebnisse</button>
+                                <span x-text="searchAlle ? '☑' : '☐'"></span> Alle (Lehrer, Mitarbeiter, Eltern)</button>
                         </div>
                     </template>
                     <button @click="closeSearch()" class="rounded-lg px-3 py-1 text-xl text-gray-400 hover:bg-gray-100">✕</button>
@@ -1556,7 +1556,7 @@
                 {{-- Hinweis auf ausgeblendete Treffer (ohne Bestellung bzw. OGS). --}}
                 <div x-show="mode !== 'ogs' && searchQuery.trim().length >= 3 && searchWeitere > 0 && !searching" x-cloak
                      class="mt-2 text-center text-sm font-medium text-indigo-600">
-                    + <span x-text="searchWeitere"></span> weitere Treffer ohne Bestellung bzw. OGS – oben „Alle Ergebnisse" bzw. „OGS einblenden".
+                    + <span x-text="searchWeitere"></span> weitere Treffer unter „Alle" bzw. „OGS einblenden".
                 </div>
                 <div x-show="searchQuery.trim().length < 3" x-cloak class="py-3 text-center text-sm text-gray-400">
                     <span x-show="searchQuery.trim().length === 0">Namen eingeben – ab dem 3. Buchstaben wird gesucht.</span>
