@@ -1248,7 +1248,7 @@
                                 <template x-for="dish in group.dishes" :key="dish.id">
                                     {{-- Infos zum Gericht/Menü über Bild, Name oder Preis; die Zahlen
                                          öffnen die Personenliste, rechts läuft die Auswahl. --}}
-                                    <div class="flex w-full items-stretch gap-4 rounded-2xl border-2 p-3 text-left transition"
+                                    <div class="flex w-full items-stretch gap-3 rounded-2xl border-2 p-2.5 text-left transition"
                                          :class="{
                                                 'border-green-500 bg-green-50 ring-2 ring-green-300': tileState(group.category_id, dish.id)==='taken',
                                                 'border-amber-500 bg-amber-50 ring-2 ring-amber-300': tileState(group.category_id, dish.id)==='alt',
@@ -1257,23 +1257,14 @@
                                                 'border-gray-200 bg-white': tileState(group.category_id, dish.id)==='idle'
                                             }">
                                         {{-- Bild oder Platzhalter + ⚠️ bei Unverträglichkeit --}}
-                                        <div @click="openDishModal(dish)" class="relative h-24 w-24 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-black/5 bg-gray-50">
-                                            <template x-if="dish.photo"><img :src="dish.photo" alt="" class="h-24 w-24 object-cover"></template>
+                                        <div @click="openDishModal(dish)" class="relative h-20 w-20 shrink-0 cursor-pointer self-center overflow-hidden rounded-xl border border-black/5 bg-gray-50">
+                                            <template x-if="dish.photo"><img :src="dish.photo" alt="" class="h-20 w-20 object-cover"></template>
                                             <template x-if="!dish.photo"><x-schulkantine::dish-placeholder /></template>
                                             <div x-show="dishWarn(dish)" x-cloak
                                                  class="absolute left-0 top-0 flex h-8 w-8 items-center justify-center rounded-br-xl bg-yellow-400 text-lg font-black text-yellow-900 shadow">!</div>
                                         </div>
                                         {{-- Inhalt --}}
-                                        <div class="flex min-w-0 flex-1 flex-col">
-                                            {{-- Zähler-Streifen: Tipp auf eine Zahl zeigt die Personen dahinter. --}}
-                                            <div class="mb-2 flex items-center gap-2 font-bold">
-                                                <button type="button" @click="openPeople(dish, 'ordered')" title="Wer hat bestellt?"
-                                                        class="inline-flex h-12 min-w-14 items-center justify-center rounded-xl border-2 border-gray-300 bg-gray-100 px-3 text-xl text-gray-700 shadow-sm active:bg-gray-200" x-text="dish.ordered"></button>
-                                                <button type="button" @click="openPeople(dish, 'open')" title="Wer ist noch offen?"
-                                                        class="inline-flex h-12 min-w-14 items-center justify-center rounded-xl border-2 border-amber-300 bg-amber-100 px-3 text-xl text-amber-700 shadow-sm active:bg-amber-200" x-text="dish.open"></button>
-                                                <button type="button" @click="openPeople(dish, 'served')" title="Wer hat schon bekommen?"
-                                                        class="inline-flex h-12 min-w-14 items-center justify-center rounded-xl border-2 border-green-300 bg-green-100 px-3 text-xl text-green-700 shadow-sm active:bg-green-200" x-text="dish.served"></button>
-                                            </div>
+                                        <div class="flex min-w-0 flex-1 flex-col justify-center">
                                             <span class="flex flex-wrap items-baseline gap-x-2 text-xl font-bold leading-tight text-gray-800">
                                                 <span @click="openDishModal(dish)" class="cursor-pointer" x-text="dish.name"></span>
                                                 <span @click="openDishModal(dish)" class="cursor-pointer whitespace-nowrap text-base font-semibold text-gray-500" x-text="euro(dish.price)"></span>
@@ -1286,7 +1277,7 @@
                                         {{-- Auswahl-Button (nur in einer bestellten Kategorie) --}}
                                         <button type="button" x-show="tileClickable(group.category_id)" x-cloak
                                                 @click.stop="clickTile(group.category_id, dish.id)"
-                                                class="flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 text-sm font-bold transition"
+                                                class="flex w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 text-sm font-bold transition"
                                                 :class="{
                                                     'border-green-500 bg-green-100 text-green-700': tileState(group.category_id, dish.id)==='taken',
                                                     'border-amber-500 bg-amber-100 text-amber-700': tileState(group.category_id, dish.id)==='alt',
@@ -1299,6 +1290,15 @@
                                                   x-text="tileGebucht(group.category_id, dish.id) ? '✓' : (tileState(group.category_id, dish.id)==='declined' ? '✗' : '○')"></span>
                                             <span x-text="tileState(group.category_id, dish.id)==='taken' ? (tileGebucht(group.category_id, dish.id) ? 'ausgegeben' : 'ausgeben') : (tileState(group.category_id, dish.id)==='alt' ? 'Alternative' : (tileState(group.category_id, dish.id)==='declined' ? 'nein' : 'wählen'))"></span>
                                         </button>
+                                        {{-- Zähler am rechten Rand, untereinander: Tipp zeigt die Personen dahinter. --}}
+                                        <div class="flex shrink-0 flex-col justify-center gap-1.5 font-bold">
+                                            <button type="button" @click="openPeople(dish, 'ordered')" title="Wer hat bestellt?"
+                                                    class="inline-flex h-11 min-w-12 items-center justify-center rounded-xl border-2 border-gray-300 bg-gray-100 px-3 text-xl text-gray-700 shadow-sm active:bg-gray-200" x-text="dish.ordered"></button>
+                                            <button type="button" @click="openPeople(dish, 'open')" title="Wer ist noch offen?"
+                                                    class="inline-flex h-11 min-w-12 items-center justify-center rounded-xl border-2 border-amber-300 bg-amber-100 px-3 text-xl text-amber-700 shadow-sm active:bg-amber-200" x-text="dish.open"></button>
+                                            <button type="button" @click="openPeople(dish, 'served')" title="Wer hat schon bekommen?"
+                                                    class="inline-flex h-11 min-w-12 items-center justify-center rounded-xl border-2 border-green-300 bg-green-100 px-3 text-xl text-green-700 shadow-sm active:bg-green-200" x-text="dish.served"></button>
+                                        </div>
                                     </div>
                                 </template>
                             </div>
