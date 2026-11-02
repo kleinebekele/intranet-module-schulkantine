@@ -83,10 +83,11 @@
                                 @if ($noShowCount > 0)
                                     <div x-show="open" x-cloak class="border-t border-amber-100">
                                         <ul class="divide-y divide-gray-100">
-                                            @foreach ($noShowGroups as $name => $dishes)
-                                                <li class="flex items-start justify-between gap-3 px-4 py-2 text-sm">
-                                                    <span class="font-medium text-gray-800">{{ $name }}</span>
-                                                    <span class="text-right text-gray-500">{{ implode(', ', array_filter($dishes)) }}</span>
+                                            @foreach ($noShowGroups as $ns)
+                                                <li class="flex items-start gap-3 px-4 py-2 text-sm">
+                                                    <span class="w-20 shrink-0 text-xs leading-5 text-gray-500">{{ $ns['klasse'] ?? '–' }}</span>
+                                                    <span class="font-medium text-gray-800">{{ $ns['sortName'] }}</span>
+                                                    <span class="ml-auto text-right text-gray-500">{{ implode(', ', array_filter($ns['dishes'])) }}</span>
                                                 </li>
                                             @endforeach
                                         </ul>

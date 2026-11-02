@@ -77,12 +77,23 @@ class ServingController
             $menuByDish = $quant['menuByDish'];
             $ogsQuant = $quant['ogs'];
 
-            // No-Shows je Esser gruppiert (Name → Gerichte), damit die Liste kurz bleibt.
+            // No-Shows je Esser gruppiert (Person → Gerichte), damit die Liste kurz bleibt;
+            // mit Klasse und sortiert wie die übrigen Listen.
+            $groups = CustomerGroup::all()->keyBy('role_id');
             foreach ($quant['noShows'] as $ns) {
-                $name = $ns['user']?->name ?? 'Unbekannt';
-                $noShowGroups[$name][] = $ns['dish'];
+                $u = $ns['user'];
+                $key = $u?->id ?? 0;
+                if (! isset($noShowGroups[$key])) {
+                    $u?->loadMissing(['roles', 'kantineInfo']);
+                    $noShowGroups[$key] = [
+                        'klasse' => $u ? self::klasseOderRolle($u, CustomerGroup::forUser($u, $groups)) : null,
+                        'sortName' => $u ? self::sortName($u) : 'Unbekannt',
+                        'dishes' => [],
+                    ];
+                }
+                $noShowGroups[$key]['dishes'][] = $ns['dish'];
             }
-            ksort($noShowGroups, SORT_NATURAL | SORT_FLAG_CASE);
+            usort($noShowGroups, [self::class, 'nachKlasseUndName']);
 
             $menuRows = $this->menuRows($season, $date);
             $ogsRows = $this->ogsEatersDetailed($season, $date);
