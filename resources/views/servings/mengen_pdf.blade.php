@@ -47,7 +47,7 @@
             <tbody>
                 @foreach ($menuByDish as $m)
                     <tr>
-                        <td class="dish">{{ $m['dish']?->name ?? '—' }}</td>
+                        <td class="dish">{{ $m['name'] }}@if ($m['inhalt'])<br><span class="cat">{{ implode(', ', $m['inhalt']) }}</span>@endif</td>
                         <td class="cat">{{ $m['category'] }}</td>
                         <td class="num big">{{ $m['ordered'] }}</td>
                     </tr>

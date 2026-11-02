@@ -109,7 +109,14 @@
             searchQuery: '',
             searchResults: [],
             searchTotal: 0,
+            searchWeitere: 0,      // Treffer, die erst mit „OGS"/„Alle" sichtbar würden
+            searchOgs: false,      // Suche: OGS-Kinder einblenden
+            searchAlle: false,     // Suche: alle Personen statt nur Besteller des Tages
             searching: false,
+            hist: [],              // Historie dieses Geräts für den gewählten Tag
+            histOpen: false,
+            peopleModal: null,     // { name, titel, liste } – Personen hinter einer Zahl
+            isFull: false,         // Vollbild aktiv?
             searchDebounce: null,
             keyboardRows: [
                 ['Q','W','E','R','T','Z','U','I','O','P','Ü'],
@@ -130,6 +137,8 @@
                 window.addEventListener('resize', () => { this.checkSize(); this.measureRight(); });
 
                 this.chipUi = window.kantineChipBedienung();
+                this.histLoad();
+                document.addEventListener('fullscreenchange', () => { this.isFull = !!document.fullscreenElement; });
 
                 // Aktuelle Ansicht im URL-Anker halten, damit F5 sie wiederherstellt.
                 this.$watch('mode', (m) => {
@@ -310,6 +319,12 @@
             async openFor(uid) {
                 if (!uid) { this.banner = { ok:false, text:'Chip ohne Kennung.' }; return; }
                 if (this.busy) return;
+                // Ein Chip bucht nur am heutigen Tag – sonst landete die Ausgabe am
+                // falsch gewählten Datum. Nachtragen geht über die Suche.
+                if (!this.isToday) {
+                    this.banner = { ok:false, text:'Chip nicht gebucht: gewählt ist der ' + this.date.split('-').reverse().join('.') + ', nicht heute. Oben „Heute" tippen.' };
+                    return;
+                }
                 if (! await this.guardPending()) return;
                 this.busy = true;
                 try {
@@ -319,7 +334,14 @@
                         body: JSON.stringify({ uid, date: this.date }),
                     });
                     const data = await res.json();
-                    if (!data.found) { this.banner = { ok:false, text:'Chip unbekannt oder zurueckgegeben.' }; this.busy = false; return; }
+                    if (!data.found) {
+                        this.banner = { ok:false, text:'Chip unbekannt oder zurueckgegeben.' };
+                        this.histAdd('Unbekannter Chip', 'Chip', 'Chip unbekannt – nichts gebucht', 'fehler');
+                        this.busy = false; return;
+                    }
+                    // Chip vorgehalten: aus Übersicht/OGS-Ansicht direkt in die Ausgabe springen.
+                    if (data.mode !== 'ja_nein' && this.mode !== 'vorbesteller') { this.ovSearchOpen = false; this.mode = 'vorbesteller'; }
+                    this.histAdd(data.name, 'Chip');
                     this.loadPerson(data);
                 } catch (e) {
                     this.banner = { ok:false, text:'Fehler beim Lesen: ' + e };
@@ -332,6 +354,8 @@
                 this.searchOpen = true;
                 this.searchQuery = '';
                 this.searchResults = [];
+                this.searchOgs = false;
+                this.searchAlle = false;
                 this.$nextTick(() => this.$refs.searchInput && this.$refs.searchInput.focus());
             },
             closeSearch() { this.searchOpen = false; },
@@ -353,22 +377,29 @@
                     const res = await fetch(this.urls.search, {
                         method: 'POST',
                         headers: { 'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': this.csrf },
-                        // mode/date: im OGS-Modus die heute essenden OGS-Kinder finden.
-                        body: JSON.stringify({ q, mode: this.mode, date: this.date }),
+                        // mode/date: im OGS-Modus die OGS-Kinder finden; sonst die Besteller
+                        // des Tages, auf Knopfdruck auch OGS (ogs) bzw. alle (alle).
+                        body: JSON.stringify({ q, mode: this.mode, date: this.date, ogs: this.searchOgs, alle: this.searchAlle }),
                     });
                     const data = await res.json();
                     this.searchResults = data.results || [];
                     this.searchTotal = typeof data.total === 'number' ? data.total : this.searchResults.length;
+                    this.searchWeitere = data.weitere || 0;
                 } catch (e) {
                     this.banner = { ok:false, text:'Suche fehlgeschlagen: ' + e };
                 }
                 this.searching = false;
             },
-            async pickSearch(id) {
-                // OGS-Modus: Treffer direkt als abgeholt buchen (kein Menü-/Chip-Fluss).
+            toggleSearchFilter(art) {
+                if (art === 'ogs') this.searchOgs = !this.searchOgs; else this.searchAlle = !this.searchAlle;
+                this.doSearch();
+            },
+            async pickSearch(r) {
+                const id = r.id;
+                // OGS-Modus bzw. OGS-Kind: Treffer direkt als abgeholt buchen (kein Menü-/Chip-Fluss).
                 // Auch ein heute nicht angemeldetes OGS-Kind kann so spontan mitessen –
                 // der Server legt die Anwesenheit an und liefert den Board-Eintrag zurück.
-                if (this.mode === 'ogs') {
+                if (this.mode === 'ogs' || r.ogs) {
                     this.closeSearch();
                     const existing = this.ogsEaters.find(x => x.user_id === id);
                     if (existing && existing.served) { this.banner = { ok:true, text: existing.name + ' ist bereits abgeholt.' }; return; }
@@ -388,6 +419,7 @@
                             this.ogsEaters.push(data.eater); // spontan dazugekommenes Kind aufs Board
                         }
                         this.banner = { ok:true, text: (existing?.name || data.eater?.name || 'Kind') + ' als abgeholt gebucht.' };
+                        this.histAdd(existing?.name || data.eater?.name || r.name, 'Suche', 'OGS-Essen abgeholt', 'ok');
                     } catch (err) {
                         this.banner = { ok:false, text:'Fehler beim Buchen: ' + err };
                     }
@@ -399,7 +431,7 @@
 
             // Person laden und anzeigen – wie nach dem Auflegen des Chips (Suche,
             // Klick auf einen Namen in der Übersicht).
-            async zeigePerson(id) {
+            async zeigePerson(id, quelle = 'Suche') {
                 if (this.busy) return;
                 if (! await this.guardPending()) return;
                 this.busy = true;
@@ -411,6 +443,7 @@
                     });
                     const data = await res.json();
                     if (!data.found) { this.banner = { ok:false, text:'Person nicht gefunden.' }; this.busy = false; return; }
+                    this.histAdd(data.name, quelle);
                     this.loadPerson(data);
                     this.closeSearch();
                 } catch (e) {
@@ -430,6 +463,10 @@
 
             // Setzt die Auswahl auf den „frischen Stempel"-Zustand: Menue vorausgewaehlt
             // (alles genommen), rechts alles auf null.
+            // Auswahl-Einheiten: ein bestelltes Menü ist EINE Einheit (alle seine
+            // Bestellzeilen, Kachel 'md<id>' in der Gruppe 'menus'); ein Einzelgericht
+            // ist eine Einheit je Kategorie (Kachel = Gericht).
+            unitKeyOf(d) { return d.menu_day_id ? 'md' + d.menu_day_id : String(d.category_id); },
             resetSelection() {
                 this.choice = {};
                 this.orderMeta = {};
@@ -438,8 +475,14 @@
                 if (this.person && this.person.hasOrder) {
                     this.person.dishes.forEach(d => {
                         if (d.category_id == null) return;
-                        this.orderMeta[d.category_id] = { order_id: d.order_id, orderedDishId: d.dish_id };
-                        this.choice[d.category_id] = d.dish_id; // Vorauswahl = wie bestellt (genommen)
+                        const key = this.unitKeyOf(d);
+                        const tile = d.menu_day_id ? 'md' + d.menu_day_id : d.dish_id;
+                        if (!this.orderMeta[key]) {
+                            this.orderMeta[key] = { group: d.menu_day_id ? 'menus' : d.category_id, order_ids: [], orderedDishId: tile,
+                                                    name: d.menu_day_id ? (d.menu_name || 'Menü') : d.name };
+                        }
+                        this.orderMeta[key].order_ids.push(d.order_id);
+                        this.choice[key] = tile; // Vorauswahl = wie bestellt (genommen)
                     });
                 }
             },
@@ -453,7 +496,8 @@
                     data.dishes.forEach(d => {
                         if (d.category_id == null || !d.handled) return;
                         this.servedOnLoad = true;
-                        this.choice[d.category_id] = d.declined ? 'declined' : (d.alternative ? 'alternative' : d.dish_id);
+                        const key = this.unitKeyOf(d);
+                        this.choice[key] = d.declined ? 'declined' : (d.alternative ? 'alternative' : this.orderMeta[key].orderedDishId);
                     });
                 }
                 (data.walkin || []).forEach(w => {
@@ -482,12 +526,20 @@
             closeDishModal() { this.modalOpen = false; },
 
             // ---- Linke Spalte (Menue-Auswahl) ----
-            catOrdered(catId) { return this.orderMeta[catId] !== undefined; },
-            tileState(catId, dishId) {
-                // Nur relevant, wenn eine Person mit Bestellung in dieser Kategorie da ist.
-                if (!this.person || !this.person.hasOrder || !this.catOrdered(catId)) return 'idle';
-                const ch = this.choice[catId];
-                const ordered = this.orderMeta[catId].orderedDishId;
+            // Welche Auswahl-Einheit gehört zu dieser Kachel? Bevorzugt die, deren
+            // bestellte Kachel es ist; sonst die erste der Gruppe (Alternative).
+            unitFor(groupKey, dishId) {
+                const keys = Object.keys(this.orderMeta).filter(k => this.orderMeta[k].group == groupKey);
+                if (!keys.length) return null;
+                return keys.find(k => this.orderMeta[k].orderedDishId === dishId) || keys[0];
+            },
+            catOrdered(groupKey) { return this.unitFor(groupKey, null) !== null; },
+            tileState(groupKey, dishId) {
+                // Nur relevant, wenn eine Person mit Bestellung in dieser Gruppe da ist.
+                const unit = this.person && this.person.hasOrder ? this.unitFor(groupKey, dishId) : null;
+                if (!unit) return 'idle';
+                const ch = this.choice[unit];
+                const ordered = this.orderMeta[unit].orderedDishId;
                 if (ch === 'declined') return dishId === ordered ? 'declined' : 'idle';
                 // Reload einer Alternative (welches Ersatzgericht ist nicht gespeichert):
                 // am bestellten Gericht als „Alternative" anzeigen.
@@ -498,10 +550,11 @@
             tileClickable(catId) {
                 return this.person && this.person.hasOrder && this.catOrdered(catId) && !this.busy;
             },
-            clickTile(catId, dishId) {
-                if (!this.tileClickable(catId)) return;
+            clickTile(groupKey, dishId) {
+                if (!this.tileClickable(groupKey)) return;
+                const unit = this.unitFor(groupKey, dishId);
                 // Auf die aktuell gewaehlte Kachel tippen = abwaehlen (declined).
-                this.choice[catId] = (this.choice[catId] === dishId) ? 'declined' : dishId;
+                this.choice[unit] = (this.choice[unit] === dishId) ? 'declined' : dishId;
             },
 
             // ---- Rechte Spalte (Extras) ----
@@ -523,7 +576,47 @@
             padCancel() { this.padOpen = false; },
 
             // ---- Aktionen ----
-            cancel() { this.person = null; this.servedOnLoad = false; this.resetSelection(); this.banner = null; },
+            cancel() {
+                if (this.person) this.histDone('nichts ausgegeben (abgebrochen)', 'nichts');
+                this.person = null; this.servedOnLoad = false; this.resetSelection(); this.banner = null;
+            },
+
+            // ---- Historie (je Gerät und Tag im Browser gespeichert) ----
+            histKey() { return 'kantineTerminalHist:' + this.date; },
+            histLoad() {
+                try { this.hist = JSON.parse(localStorage.getItem(this.histKey()) || '[]'); } catch (e) { this.hist = []; }
+                this.hist.forEach((x, i) => { if (!x.id) x.id = 'alt-' + i; });
+                this.histSchliessen();
+            },
+            histSave() { try { localStorage.setItem(this.histKey(), JSON.stringify(this.hist.slice(0, 300))); } catch (e) {} },
+            histNow() { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); },
+            // Liegengebliebene Einträge ohne Ergebnis (Person ohne Buchung gewechselt, Seite neu geladen).
+            histSchliessen() { this.hist.forEach(x => { if (x.art === 'offen') { x.ergebnis = 'nichts gebucht'; x.art = 'nichts'; } }); },
+            // Neuer Eintrag; ein offener (art 'offen') bekommt sein Ergebnis über histDone().
+            histAdd(name, quelle, ergebnis = null, art = 'offen') {
+                this.histSchliessen();
+                this.hist.unshift({ id: Date.now() + '-' + Math.random(), t: this.histNow(), name, quelle, ergebnis, art });
+                this.histSave();
+            },
+            histDone(ergebnis, art) {
+                const e = this.hist.find(x => x.art === 'offen');
+                if (e) { e.ergebnis = ergebnis; e.art = art; this.histSave(); }
+            },
+
+            // ---- Personen hinter den Zahlen (linke Spalte) ----
+            openPeople(dish, art) {
+                const titel = { ordered: 'bestellt', open: 'offen', served: 'ausgegeben' }[art];
+                const liste = (dish.people || []).filter(p => art === 'ordered' || p.status === art);
+                this.peopleModal = { name: dish.name, titel, liste };
+            },
+
+            // ---- Vollbild (wie F11) ----
+            toggleFullscreen() {
+                if (document.fullscreenElement) document.exitFullscreen();
+                else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+            },
+            gotoToday() { window.location = this.urls.base + '#' + this.hashForMode(this.mode); },
+            get isToday() { return this.date === this.today; },
             back() { this.resetSelection(); this.banner = null; }, // zurueck = frischer Stempel-Zustand
 
             toggleAutoFinish() {
@@ -531,14 +624,43 @@
                 localStorage.setItem('kantineTerminalAutoFinish', this.autoFinish ? '1' : '0');
             },
 
+            unitOutcome(key) {
+                const ch = this.choice[key];
+                if (ch === 'declined') return 'declined';
+                if (ch === 'alternative' || ch !== this.orderMeta[key].orderedDishId) return 'alternative';
+                return 'taken';
+            },
+            tileName(id) {
+                for (const g of this.planGroups) { const d = g.dishes.find(x => x.id === id); if (d) return d.name; }
+                return null;
+            },
+            // Kurzfassung der Buchung für die Historie, z. B. „Menü 1 ausgegeben · 2× Brötchen".
+            bookingSummary() {
+                const teile = [];
+                let ausgegeben = false;
+                for (const [key, meta] of Object.entries(this.orderMeta)) {
+                    const o = this.unitOutcome(key);
+                    if (o === 'declined') { teile.push(meta.name + ' nicht genommen'); continue; }
+                    ausgegeben = true;
+                    const alt = o === 'alternative' ? this.tileName(this.choice[key]) : null;
+                    teile.push(o === 'alternative' ? meta.name + ' → ' + (alt || 'Alternative') : meta.name + ' ausgegeben');
+                }
+                for (const [id, q] of Object.entries(this.walkinQty)) {
+                    if (!q) continue;
+                    ausgegeben = true;
+                    let name = '?';
+                    this.walkinGroups.forEach(g => g.dishes.forEach(d => { if (String(d.id) === String(id)) name = d.name; }));
+                    teile.push(q + '× ' + name + ' (spontan)');
+                }
+                if (this.nachschlagTotal > 0) { ausgegeben = true; teile.push('Extras ' + this.euro(this.nachschlagTotal)); }
+                return { text: teile.length ? teile.join(' · ') : 'nichts ausgegeben', art: ausgegeben ? 'ok' : 'nichts' };
+            },
+
             buildPayload() {
                 const menu = [];
-                for (const [catId, meta] of Object.entries(this.orderMeta)) {
-                    const ch = this.choice[catId];
-                    let outcome = 'taken';
-                    if (ch === 'declined') outcome = 'declined';
-                    else if (ch === 'alternative' || ch !== meta.orderedDishId) outcome = 'alternative';
-                    menu.push({ order_id: meta.order_id, outcome });
+                for (const [key, meta] of Object.entries(this.orderMeta)) {
+                    const outcome = this.unitOutcome(key);
+                    meta.order_ids.forEach(order_id => menu.push({ order_id, outcome }));
                 }
                 const walkin = Object.entries(this.walkinQty).map(([dish_id, qty]) => ({ dish_id: Number(dish_id), qty }));
                 const nachschlag = this.nachschlagTotal > 0 ? [{ amount: this.nachschlagTotal, qty: 1 }] : [];
@@ -566,6 +688,8 @@
                         return false;
                     }
                     if (!data.ok) { this.banner = { ok:false, text: data.error || 'Buchung fehlgeschlagen.' }; this.busy = false; return false; }
+                    const summe = this.bookingSummary();
+                    this.histDone(summe.text, summe.art);
                     if (data.plan) this.planGroups = data.plan; // Zaehler aktualisieren
                     if (!silent) this.banner = { ok:true, text: 'Gebucht: ' + data.name + (this.extrasTotal > 0 ? ' · Extras ' + this.euro(this.extrasTotal) : '') };
                     this.person = null;
@@ -673,6 +797,8 @@
                         e.served = data.served;
                         e.declined = data.declined;
                     }
+                    this.histAdd(e.name, 'OGS-Liste', !data.served ? 'OGS zurückgenommen' : (data.declined ? 'OGS abgelehnt' : 'OGS-Essen abgeholt'),
+                        data.served && !data.declined ? 'ok' : 'nichts');
                 } catch (err) {
                     this.banner = { ok:false, text:'Fehler beim Buchen: ' + err };
                 }
@@ -736,7 +862,7 @@
                 if (! p.vertrag) return;
                 this.ovSearchOpen = false;
                 this.mode = 'vorbesteller';
-                await this.zeigePerson(p.user_id);
+                await this.zeigePerson(p.user_id, 'Übersicht');
             },
 
             // ---- Touch-Kalender ----
@@ -796,18 +922,24 @@
         {{-- Links: ‹ Woche zurück + KW/Datum (Kalender). Der ›-Button (Woche vor) steht
              bewusst RECHTS nach den Tagen. In der Übersicht so breit wie die Namensspalte
              (16rem), damit die Spalten zusammenpassen. --}}
-        <div class="flex items-stretch border-r border-gray-200 bg-gray-50"
-             :class="mode === 'overview' ? 'w-64 shrink-0' : 'w-[13%] min-w-[168px]'">
+        {{-- Ist nicht heute gewählt, wird die Box orange und bietet „Heute" an –
+             Chips buchen dann nicht (siehe openFor). --}}
+        <div class="flex items-stretch border-r border-gray-200"
+             :class="[mode === 'overview' ? 'w-64 shrink-0' : 'w-[15%] min-w-[190px]', isToday ? 'bg-gray-50' : 'bg-amber-100']">
             {{-- Woche zurück --}}
             <button type="button" @click="kwStep(-1)" :disabled="!hasPrevKw" title="Woche zurück"
                     class="flex w-8 shrink-0 items-center justify-center border-r border-gray-200 text-3xl font-bold text-gray-500 hover:bg-gray-100 disabled:opacity-30">‹</button>
-            {{-- Mitte: KW + Datum, öffnet den Kalender --}}
-            <button type="button" @click="openDateModal()"
-                    class="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 leading-tight hover:bg-gray-100">
-                <div class="text-2xl font-bold text-indigo-700">KW {{ $week['kw'] }}</div>
-                <div class="text-sm font-semibold text-gray-700">{{ $date->isoFormat('dd, D.M.') }}</div>
-                <div class="text-[10px] font-medium text-gray-400">📅 Tag wählen</div>
-            </button>
+            {{-- Mitte: KW + Datum (öffnet den Kalender), darunter „Heute" --}}
+            <div class="flex min-w-0 flex-1 flex-col items-stretch justify-center">
+                <button type="button" @click="openDateModal()" title="Tag wählen"
+                        class="flex flex-col items-center justify-center px-1 leading-tight hover:bg-black/5">
+                    <div class="text-2xl font-bold text-indigo-700">KW {{ $week['kw'] }}</div>
+                    <div class="text-lg font-bold" :class="isToday ? 'text-gray-800' : 'text-amber-800'">{{ $date->isoFormat('dd, D.M.') }}</div>
+                </button>
+                <button type="button" x-show="!isToday" x-cloak @click="gotoToday()"
+                        class="mx-2 mb-1 rounded-lg bg-amber-500 px-2 py-0.5 text-sm font-bold text-white shadow hover:bg-amber-600">Heute</button>
+                <div x-show="isToday" class="text-center text-[10px] font-medium text-gray-400">heute</div>
+            </div>
         </div>
 
         {{-- Rechts: Wochenüberblick ODER Person --}}
@@ -866,8 +998,14 @@
             {{-- Woche vor – steht nach den Tagen der aktuellen Woche --}}
             <button type="button" @click="kwStep(1)" :disabled="!hasNextKw" title="Woche vor"
                     class="flex w-8 shrink-0 items-center justify-center border-l border-gray-200 bg-gray-50 text-3xl font-bold text-gray-500 hover:bg-gray-100 disabled:opacity-30">›</button>
-            {{-- Übersicht öffnen (Männchen) bzw. schließen (rotes X → zurück zur Herkunft) --}}
-            <div class="flex items-center border-l border-gray-200 bg-gray-50 px-3">
+            {{-- Übersicht öffnen (Männchen) bzw. schließen (rotes X → zurück zur Herkunft);
+                 davor Vollbild an/aus (wie F11). --}}
+            <div class="flex items-center gap-2 border-l border-gray-200 bg-gray-50 px-3">
+                <button type="button" @click="toggleFullscreen()" :title="isFull ? 'Vollbild beenden' : 'Vollbild'"
+                        class="flex h-14 w-14 items-center justify-center rounded-xl bg-white text-gray-600 shadow-sm transition hover:bg-gray-100">
+                    <svg x-show="!isFull" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="h-7 w-7"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+                    <svg x-show="isFull" x-cloak viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="h-7 w-7"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+                </button>
                 <button type="button" @click="toggleOverview()" :title="mode === 'overview' ? 'Übersicht schließen' : 'Übersicht'"
                         class="flex h-14 w-14 items-center justify-center rounded-xl shadow-sm transition"
                         :class="mode === 'overview' ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-white text-indigo-600 hover:bg-indigo-50'">
@@ -1028,13 +1166,10 @@
                                         <div>
                                             <template x-if="p.days[d.date] && p.days[d.date].posten.length">
                                                 <div class="space-y-1">
+                                                    {{-- Menü als ein Posten (Gerichte im Tooltip), Einzelgerichte mit Anzahl. --}}
                                                     <template x-for="(po, k) in p.days[d.date].posten" :key="k">
-                                                        <div>
-                                                            <div x-show="po.menu" class="text-[11px] font-bold uppercase tracking-wide text-emerald-700" x-text="po.menu"></div>
-                                                            <template x-for="name in po.dishes" :key="name">
-                                                                <div class="text-gray-700" x-text="name"></div>
-                                                            </template>
-                                                        </div>
+                                                        <div :title="po.inhalt" :class="po.menu ? 'font-semibold text-emerald-700' : 'text-gray-700'"
+                                                             x-text="(po.anzahl > 1 ? po.anzahl + '× ' : '') + po.name"></div>
                                                     </template>
                                                 </div>
                                             </template>
@@ -1064,7 +1199,9 @@
         @else
 
         {{-- ---------- LINKS: Menüs (1/3) ---------- --}}
-        <section class="flex w-1/2 min-w-0 flex-col border-r border-gray-300 bg-white xl:w-1/3">
+        {{-- Hat die gestempelte Person bestellt, wird die ganze linke Seite grün. --}}
+        <section class="flex w-1/2 min-w-0 flex-col border-r border-gray-300 transition-colors xl:w-1/3"
+                 :class="person && person.hasOrder && !isOgs ? 'bg-green-200' : 'bg-white'">
             <div class="flex items-center justify-between border-b border-gray-200 px-4 py-2">
                 <div class="flex items-center gap-3">
                     <h2 class="text-lg font-bold text-gray-700">Menüs</h2>
@@ -1120,17 +1257,23 @@
                                         </div>
                                         {{-- Inhalt --}}
                                         <div class="flex min-w-0 flex-1 flex-col">
-                                            {{-- Zähler-Streifen --}}
+                                            {{-- Zähler-Streifen: Tipp auf eine Zahl zeigt die Personen dahinter. --}}
                                             <div class="mb-1.5 flex items-center gap-2 font-bold">
-                                                <span class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-gray-100 px-2 text-base text-gray-700" x-text="dish.ordered"></span>
-                                                <span class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-amber-100 px-2 text-base text-amber-700" x-text="dish.open"></span>
-                                                <span class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-green-100 px-2 text-base text-green-700" x-text="dish.served"></span>
+                                                <button type="button" @click.stop="openPeople(dish, 'ordered')" title="Wer hat bestellt?"
+                                                        class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-gray-100 px-2 text-base text-gray-700 hover:ring-2 hover:ring-gray-400" x-text="dish.ordered"></button>
+                                                <button type="button" @click.stop="openPeople(dish, 'open')" title="Wer ist noch offen?"
+                                                        class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-amber-100 px-2 text-base text-amber-700 hover:ring-2 hover:ring-amber-400" x-text="dish.open"></button>
+                                                <button type="button" @click.stop="openPeople(dish, 'served')" title="Wer hat schon bekommen?"
+                                                        class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-green-100 px-2 text-base text-green-700 hover:ring-2 hover:ring-green-400" x-text="dish.served"></button>
                                                 <span class="ml-auto text-base font-semibold text-gray-500" x-text="euro(dish.price)"></span>
                                             </div>
                                             <span class="flex items-center gap-2 text-xl font-bold leading-tight text-gray-800">
                                                 <span x-text="dish.name"></span>
                                                 <span x-show="dishWarn(dish)" x-cloak class="shrink-0 rounded-md bg-yellow-100 px-1.5 text-sm font-bold text-yellow-800">⚠ nicht geeignet</span>
                                             </span>
+                                            {{-- Menü: seine Gerichte klein darunter --}}
+                                            <span x-show="dish.inhalt && dish.inhalt.length" x-cloak class="mt-0.5 text-sm leading-tight text-gray-500"
+                                                  x-text="(dish.inhalt || []).join(' · ')"></span>
                                         </div>
                                         {{-- Auswahl-Button (nur in einer bestellten Kategorie) --}}
                                         <button type="button" x-show="tileClickable(group.category_id)" x-cloak
@@ -1150,7 +1293,7 @@
                             </div>
                         </fieldset>
                     </template>
-                    <div x-show="!planGroups.length" class="py-10 text-center text-gray-400">Kein vorbestellbares Menü heute.</div>
+                    <div x-show="!planGroups.length" class="py-10 text-center text-gray-400">Kein vorbestellbares Menü an diesem Tag.</div>
                 </div>
             </div>
         </section>
@@ -1295,6 +1438,9 @@
                 class="rounded-full px-4 py-2 text-sm font-medium text-white shadow-lg"
                 :class="(mode === 'overview' && ovSearchOpen) ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-800/80 hover:bg-gray-700'">🔍 Suchen</button>
 
+        <button @click="histLoad(); histOpen = true"
+                class="rounded-full bg-gray-800/80 px-4 py-2 text-sm font-medium text-white shadow-lg hover:bg-gray-700">🕘 Historie</button>
+
         <a href="{{ route('module.schulkantine.servings.index') }}"
            class="rounded-full bg-gray-800/70 px-4 py-2 text-sm font-medium text-white shadow-lg hover:bg-gray-800">✕ Terminal verlassen</a>
     </div>
@@ -1343,9 +1489,30 @@
          class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-6"
          @click.self="closeSearch()" @keydown.escape.window="closeSearch()">
         <div class="w-full max-w-4xl rounded-2xl bg-white p-5 shadow-2xl">
-            <div class="mb-3 flex items-center justify-between">
-                <h3 class="text-lg font-bold text-gray-800">Person suchen</h3>
-                <button @click="closeSearch()" class="rounded-lg px-3 py-1 text-xl text-gray-400 hover:bg-gray-100">✕</button>
+            <div class="mb-3 flex items-center justify-between gap-3">
+                <h3 class="text-lg font-bold text-gray-800">
+                    Person suchen
+                    <span x-show="mode !== 'ogs'" class="ml-2 text-sm font-medium text-gray-400"
+                          x-text="searchAlle ? (searchOgs ? '· alle Personen' : '· alle ohne OGS') : (searchOgs ? '· Besteller des Tages + OGS' : '· nur Besteller des Tages')"></span>
+                </h3>
+                <div class="flex items-center gap-2">
+                    {{-- Standard: nur, wer für den Tag bestellt hat (ohne OGS). --}}
+                    <template x-if="mode !== 'ogs'">
+                        <div class="flex items-center gap-2">
+                            @if ($hasOgs)
+                                <button type="button" @click="toggleSearchFilter('ogs')"
+                                        class="rounded-xl border-2 px-4 py-2 text-base font-semibold"
+                                        :class="searchOgs ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-indigo-200 bg-white text-indigo-700'">
+                                    <span x-text="searchOgs ? '☑' : '☐'"></span> OGS einblenden</button>
+                            @endif
+                            <button type="button" @click="toggleSearchFilter('alle')"
+                                    class="rounded-xl border-2 px-4 py-2 text-base font-semibold"
+                                    :class="searchAlle ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-indigo-200 bg-white text-indigo-700'">
+                                <span x-text="searchAlle ? '☑' : '☐'"></span> Alle Ergebnisse</button>
+                        </div>
+                    </template>
+                    <button @click="closeSearch()" class="rounded-lg px-3 py-1 text-xl text-gray-400 hover:bg-gray-100">✕</button>
+                </div>
             </div>
             {{-- inputmode=none: die OS-Tastatur bleibt aus, es zählt die Bildschirmtastatur unten. --}}
             <div class="relative">
@@ -1366,7 +1533,7 @@
                 <template x-for="r in searchResults" :key="r.id">
                     {{-- Farbe je Personengruppe: Schüler indigo, Mitarbeiter amber,
                          Lehrer emerald, Eltern grau (Reihenfolge kommt vom Server). --}}
-                    <button @click="pickSearch(r.id)"
+                    <button @click="pickSearch(r)"
                             class="flex w-full items-center justify-between gap-3 rounded-xl border p-4 text-left"
                             :class="{
                                 'border-indigo-200 bg-indigo-50 hover:border-indigo-400 hover:bg-indigo-50': r.rolle === 'student',
@@ -1386,6 +1553,11 @@
                 </template>
                 </div>
                 <div x-show="searchQuery.trim().length >= 3 && !searchResults.length && !searching" x-cloak class="py-3 text-center text-sm text-gray-400">Keine Treffer.</div>
+                {{-- Hinweis auf ausgeblendete Treffer (ohne Bestellung bzw. OGS). --}}
+                <div x-show="mode !== 'ogs' && searchQuery.trim().length >= 3 && searchWeitere > 0 && !searching" x-cloak
+                     class="mt-2 text-center text-sm font-medium text-indigo-600">
+                    + <span x-text="searchWeitere"></span> weitere Treffer ohne Bestellung bzw. OGS – oben „Alle Ergebnisse" bzw. „OGS einblenden".
+                </div>
                 <div x-show="searchQuery.trim().length < 3" x-cloak class="py-3 text-center text-sm text-gray-400">
                     <span x-show="searchQuery.trim().length === 0">Namen eingeben – ab dem 3. Buchstaben wird gesucht.</span>
                     <span x-show="searchQuery.trim().length > 0" x-cloak>Noch <span x-text="3 - searchQuery.trim().length"></span> Buchstabe<span x-show="(3 - searchQuery.trim().length) !== 1">n</span> …</span>
@@ -1410,6 +1582,64 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    {{-- Historie: was an DIESEM Gerät am gewählten Tag gestempelt/gesucht und gebucht
+         wurde (im Browser gespeichert, neueste oben). --}}
+    <div x-show="histOpen" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
+         @click.self="histOpen = false" @keydown.escape.window="histOpen = false">
+        <div class="flex max-h-full w-full max-w-3xl flex-col rounded-2xl bg-white p-5 shadow-2xl">
+            <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-gray-800">Historie · {{ $date->isoFormat('dd, D.M.') }}
+                    <span class="ml-2 text-sm font-medium text-gray-400">dieses Gerät</span></h3>
+                <button @click="histOpen = false" class="rounded-lg px-3 py-1 text-xl text-gray-400 hover:bg-gray-100">✕</button>
+            </div>
+            <div class="min-h-0 flex-1 overflow-y-auto">
+                <template x-for="(e, i) in hist" :key="e.id">
+                    <div class="flex items-start gap-3 border-l-4 px-3 py-2"
+                         :class="{ 'border-green-500': e.art === 'ok', 'border-gray-300': e.art === 'nichts', 'border-red-500': e.art === 'fehler', 'border-indigo-400 bg-indigo-50': e.art === 'offen', 'bg-gray-50': i % 2 && e.art !== 'offen' }">
+                        <span class="w-12 shrink-0 font-mono text-sm text-gray-500" x-text="e.t"></span>
+                        <span class="w-20 shrink-0 text-xs font-semibold uppercase text-gray-400" x-text="e.quelle"></span>
+                        <span class="w-56 shrink-0 truncate font-semibold text-gray-800" x-text="e.name"></span>
+                        <span class="min-w-0 flex-1 text-sm"
+                              :class="{ 'text-green-700': e.art === 'ok', 'text-gray-500': e.art === 'nichts', 'text-red-700': e.art === 'fehler', 'text-indigo-700': e.art === 'offen' }"
+                              x-text="e.art === 'offen' ? 'gerade in Bearbeitung …' : e.ergebnis"></span>
+                    </div>
+                </template>
+                <div x-show="!hist.length" class="py-10 text-center text-gray-400">An diesem Tag wurde an diesem Gerät noch nichts gestempelt.</div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Personen hinter einer Zahl der linken Spalte (bestellt / offen / ausgegeben),
+         sortiert nach Nachname, Vorname, Klasse. --}}
+    <div x-show="peopleModal" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
+         @click.self="peopleModal = null" @keydown.escape.window="peopleModal = null">
+        <template x-if="peopleModal">
+            <div class="flex max-h-full w-full max-w-2xl flex-col rounded-2xl bg-white p-5 shadow-2xl">
+                <div class="mb-3 flex items-start justify-between gap-3">
+                    <h3 class="text-xl font-bold text-gray-800">
+                        <span x-text="peopleModal.name"></span>
+                        <span class="ml-1 font-semibold text-gray-500" x-text="'· ' + peopleModal.titel + ' (' + peopleModal.liste.length + ')'"></span>
+                    </h3>
+                    <button @click="peopleModal = null" class="shrink-0 rounded-lg px-3 py-1 text-xl text-gray-400 hover:bg-gray-100">✕</button>
+                </div>
+                <div class="min-h-0 flex-1 overflow-y-auto">
+                    <template x-for="(p, i) in peopleModal.liste" :key="p.id">
+                        <div class="flex items-center gap-3 px-3 py-2 text-lg" :class="i % 2 ? 'bg-gray-50' : ''">
+                            <span class="w-6 shrink-0 text-center"
+                                  :class="{ 'text-green-600': p.status === 'served', 'text-amber-500': p.status === 'open', 'text-red-600': p.status === 'declined' }"
+                                  x-text="p.status === 'served' ? '✓' : (p.status === 'declined' ? '✗' : '○')"></span>
+                            <span class="min-w-0 flex-1 truncate font-semibold text-gray-800" x-text="p.name"></span>
+                            <span class="shrink-0 rounded-full bg-indigo-100 px-3 py-0.5 text-base font-semibold text-indigo-700" x-show="p.klasse" x-text="p.klasse"></span>
+                        </div>
+                    </template>
+                    <div x-show="!peopleModal.liste.length" class="py-8 text-center text-gray-400">Niemand.</div>
+                </div>
+            </div>
+        </template>
     </div>
 
     {{-- Zahlen-Tastatur: manueller Nachschlag-Betrag --}}
@@ -1511,6 +1741,11 @@
                     </div>
                     <div class="min-w-0 flex-1">
                         <div class="text-xl font-bold text-gray-800" x-text="euro(modalDish.price)"></div>
+                        <template x-if="modalDish.inhalt && modalDish.inhalt.length">
+                            <ul class="mt-2 list-inside list-disc text-base text-gray-700">
+                                <template x-for="n in modalDish.inhalt" :key="n"><li x-text="n"></li></template>
+                            </ul>
+                        </template>
                     </div>
                 </div>
 

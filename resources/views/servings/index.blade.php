@@ -21,8 +21,16 @@
                     @endif
                 </div>
                 <div class="text-center">
-                    <div class="text-sm font-semibold text-gray-800">{{ ucfirst($date->isoFormat('dddd')) }}, {{ $date->format('d.m.Y') }}</div>
-                    <div class="text-xs text-gray-400">Saison „{{ $season->name }}"</div>
+                    <div class="text-sm font-bold uppercase tracking-wide text-indigo-600">KW {{ $date->isoWeek() }}</div>
+                    <div class="text-2xl font-bold text-gray-800">{{ ucfirst($date->isoFormat('dddd')) }}, {{ $date->format('d.m.Y') }}</div>
+                    <div class="mt-1 flex items-center justify-center gap-2 text-xs text-gray-400">
+                        Saison „{{ $season->name }}"
+                        @unless ($date->isToday())
+                            {{-- Ohne Datum springt die Seite auf heute bzw. den nächsten Öffnungstag. --}}
+                            <a href="{{ route('module.schulkantine.servings.index') }}"
+                               class="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700">Heute</a>
+                        @endunless
+                    </div>
                 </div>
                 <div>
                     @if ($nextDate)
@@ -98,15 +106,15 @@
 
                         {{-- Mengen je Gericht --}}
                         <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
-                            <div class="border-b border-gray-100 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700">Mengen je Gericht</div>
+                            <div class="border-b border-gray-100 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700">Mengen je Menü und Gericht</div>
                             @if (empty($menuByDish))
-                                <p class="px-4 py-6 text-center text-sm text-gray-500">Für diesen Tag liegen keine Menü-Bestellungen vor.</p>
+                                <p class="px-4 py-6 text-center text-sm text-gray-500">Für diesen Tag ist nichts im Speiseplan.</p>
                             @else
                                 <div class="overflow-x-auto">
                                     <table class="min-w-full text-sm">
                                         <thead>
                                             <tr class="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400">
-                                                <th class="px-4 py-2 font-medium">Gericht</th>
+                                                <th class="px-4 py-2 font-medium">Menü / Gericht</th>
                                                 <th class="px-3 py-2 font-medium">Kategorie</th>
                                                 <th class="px-3 py-2 text-center font-medium">Bestellt</th>
                                                 <th class="px-3 py-2 text-center font-medium">Ausgegeben</th>
@@ -117,7 +125,12 @@
                                         <tbody class="divide-y divide-gray-50">
                                             @foreach ($menuByDish as $m)
                                                 <tr>
-                                                    <td class="px-4 py-2 font-medium text-gray-800">{{ $m['dish']?->name ?? '—' }}</td>
+                                                    <td class="px-4 py-2 font-medium text-gray-800">
+                                                        {{ $m['name'] }}
+                                                        @if ($m['inhalt'])
+                                                            <div class="text-xs font-normal text-gray-400">{{ implode(', ', $m['inhalt']) }}</div>
+                                                        @endif
+                                                    </td>
                                                     <td class="px-3 py-2">
                                                         <span class="inline-flex items-center gap-1 text-gray-600">
                                                             @if ($m['color'])<span class="inline-block h-2.5 w-2.5 rounded-full" style="background-color: {{ $m['color'] }};"></span>@endif
@@ -126,7 +139,8 @@
                                                     </td>
                                                     <td class="px-3 py-2 text-center font-semibold text-gray-800">{{ $m['ordered'] }}</td>
                                                     <td class="px-3 py-2 text-center text-green-700">{{ $m['served'] }}</td>
-                                                    <td class="px-3 py-2 text-center text-indigo-600">{{ $m['spontaneous'] }}</td>
+                                                    {{-- Menüs gibt es nur vorbestellt, spontan nur Einzelgerichte. --}}
+                                                    <td class="px-3 py-2 text-center {{ $m['spontaneous'] ? 'text-indigo-600' : 'text-gray-300' }}">{{ $m['is_menu'] ? '–' : $m['spontaneous'] }}</td>
                                                     <td class="px-3 py-2 text-center {{ $m['openNoShow'] > 0 ? 'font-semibold text-amber-600' : 'text-gray-300' }}">{{ $m['openNoShow'] }}</td>
                                                 </tr>
                                             @endforeach
@@ -184,8 +198,8 @@
                                                     @foreach ($row['dishes'] as $d)
                                                         <span class="inline-flex flex-col gap-0.5 rounded-md border px-2 py-0.5 text-sm
                                                                      {{ ($d['allergenHits'] || $d['dietHits']) ? 'border-red-300 bg-red-50 text-red-800' : 'border-gray-200 bg-gray-50 text-gray-700' }}">
-                                                            <span class="inline-flex items-center gap-1">
-                                                                {{ $d['dish']?->name ?? '—' }}
+                                                            <span class="inline-flex items-center gap-1" @if ($d['inhalt']) title="{{ implode(', ', $d['inhalt']) }}" @endif>
+                                                                {{ $d['name'] }}
                                                                 @if ($d['allergenHits'] || $d['dietHits'])
                                                                     <span class="text-xs font-medium">⚠️ {{ implode(', ', array_merge($d['allergenHits'], $d['dietHits'])) }}</span>
                                                                 @endif

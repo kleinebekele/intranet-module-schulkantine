@@ -75,7 +75,10 @@
                                     @foreach ($menuByDish as $m)
                                         <tr>
                                             <td class="px-4 py-2 font-medium text-gray-800">
-                                                {{ $m['dish']?->name ?? '—' }}
+                                                {{ $m['name'] }}
+                                                @if ($m['inhalt'])
+                                                    <div class="text-xs font-normal text-gray-400">{{ implode(', ', $m['inhalt']) }}</div>
+                                                @endif
                                             </td>
                                             <td class="px-4 py-2">
                                                 <span class="inline-flex items-center gap-1 text-gray-600">

@@ -122,17 +122,19 @@
                                 @php
                                     $st = $d['status'] ?? 'none';
                                     $cls = $st === 'taken' ? 'bg-green-100 text-green-700'
-                                        : ($st === 'declined' ? 'bg-red-100 text-red-700' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-200');
-                                    $sym = $st === 'taken' ? '✓' : ($st === 'declined' ? '✗' : '○');
+                                        : ($st === 'declined' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600');
+                                    // OGS wird an der Ausgabe nicht abgehakt: ohne Ausgabe-Zeile neutral, kein No-Show.
+                                    $sym = $st === 'taken' ? '✓ ' : ($st === 'declined' ? '✗ ' : '');
                                 @endphp
-                                <span class="rounded px-1.5 py-0.5 text-xs {{ $cls }}">{{ $sym }} {{ $d['date']->isoFormat('dd DD.MM.') }}</span>
+                                <span class="rounded px-1.5 py-0.5 text-xs {{ $cls }}">{{ $sym }}{{ $d['date']->isoFormat('dd DD.MM.') }}</span>
                             @endforeach
                         </div>
                         <div class="mt-2 text-xs text-gray-400">
-                            <span class="font-semibold text-green-600">{{ $ogs['picked'] }}</span> abgeholt ·
-                            <span class="font-semibold text-red-600">{{ $ogs['declined'] }}</span> abgelehnt ·
-                            <span class="font-semibold text-amber-600">{{ $ogs['noshow'] }}</span> nicht abgeholt
-                            <span class="text-gray-300">— alle Tage berechnet</span>
+                            @if ($ogs['picked'] || $ogs['declined'])
+                                <span class="font-semibold text-green-600">{{ $ogs['picked'] }}</span> abgeholt ·
+                                <span class="font-semibold text-red-600">{{ $ogs['declined'] }}</span> abgelehnt
+                            @endif
+                            <span class="text-gray-300">— alle gebuchten Tage berechnet</span>
                         </div>
                     @endif
                     @if (! empty($ogs['cancelled']))

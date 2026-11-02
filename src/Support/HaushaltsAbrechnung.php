@@ -268,7 +268,8 @@ class HaushaltsAbrechnung
         }
         foreach ($d['ogs']['dates'] as $o) {
             $posten[] = ['datum' => Carbon::parse($o['date']), 'was' => 'OGS-Mittagessen',
-                'hinweis' => match ($o['status']) { 'none' => $noShow, 'declined' => 'nicht gegessen', default => null },
+                // OGS wird an der Ausgabe nicht abgehakt – „nicht abgeholt" wäre hier kein No-Show.
+                'hinweis' => $o['status'] === 'declined' ? 'nicht gegessen' : null,
                 'betrag' => (float) $d['ogs']['price']];
         }
         foreach ($d['spontan'] as $s) {

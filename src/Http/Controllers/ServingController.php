@@ -340,7 +340,7 @@ class ServingController
                 ->whereDate('date', $date->toDateString())
                 ->whereNotNull('category_id')
                 ->where('status', Order::STATUS_ORDERED)
-                ->with(['dish.category', 'dish.allergens', 'dish.additives', 'dish.unsuitableDiets'])
+                ->with(['dish.category', 'dish.allergens', 'dish.additives', 'dish.unsuitableDiets', 'menuDay'])
                 ->get()
                 ->sortBy(fn (Order $o) => $o->dish?->category?->sort_order ?? 999);
 
@@ -352,6 +352,9 @@ class ServingController
                     'order_id' => $o->id,
                     'dish_id' => $o->dish_id,
                     'category_id' => $o->category_id,
+                    // Teil eines Menüs? Dann wählt das Terminal das Menü als Ganzes.
+                    'menu_day_id' => $o->menu_day_id,
+                    'menu_name' => $o->menuDay?->name,
                     'name' => $dish?->name,
                     'category' => $dish?->category?->name,
                     'price' => (float) $o->price_snapshot,
@@ -728,7 +731,7 @@ class ServingController
             'season' => $season,
             'date' => $date,
             'open' => $open,
-            'menuByDish' => $data['menuByDish'],
+            'menuByDish' => self::nurBestellte($data['menuByDish']),
             'ogs' => $data['ogs'],
             'ogsPrice' => (float) ($season->ogsPreis() ?? 0),
             'closedReason' => $open ? null : $this->closedReason($season, $date),
@@ -750,7 +753,7 @@ class ServingController
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('schulkantine::servings.mengen_pdf', [
             'season' => $season,
             'date' => $date,
-            'menuByDish' => $data['menuByDish'],
+            'menuByDish' => self::nurBestellte($data['menuByDish']),
             'ogs' => $data['ogs'],
             'ogsPrice' => (float) ($season->ogsPreis() ?? 0),
             'generatedAt' => Carbon::now(),
@@ -787,19 +790,23 @@ class ServingController
     }
 
     /**
-     * Gemeinsame Auswertung eines Tages: Portionen je Gericht, No-Shows und die
-     * OGS-Zahlen. Von Mengen-Seite, No-Show-Seite und PDF gemeinsam genutzt.
+     * Gemeinsame Auswertung eines Tages: Portionen je Posten, No-Shows und die
+     * OGS-Zahlen. Von Ausgabe-Übersicht, Mengen-Seite, No-Show-Seite und PDF
+     * gemeinsam genutzt. Ein Menü ist EIN Posten (je Esser einmal gezählt), nicht
+     * seine Einzelgerichte – sonst stünde jede Menü-Bestellung mehrfach da.
+     * Zeilen entstehen aus dem ganzen Tagesangebot (Menüs + Speiseplan), damit
+     * auch rein spontan Verkauftes seine Zahl bekommt.
      */
     private function quantitiesData(Season $season, Carbon $date): array
     {
         $dateStr = $date->toDateString();
 
-        // Aktive Menü-Bestellungen des Tages → Portionen je Gericht.
+        // Aktive Menü-Bestellungen des Tages.
         $orders = Order::where('season_id', $season->id)
             ->whereDate('date', $dateStr)
             ->whereNotNull('category_id')
             ->where('status', Order::STATUS_ORDERED)
-            ->with(['dish.category', 'user'])
+            ->with(['dish.category', 'user', 'menuDay'])
             ->get();
 
         // Ausgegebene Zeilen des Tages (nicht spontan) je order_id.
@@ -819,60 +826,80 @@ class ServingController
             ->get();
 
         $rows = [];
-        // $onlyExisting: Zeilen entstehen NUR aus Vorbestellungen – wie bisher. Ein
-        // Gericht, das heute ausschließlich spontan gekauft wurde, war noch nie ein
-        // Kochposten (es ist ja schon über den Tresen gegangen) und soll auch jetzt
-        // nicht mit „0 Portionen" in der Liste stehen.
-        $tally = function (?Dish $dish, string $key, bool $onlyExisting = false) use (&$rows) {
-            if (! $dish || ($onlyExisting && ! isset($rows[$dish->id]))) {
-                return;
+        $zeile = function (string $key, array $kopf) use (&$rows) {
+            $rows[$key] ??= $kopf + ['ordered' => 0, 'served' => 0, 'spontaneous' => 0];
+        };
+        $gerichtZeile = function (?Dish $dish) use ($zeile): ?string {
+            if (! $dish) {
+                return null;
             }
-            $rows[$dish->id] ??= [
-                'dish' => $dish,
-                'category' => $dish->category?->name ?? 'Ohne Kategorie',
+            $zeile('d'.$dish->id, [
+                'name' => $dish->name, 'is_menu' => false, 'inhalt' => [],
+                'dish' => $dish, 'category' => $dish->category?->name ?? 'Ohne Kategorie',
                 'color' => $dish->category?->color,
-                'ordered' => 0, 'served' => 0, 'spontaneous' => 0,
-            ];
-            $rows[$dish->id][$key]++;
+            ]);
+
+            return 'd'.$dish->id;
         };
 
-        foreach ($orders as $order) {
-            $tally($order->dish, 'ordered');
-            if ($servedOrderIds->has($order->id)) {
-                $tally($order->dish, 'served');
+        // 1) Tagesangebot: Menüs (mit Inhalt) und Gerichte des Speiseplans.
+        $menuDays = MenuDay::where('season_id', $season->id)->whereDate('date', $dateStr)
+            ->with('slots.dish')->orderBy('id')->get();
+        foreach ($menuDays as $md) {
+            $zeile('md'.$md->id, [
+                'name' => $md->name, 'is_menu' => true,
+                'inhalt' => $md->slots->map(fn ($sl) => $sl->dish?->name)->filter()->values()->all(),
+                'dish' => null, 'category' => 'Menü', 'color' => null,
+            ]);
+        }
+        $plan = Menu::where('season_id', $season->id)->whereDate('date', $dateStr)
+            ->with('dish.category')->orderBy('sort_order')->orderBy('id')->get();
+        foreach ($plan as $m) {
+            $gerichtZeile($m->dish);
+        }
+
+        // 2) Bestellungen: ein Menü je Esser einmal, Einzelgerichte je Bestellung.
+        $noShows = [];
+        foreach ($orders->groupBy(fn (Order $o) => $o->menu_day_id ? $o->user_id.'|md'.$o->menu_day_id : 'o'.$o->id) as $gruppe) {
+            $first = $gruppe->first();
+            if ($first->menu_day_id) {
+                $key = 'md'.$first->menu_day_id;
+                $zeile($key, ['name' => $first->menuDay?->name ?? 'Menü', 'is_menu' => true, 'inhalt' => [],
+                    'dish' => null, 'category' => 'Menü', 'color' => null]);
+            } elseif (! ($key = $gerichtZeile($first->dish))) {
+                continue;
+            }
+            $rows[$key]['ordered']++;
+            if ($gruppe->contains(fn (Order $o) => $servedOrderIds->has($o->id))) {
+                $rows[$key]['served']++;
+            } else {
+                // No-Show: aktive Bestellung, aber keine (vorbestellte) Ausgabe.
+                $noShows[] = ['user' => $first->user, 'dish' => $rows[$key]['name']];
             }
         }
 
+        // 3) Spontane Abholungen (immer Einzelgerichte).
         foreach ($spontaneous as $serving) {
-            $tally($serving->dish, 'spontaneous', onlyExisting: true);
+            if ($key = $gerichtZeile($serving->dish)) {
+                $rows[$key]['spontaneous']++;
+            }
         }
 
         $menuByDish = [];
-        foreach ($rows as $row) {
+        foreach ($rows as $key => $row) {
+            $row['key'] = $key;
             $row['openNoShow'] = $row['ordered'] - $row['served'];
             $menuByDish[] = $row;
         }
 
-        // Reihenfolge wie auf „Essen bestellen": nach dem Tages-Speiseplan.
-        // Kategorien in Reihenfolge ihres ersten Auftretens im Plan, Gerichte
-        // innerhalb der Kategorie in Plan-Reihenfolge (Menü-sort_order).
+        // Reihenfolge: zuerst die Menüs, dann wie auf „Essen bestellen" nach dem
+        // Tages-Speiseplan – Kategorien in Reihenfolge ihres ersten Auftretens,
+        // Gerichte innerhalb der Kategorie in Plan-Reihenfolge.
         [$dishPos, $catFirstPos] = $this->planOrder($season, $date);
-        usort($menuByDish, function ($a, $b) use ($dishPos, $catFirstPos) {
-            $ca = $catFirstPos[$a['dish']?->category_id] ?? PHP_INT_MAX;
-            $cb = $catFirstPos[$b['dish']?->category_id] ?? PHP_INT_MAX;
-            $da = $dishPos[$a['dish']?->id] ?? PHP_INT_MAX;
-            $db = $dishPos[$b['dish']?->id] ?? PHP_INT_MAX;
-
-            return [$ca, $da, $a['dish']?->name] <=> [$cb, $db, $b['dish']?->name];
-        });
-
-        // No-Shows Menü: aktive Bestellung, aber keine (vorbestellte) Ausgabe.
-        $noShows = [];
-        foreach ($orders as $order) {
-            if (! $servedOrderIds->has($order->id)) {
-                $noShows[] = ['user' => $order->user, 'dish' => $order->dish?->name];
-            }
-        }
+        $rang = fn ($r) => $r['is_menu']
+            ? [0, 0, 0, $r['key']]
+            : [1, $catFirstPos[$r['dish']?->category_id] ?? PHP_INT_MAX, $dishPos[$r['dish']?->id] ?? PHP_INT_MAX, $r['name']];
+        usort($menuByDish, fn ($a, $b) => $rang($a) <=> $rang($b));
 
         // OGS: Teilnehmer heute + davon ausgegeben.
         $ogsEaters = $this->attendingOgs($season, $date);
@@ -892,6 +919,12 @@ class ServingController
                 'noShows' => $ogsEaters->reject(fn ($u) => $ogsServedIds->has($u->id))->values(),
             ],
         ];
+    }
+
+    /** Nur die Posten mit Vorbestellungen – die Kochliste braucht keine Nullzeilen. */
+    private static function nurBestellte(array $menuByDish): array
+    {
+        return array_values(array_filter($menuByDish, fn ($r) => $r['ordered'] > 0));
     }
 
     private function emptyOgs(): array
@@ -991,7 +1024,7 @@ class ServingController
             'klasse' => $r['klasse'],
             'sortName' => $r['sortName'],
             'zeilen' => array_values(array_filter([
-                ['text' => $r['dishes']->map(fn ($d) => $d['dish']?->name ?? '—')->implode(', '), 'warn' => false],
+                ['text' => $r['dishes']->pluck('name')->implode(', '), 'warn' => false],
                 $r['warn'] ? ['text' => '⚠ Verträglichkeit: '.$r['dishes']->flatMap(fn ($d) => array_merge($d['allergenHits'], $d['dietHits']))->unique()->implode(', '), 'warn' => true] : null,
             ])),
         ])->sort(fn ($a, $b) => strcmp(self::sortierbar($a['sortName']), self::sortierbar($b['sortName']))
@@ -1107,7 +1140,7 @@ class ServingController
             ->whereDate('date', $date->toDateString())
             ->whereNotNull('category_id')
             ->where('status', Order::STATUS_ORDERED)
-            ->with(['dish.category', 'dish.allergens', 'dish.unsuitableDiets'])
+            ->with(['dish.category', 'dish.allergens', 'dish.unsuitableDiets', 'menuDay'])
             ->get();
 
         if ($orders->isEmpty()) {
@@ -1127,22 +1160,22 @@ class ServingController
             $allergenIds = $eater->kantineAllergens->pluck('id');
             $dietIds = $eater->kantineDiets->pluck('id');
 
-            // Gerichte je Person in Kategorie-Reihenfolge (wie im Speiseplan).
+            // Posten je Person: ein Menü als EIN Posten (Menüname, Warnungen aller
+            // seiner Gerichte), Einzelgerichte in Kategorie-Reihenfolge danach.
             $dishes = $orders->where('user_id', $eater->id)
-                ->sortBy(fn (Order $o) => $o->dish?->category?->sort_order ?? 999)
-                ->map(function (Order $o) use ($allergenIds, $dietIds) {
-                $dish = $o->dish;
-                $allergenHits = $dish ? $dish->allergens->whereIn('id', $allergenIds)->pluck('name')->all() : [];
-                $dietHits = $dish ? $dish->unsuitableDiets->whereIn('id', $dietIds)->pluck('name')->all() : [];
+                ->sortBy(fn (Order $o) => [$o->menu_day_id ? 0 : 1, $o->dish?->category?->sort_order ?? 999])
+                ->groupBy(fn (Order $o) => $o->menu_day_id ? 'md'.$o->menu_day_id : 'o'.$o->id)
+                ->map(function (Collection $gruppe) use ($allergenIds, $dietIds) {
+                    $first = $gruppe->first();
+                    $gerichte = $gruppe->map(fn (Order $o) => $o->dish)->filter();
 
-                return [
-                    'dish' => $dish,
-                    'category' => $dish?->category?->name,
-                    'color' => $dish?->category?->color,
-                    'allergenHits' => $allergenHits,
-                    'dietHits' => $dietHits,
-                ];
-            })->values();
+                    return [
+                        'name' => $first->menu_day_id ? ($first->menuDay?->name ?? 'Menü') : ($first->dish?->name ?? '—'),
+                        'inhalt' => $first->menu_day_id ? $gerichte->pluck('name')->all() : [],
+                        'allergenHits' => $gerichte->flatMap(fn (Dish $d) => $d->allergens->whereIn('id', $allergenIds)->pluck('name'))->unique()->values()->all(),
+                        'dietHits' => $gerichte->flatMap(fn (Dish $d) => $d->unsuitableDiets->whereIn('id', $dietIds)->pluck('name'))->unique()->values()->all(),
+                    ];
+                })->values();
 
             $group = CustomerGroup::forUser($eater, $groups);
             $rows[] = [
@@ -1401,11 +1434,33 @@ class ServingController
             array_keys(self::PERSONEN_RANG), array_values(self::PERSONEN_RANG),
         )).' ELSE 9 END';
 
-        $abfrage = User::where('name', 'like', '%'.$q.'%')
-            ->whereDoesntHave('roles', fn ($r) => $r->whereIn('roles.role_id', $ogsRoleIds));
+        // Standard: nur, wer für den Tag bestellt hat – ohne OGS. Knöpfe am Terminal
+        // blenden OGS-Kinder (`ogs`) bzw. alle Personen (`alle`) dazu.
+        try {
+            $tag = Carbon::parse((string) $request->input('date'))->toDateString();
+        } catch (\Exception $e) {
+            $tag = Carbon::today()->toDateString();
+        }
+        $alle = $request->boolean('alle');
+        $mitOgs = $request->boolean('ogs');
+        $istOgs = fn ($r) => $r->whereIn('roles.role_id', $ogsRoleIds);
+
+        $basis = User::where('name', 'like', '%'.$q.'%');
+        $abfrage = (clone $basis);
+        if (! $alle) {
+            $bestellerIds = Order::whereDate('date', $tag)->whereNotNull('category_id')
+                ->where('status', Order::STATUS_ORDERED)->distinct()->pluck('user_id');
+            $abfrage->where(fn ($w) => $w->whereIn('users.id', $bestellerIds)
+                ->when($mitOgs, fn ($w) => $w->orWhereHas('roles', $istOgs)));
+        }
+        if (! $mitOgs) {
+            $abfrage->whereDoesntHave('roles', $istOgs);
+        }
         // Gesamtzahl mitgeben: sieht man mehr als die sechs Angezeigten, weiß
-        // man am Terminal, dass weiter eingeschränkt werden muss.
+        // man am Terminal, dass weiter eingeschränkt werden muss. „weitere" = Treffer,
+        // die erst mit OGS/Alle sichtbar würden.
         $gesamt = (clone $abfrage)->count();
+        $weitere = max(0, (clone $basis)->count() - $gesamt);
 
         $users = $abfrage
             ->with(['roles', 'kantineInfo'])
@@ -1416,12 +1471,15 @@ class ServingController
 
         return response()->json([
             'total' => $gesamt,
+            'weitere' => $weitere,
             'results' => $users->map(fn (User $u) => [
                 'id' => $u->id,
                 'name' => $u->name,
                 'group' => ($g = CustomerGroup::forUser($u, $groups))?->name,
-                'label' => self::personLabel($u, $g),
+                'label' => $g?->ordering_mode === CustomerGroup::MODE_JA_NEIN ? 'OGS' : self::personLabel($u, $g),
                 'rolle' => self::personenRolle($u),
+                // OGS-Kinder bucht das Terminal als „abgeholt" statt über den Menü-Fluss.
+                'ogs' => $g?->ordering_mode === CustomerGroup::MODE_JA_NEIN,
             ])->values(),
         ]);
     }
@@ -1810,14 +1868,15 @@ class ServingController
                 if ($isOgs) {
                     $daysData[$ds] = ['ogs' => $attendingByDay[$ds]->has($u->id)];
                 } else {
-                    // Je bestelltem Menü ein Posten mit Menünamen, Einzelgerichte ohne.
-                    $daysData[$ds] = ['posten' => $userOrders
-                        ->filter(fn (Order $o) => $o->date->toDateString() === $ds)
-                        ->groupBy(fn (Order $o) => $o->menu_day_id ?? 'einzeln')
-                        ->map(fn ($gruppe) => [
-                            'menu' => $gruppe->first()->menuDay?->name,
-                            'dishes' => $gruppe->map(fn (Order $o) => $o->dish?->name)->filter()->values()->all(),
-                        ])->sortBy(fn ($po) => $po['menu'] === null)->values()->all()];
+                    // Ein bestelltes Menü = EIN Posten (nur der Menüname, die Gerichte
+                    // stehen als Tooltip dabei); gleiche Einzelgerichte als „2× …".
+                    $tag = $userOrders->filter(fn (Order $o) => $o->date->toDateString() === $ds);
+                    $menues = $tag->whereNotNull('menu_day_id')->groupBy('menu_day_id')
+                        ->map(fn ($g) => ['name' => $g->first()->menuDay?->name ?? 'Menü', 'menu' => true, 'anzahl' => 1,
+                            'inhalt' => $g->map(fn (Order $o) => $o->dish?->name)->filter()->implode(', ')]);
+                    $einzeln = $tag->whereNull('menu_day_id')->groupBy('dish_id')
+                        ->map(fn ($g) => ['name' => $g->first()->dish?->name ?? '—', 'menu' => false, 'anzahl' => $g->count(), 'inhalt' => '']);
+                    $daysData[$ds] = ['posten' => $menues->values()->concat($einzeln->values())->all()];
                 }
             }
 
@@ -1856,8 +1915,11 @@ class ServingController
     }
 
     /**
-     * Vorbestellbare Gerichte des Tages, nach Kategorie gruppiert, je mit den drei
-     * Zählern bestellt / offen / ausgegeben. Basis der linken Terminal-Spalte.
+     * Linke Terminal-Spalte: zuerst die Menüs des Tages (je Menü EINE Kachel, nicht
+     * seine Einzelgerichte), danach die einzeln vorbestellbaren Gerichte nach
+     * Kategorie. Jede Kachel trägt die Zähler bestellt / offen / ausgegeben und die
+     * Personen dahinter (für das Modal hinter den Zahlen). Gezählt wird je Esser:
+     * ein Menü mit drei Gerichten ist eine Bestellung.
      *
      * @return Collection<int, array>
      */
@@ -1865,55 +1927,112 @@ class ServingController
     {
         $dateStr = $date->toDateString();
 
-        // Zwei Quellen: Einzelgerichte des Tagesplans (vorbestellbare Kategorien)
-        // und die Gerichte der Menüs des Tages. Seit der Menü-Logik stehen
-        // vorbestellte Gerichte oft NUR in einem Menü – ohne die zweite Quelle
-        // blieb die Spalte leer, solange niemand gestempelt hatte.
-        $planGerichte = Menu::where('season_id', $season->id)
+        $personen = $this->terminalTilePeople($season, $date);
+        $zaehler = function (string $tile) use ($personen): array {
+            $p = $personen->get($tile, collect());
+
+            return [
+                'people' => $p->values()->all(),
+                'ordered' => $p->count(),
+                'served' => $p->where('status', 'served')->count(),
+                'open' => $p->where('status', 'open')->count(),
+                'declined' => $p->where('status', 'declined')->count(),
+            ];
+        };
+
+        $gruppen = collect();
+
+        // 1) Menüs: Inhalt, Preis und Sonderkost aus ihren Gerichten.
+        $menuDays = MenuDay::where('season_id', $season->id)
+            ->whereDate('date', $dateStr)
+            ->with(collect($this->terminalDishRelations())->map(fn ($r) => 'slots.'.$r)->all())
+            ->orderBy('id')
+            ->get();
+        if ($menuDays->isNotEmpty()) {
+            $gruppen->push([
+                'category' => 'Menüs',
+                'category_id' => 'menus',
+                'color' => null,
+                'dishes' => $menuDays->map(function (MenuDay $md) use ($zaehler) {
+                    $gerichte = $md->slots->sortBy('position')->map(fn ($s) => $s->dish)->filter()->values();
+                    $vereint = fn (string $feld) => $gerichte->flatMap(fn (Dish $d) => $this->terminalDishPayload($d)[$feld])
+                        ->unique(fn ($x) => is_array($x) ? $x['id'] : $x)->values()->all();
+
+                    return [
+                        'id' => 'md'.$md->id,
+                        'menu' => true,
+                        'name' => $md->name,
+                        'price' => (float) $md->price,
+                        'photo' => $gerichte->map(fn (Dish $d) => $d->photoUrl())->filter()->first(),
+                        'inhalt' => $gerichte->pluck('name')->all(),
+                        'allergens' => $vereint('allergens'),
+                        'additives' => $vereint('additives'),
+                        'unsuitable' => $vereint('unsuitable'),
+                        'allergenIds' => $vereint('allergenIds'),
+                        'dietIds' => $vereint('dietIds'),
+                    ] + $zaehler('md'.$md->id);
+                })->values(),
+            ]);
+        }
+
+        // 2) Einzeln vorbestellbare Gerichte des Tagesplans.
+        $einzeln = Menu::where('season_id', $season->id)
             ->whereDate('date', $dateStr)
             ->with($this->terminalDishRelations())
             ->orderBy('sort_order')->orderBy('id')
             ->get()
             ->filter(fn (Menu $m) => $m->dish && $m->dish->category && $m->dish->category->allows_preorder)
-            ->map(fn (Menu $m) => $m->dish);
+            ->map(fn (Menu $m) => $m->dish)
+            ->unique('id');
 
-        $menueGerichte = MenuDay::where('season_id', $season->id)
-            ->whereDate('date', $dateStr)
-            ->with(collect($this->terminalDishRelations())->map(fn ($r) => 'slots.'.$r)->all())
-            ->orderBy('id')
-            ->get()
-            ->flatMap(fn (MenuDay $md) => $md->slots->sortBy('position')->map(fn ($s) => $s->dish))
-            ->filter(fn (?Dish $d) => $d && $d->category);
-
-        $menus = $planGerichte->concat($menueGerichte)
-            ->unique('id')
-            ->values();
-
-        // Zähler je Gericht: bestellt = aktive Vorbestellungen; ausgegeben =
-        // nicht-spontane, nicht abgelehnte Ausgabe-Zeilen.
-        $ordered = Order::where('season_id', $season->id)->whereDate('date', $dateStr)
-            ->whereNotNull('category_id')->where('status', Order::STATUS_ORDERED)
-            ->selectRaw('dish_id, COUNT(*) as c')->groupBy('dish_id')->pluck('c', 'dish_id');
-        $served = Serving::where('season_id', $season->id)->whereDate('date', $dateStr)
-            ->where('spontaneous', false)->where('declined', false)->whereNotNull('dish_id')
-            ->selectRaw('dish_id, COUNT(*) as c')->groupBy('dish_id')->pluck('c', 'dish_id');
-
-        return $menus->groupBy(fn (Dish $d) => $d->category?->name ?? 'Ohne Kategorie')
+        return $gruppen->concat($einzeln->groupBy(fn (Dish $d) => $d->category?->name ?? 'Ohne Kategorie')
             ->map(fn (Collection $group, string $cat) => [
                 'category' => $cat,
                 'category_id' => $group->first()->category_id,
                 'color' => $group->first()->category?->color,
-                'dishes' => $group->map(function (Dish $d) use ($ordered, $served) {
-                    $o = (int) ($ordered[$d->id] ?? 0);
-                    $s = (int) ($served[$d->id] ?? 0);
+                'dishes' => $group->map(fn (Dish $d) => $this->terminalDishPayload($d)
+                    + ['menu' => false, 'inhalt' => []] + $zaehler('d'.$d->id))->values(),
+            ])->values());
+    }
 
-                    return $this->terminalDishPayload($d) + [
-                        'ordered' => $o,
-                        'served' => $s,
-                        'open' => max(0, $o - $s),
-                    ];
-                })->values(),
-            ])->values();
+    /**
+     * Personen je Terminal-Kachel ('md<id>' für Menüs, 'd<id>' für Einzelgerichte)
+     * mit Ausgabe-Status open/served/declined – sortiert nach Nachname, Vorname, Klasse.
+     *
+     * @return Collection<string, Collection<int, array>>
+     */
+    private function terminalTilePeople(Season $season, Carbon $date): Collection
+    {
+        $dateStr = $date->toDateString();
+
+        $orders = Order::where('season_id', $season->id)->whereDate('date', $dateStr)
+            ->whereNotNull('category_id')->where('status', Order::STATUS_ORDERED)
+            ->with(['user.roles', 'user.kantineInfo'])
+            ->get();
+        $servings = Serving::where('season_id', $season->id)->whereDate('date', $dateStr)
+            ->where('spontaneous', false)->whereNotNull('order_id')
+            ->get()->keyBy('order_id');
+        $groups = CustomerGroup::all()->keyBy('role_id');
+
+        return $orders
+            ->filter(fn (Order $o) => $o->user !== null)
+            ->groupBy(fn (Order $o) => $o->menu_day_id ? $o->user_id.'|md'.$o->menu_day_id : 'o'.$o->id)
+            ->map(function (Collection $g) use ($servings, $groups) {
+                $first = $g->first();
+                $sv = $g->map(fn (Order $o) => $servings->get($o->id))->filter();
+
+                return [
+                    'tile' => $first->menu_day_id ? 'md'.$first->menu_day_id : 'd'.$first->dish_id,
+                    'id' => $first->user_id,
+                    'name' => self::sortName($first->user),
+                    'klasse' => self::klasseOderRolle($first->user, CustomerGroup::forUser($first->user, $groups)),
+                    'status' => $sv->isEmpty() ? 'open' : ($sv->every(fn (Serving $s) => $s->declined) ? 'declined' : 'served'),
+                ];
+            })
+            ->sort(fn ($a, $b) => strcmp(self::sortierbar($a['name']), self::sortierbar($b['name']))
+                ?: strnatcasecmp((string) $a['klasse'], (string) $b['klasse']))
+            ->groupBy('tile')
+            ->map(fn (Collection $p) => $p->map(fn ($e) => collect($e)->except('tile')->all())->values());
     }
 
     /** Walk-in-Gerichte des Tages, gruppiert (rechte Terminal-Spalte oben). */
@@ -1978,15 +2097,22 @@ class ServingController
             if (! $season->isOpenOn($d)) {
                 continue;
             }
-            $ordered = Order::where('season_id', $season->id)->whereDate('date', $d->toDateString())
-                ->whereNotNull('category_id')->where('status', Order::STATUS_ORDERED)
+            // Menüs je Esser einmal gezählt, Einzelgerichte je Bestellung.
+            $bestellt = Order::where('season_id', $season->id)->whereDate('date', $d->toDateString())
+                ->whereNotNull('category_id')->where('status', Order::STATUS_ORDERED);
+            $menuZahl = (clone $bestellt)->whereNotNull('menu_day_id')
+                ->selectRaw('menu_day_id, COUNT(DISTINCT user_id) as c')->groupBy('menu_day_id')->pluck('c', 'menu_day_id');
+            $einzelZahl = (clone $bestellt)->whereNull('menu_day_id')
                 ->selectRaw('dish_id, COUNT(*) as c')->groupBy('dish_id')->pluck('c', 'dish_id');
 
-            $dishes = Menu::where('season_id', $season->id)->whereDate('date', $d->toDateString())
+            $menues = MenuDay::where('season_id', $season->id)->whereDate('date', $d->toDateString())
+                ->orderBy('id')->get()
+                ->map(fn (MenuDay $md) => ['name' => $md->name, 'ordered' => (int) ($menuZahl[$md->id] ?? 0)]);
+            $dishes = $menues->concat(Menu::where('season_id', $season->id)->whereDate('date', $d->toDateString())
                 ->with('dish.category')->orderBy('sort_order')->orderBy('id')->get()
                 ->filter(fn (Menu $m) => $m->dish && $m->dish->category && $m->dish->category->allows_preorder)
                 ->unique(fn (Menu $m) => $m->dish_id)
-                ->map(fn (Menu $m) => ['name' => $m->dish->name, 'ordered' => (int) ($ordered[$m->dish_id] ?? 0)])
+                ->map(fn (Menu $m) => ['name' => $m->dish->name, 'ordered' => (int) ($einzelZahl[$m->dish_id] ?? 0)]))
                 ->values()->all();
 
             $days[] = [
