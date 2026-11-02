@@ -1279,8 +1279,9 @@
                                                 @click.stop="clickTile(group.category_id, dish.id)"
                                                 class="flex w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 text-sm font-bold transition"
                                                 :class="{
-                                                    'border-green-500 bg-green-100 text-green-700': tileState(group.category_id, dish.id)==='taken',
-                                                    'border-amber-500 bg-amber-100 text-amber-700': tileState(group.category_id, dish.id)==='alt',
+                                                    {{-- „ausgeben" gelb wie „offen", „✓ ausgegeben" grün wie „ausgegeben". --}}
+                                                    'border-green-500 bg-green-100 text-green-700': tileGebucht(group.category_id, dish.id),
+                                                    'border-amber-500 bg-amber-100 text-amber-700': ['taken','alt'].includes(tileState(group.category_id, dish.id)) && !tileGebucht(group.category_id, dish.id),
                                                     'border-red-300 bg-red-100 text-red-600': tileState(group.category_id, dish.id)==='declined',
                                                     'border-gray-300 bg-white text-gray-400 hover:border-indigo-400': tileState(group.category_id, dish.id)==='selectable'
                                                 }">
