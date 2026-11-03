@@ -14,6 +14,7 @@ use Intranet\Modules\Schulkantine\Models\Subscription;
 use Intranet\Modules\Schulkantine\Support\Access;
 use Intranet\Modules\Schulkantine\Support\Bestellterminal;
 use Intranet\Modules\Schulkantine\Support\DeadlineService;
+use Intranet\Modules\Schulkantine\Support\MensaAudit;
 
 /**
  * Bestell-Terminal: Vollbild-Kiosk auf den Schul-Terminals, OHNE Intranet-
@@ -115,6 +116,7 @@ class BestellTerminalController
         $user = NfcChip::userForLeser($data['uid']);
         if (! $user) {
             $request->session()->forget(self::SESSION);
+            $this->unbekanntProtokollieren($data['uid']);
 
             return response()->json(['found' => false]);
         }
@@ -122,6 +124,27 @@ class BestellTerminalController
         $request->session()->put(self::SESSION, ['user' => $user->id, 'zuletzt' => time()]);
 
         return response()->json(['found' => true, 'name' => $user->name]);
+    }
+
+    /**
+     * „Dieser Chip ist nicht bekannt" ins Audit-Log: mit Kennung, damit die Verwaltung den Chip
+     * zuordnen kann. Ist es ein zurückgegebener/verlorener Chip, steht der frühere Inhaber dabei.
+     */
+    private function unbekanntProtokollieren(string $roh): void
+    {
+        $uid = NfcChip::normalize($roh);
+        $alt = $uid !== '' ? NfcChip::where('uid', $uid)->whereNotNull('returned_at')->latest('returned_at')->first() : null;
+
+        $grund = match (true) {
+            $alt && $alt->lost_at => 'als verloren gemeldet am '.$alt->lost_at->format('d.m.Y'),
+            $alt !== null => 'zurückgegeben am '.$alt->returned_at->format('d.m.Y'),
+            default => 'keinem Esser zugeordnet',
+        };
+
+        MensaAudit::schreiben('kantine.chip_unbekannt', 'Unbekannter Chip '.$uid.' ('.$grund.')', $alt?->user, [
+            'Chip' => $uid,
+            'Gelesen' => $roh,
+        ]);
     }
 
     public function abmelden(Request $request)

@@ -26,6 +26,7 @@ class MensaAudit
         'kantine.saison_geaendert' => 'Mensa: Saison-Einstellungen geändert',
         'kantine.linear_gesendet' => 'Mensa: Monat an Linear übertragen',
         'kantine.menueserve_buchungen' => 'Mensa: Menü&Serve-Buchungen übernommen',
+        'kantine.chip_unbekannt' => 'Mensa: unbekannter Chip am Terminal',
     ];
 
     /** @param  array<string, mixed>  $daten */
