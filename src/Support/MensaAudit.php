@@ -27,6 +27,7 @@ class MensaAudit
         'kantine.linear_gesendet' => 'Mensa: Monat an Linear übertragen',
         'kantine.menueserve_buchungen' => 'Mensa: Menü&Serve-Buchungen übernommen',
         'kantine.chip_unbekannt' => 'Mensa: unbekannter Chip am Terminal',
+        'kantine.ausgabe_zurueck' => 'Mensa: Ausgabe zurückgenommen',
     ];
 
     /** @param  array<string, mixed>  $daten */
@@ -41,6 +42,11 @@ class MensaAudit
 
     private static function quelle(): string
     {
-        return request()->routeIs('kantine.bestellterminal.*') ? 'Bestell-Terminal' : 'Intranet';
+        return match (true) {
+            request()->routeIs('kantine.bestellterminal.*') => 'Bestell-Terminal',
+            request()->routeIs('module.schulkantine.servings.terminal*') => 'Ausgabe-Terminal',
+            request()->routeIs('module.schulkantine.servings.*') => 'Ausgabe-Übersicht',
+            default => 'Intranet',
+        };
     }
 }

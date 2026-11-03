@@ -2,6 +2,7 @@
 
 namespace Intranet\Modules\Schulkantine\Http\Controllers;
 
+use App\Models\AuditEintrag;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -20,6 +21,8 @@ use Intranet\Modules\Schulkantine\Models\Serving;
 use Intranet\Modules\Schulkantine\Models\Subscription;
 use Intranet\Modules\Schulkantine\Support\Access;
 use Intranet\Modules\Schulkantine\Support\DeadlineService;
+use Intranet\Modules\Schulkantine\Support\LinearExport;
+use Intranet\Modules\Schulkantine\Support\MensaAudit;
 use Intranet\Modules\Schulkantine\Support\OgsAttendance;
 
 /**
@@ -758,13 +761,137 @@ class ServingController
         abort_unless(Access::canServe($request->user()), 403, 'Du darfst keine Ausgabe entfernen.');
 
         $name = $serving->user?->name;
+        if ($serving->user && LinearExport::abgerechnet($serving->user_id, $serving->date)) {
+            $msg = 'Der '.$serving->date->isoFormat('MMMM YYYY').' ist für '.$name.' bereits abgerechnet – Änderungen bitte direkt in Linear.';
+
+            return $request->wantsJson() ? response()->json(['ok' => false, 'error' => $msg]) : back()->withErrors(['ausgabe' => $msg]);
+        }
+
+        $serving->loadMissing(['dish', 'servedBy']);
+        $was = self::servingText($serving);
         $serving->delete();
+        MensaAudit::schreiben('kantine.ausgabe_zurueck', 'Ausgabe zurückgenommen: '.$was.($name ? ' für '.$name : ''), $serving->user, [
+            'Tag' => $serving->date->format('d.m.Y'),
+            'Ursprünglich' => $serving->created_at?->format('H:i').' Uhr'.($serving->servedBy ? ', '.$serving->servedBy->name : ''),
+        ]);
 
         if ($request->wantsJson()) {
             return response()->json(['ok' => true]);
         }
 
         return back()->with('status', 'Ausgabe-Zeile entfernt'.($name ? ' ('.$name.')' : '').'.');
+    }
+
+    // ------------------------------------------------------- Tagesprotokoll
+
+    /**
+     * Tagesprotokoll: wer hat wann was für diesen Tag gebucht, abbestellt, ausgegeben
+     * oder zurückgenommen – zeitlich sortiert, mit „Zurücknehmen" an jeder Ausgabe-Zeile.
+     * Quellen: das Audit-Log (Bestellungen, Abbestellungen, Rücknahmen – Schlüssel „Tag")
+     * und die Ausgabe-Zeilen selbst (served_by, Zeitpunkt der letzten Buchung).
+     * Dazu oben die OGS-Kinder, die „spontan" zählen, mit Grund und Herkunft.
+     */
+    public function protokoll(Request $request)
+    {
+        $user = $request->user();
+        abort_unless(Access::canViewServings($user) || Access::canViewOgsList($user), 403, 'Kein Zugriff auf die Ausgabelisten.');
+
+        $season = Season::where('is_active', true)->firstOrFail();
+        $date = $this->resolveDate($request, $season);
+        $tag = $date->format('d.m.Y');
+
+        $servings = Serving::with(['user.roles', 'dish', 'servedBy'])
+            ->where('season_id', $season->id)->whereDate('date', $date->toDateString())->get();
+
+        $audit = AuditEintrag::whereIn('aktion', ['kantine.bestellt', 'kantine.abbestellt', 'kantine.bestellung_geloescht', 'kantine.ausgabe_zurueck'])
+            ->where('daten->Tag', $tag)
+            ->where('created_at', '>=', $date->copy()->subDays(120))
+            ->orderBy('id')->get();
+
+        $personen = User::with('roles')->whereIn('id', $audit->pluck('betroffener_id')->filter()->unique())->get()->keyBy('id');
+        $klasseVon = fn (?User $u) => $u ? self::klasse($u) : null;
+
+        $eintraege = collect();
+        foreach ($audit as $a) {
+            $p = $personen->get($a->betroffener_id);
+            $eintraege->push([
+                'zeit' => $a->created_at,
+                'art' => match ($a->aktion) {
+                    'kantine.ausgabe_zurueck' => 'zurueck',
+                    'kantine.bestellt' => 'bestellt',
+                    default => 'abbestellt',
+                },
+                'person' => $p ? self::sortName($p) : ($a->betroffener ?? '–'),
+                'klasse' => $klasseVon($p),
+                'was' => $a->beschreibung,
+                'zusatz' => $a->daten['Ursprünglich'] ?? null,
+                'wer' => $a->akteur ?? 'System',
+                'quelle' => $a->daten['Quelle'] ?? null,
+                'serving' => null,
+            ]);
+        }
+        foreach ($servings as $s) {
+            $eintraege->push([
+                'zeit' => $s->updated_at ?? $s->created_at,
+                'art' => 'ausgabe',
+                'person' => $s->user ? self::sortName($s->user) : '–',
+                'klasse' => $klasseVon($s->user),
+                'was' => self::servingText($s),
+                'zusatz' => null,
+                'wer' => $s->servedBy?->name ?? '–',
+                'quelle' => 'Ausgabe',
+                'serving' => $s,
+            ]);
+        }
+        $eintraege = $eintraege->sortByDesc(fn ($e) => $e['zeit']?->timestamp ?? 0)->values();
+
+        // OGS-Kinder, die als „spontan" zählen: Grund (Abo) und Herkunft (wer hat angemeldet).
+        $abos = Subscription::where('season_id', $season->id)->get()->keyBy('user_id');
+        $wt = ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+        $ogsSpontan = $this->ogsEatersDetailed($season, $date)->where('nachgetragen', true)->map(function (array $e) use ($abos, $audit, $date, $wt) {
+            $abo = $abos->get($e['user']->id);
+            $grund = match (true) {
+                ! $abo => 'kein OGS-Abo',
+                ! $abo->active => 'Abo pausiert',
+                default => $wt[$date->dayOfWeekIso].' nicht im Abo (Abo: '.implode(', ', array_map(fn ($d) => $wt[(int) $d] ?? $d, (array) $abo->weekdays)).')',
+            };
+            $herkunft = $audit->where('aktion', 'kantine.bestellt')->where('betroffener_id', $e['user']->id)->last();
+            $order = Order::where('user_id', $e['user']->id)->whereNull('category_id')
+                ->whereDate('date', $date->toDateString())->where('status', Order::STATUS_ORDERED)->first();
+
+            return $e + [
+                'grund' => $grund,
+                'herkunft' => $herkunft
+                    ? $herkunft->created_at->format('d.m. H:i').' – '.($herkunft->akteur ?? 'System').($herkunft->daten['Quelle'] ?? null ? ' ('.$herkunft->daten['Quelle'].')' : '')
+                    : 'kein Protokolleintrag – angelegt '.($order?->created_at?->format('d.m. H:i') ?? '?').', vermutlich am Ausgabe-Terminal (vor v1.95.0 ohne Protokoll)',
+            ];
+        })->values();
+
+        return view('schulkantine::servings.protokoll', [
+            'season' => $season,
+            'date' => $date,
+            'eintraege' => $eintraege,
+            'ogsSpontan' => $ogsSpontan,
+            'abgerechnet' => fn (int $userId) => LinearExport::abgerechnet($userId, $date),
+            'darfZuruecknehmen' => Access::canServe($user),
+            'darfOgsEntfernen' => Access::canServe($user) || Access::canViewOgsList($user),
+        ] + $this->dayNav($season, $date, []));
+    }
+
+    /** Klartext einer Ausgabe-Zeile („OGS-Essen abgeholt", „spontan: Eis (1,50 €)" …). */
+    private static function servingText(Serving $s): string
+    {
+        $was = $s->category_id === null && ! $s->spontaneous
+            ? 'OGS-Essen'
+            : ($s->dish?->name ?? $s->label ?? 'Nachschlag');
+        $preis = $s->price_snapshot !== null ? ' ('.number_format((float) $s->price_snapshot, 2, ',', '.').' €)' : '';
+
+        return match (true) {
+            (bool) $s->declined => $was.' – nicht genommen',
+            (bool) $s->spontaneous => 'spontan: '.$was.$preis,
+            (bool) $s->alternative => $was.' – Alternative ausgegeben',
+            default => $was.' ausgegeben',
+        };
     }
 
     // ------------------------------------------------------- Mengen (4d)
@@ -1216,7 +1343,8 @@ class ServingController
     /** Ein nachgetragenes OGS-Kind wieder von der Liste des Tages nehmen. */
     public function ogsNachtragEntfernen(Request $request)
     {
-        abort_unless(Access::canViewOgsList($request->user()), 403, 'Kein Zugriff auf die OGS-Liste.');
+        // Auch die Ausgabe (Kellner) – sie kann am Terminal ohnehin spontan anmelden und zurücknehmen.
+        abort_unless(Access::canViewOgsList($request->user()) || Access::canServe($request->user()), 403, 'Kein Zugriff auf die OGS-Liste.');
 
         $data = $request->validate([
             'eater_id' => ['required', 'integer', 'exists:users,id'],
@@ -1225,14 +1353,23 @@ class ServingController
         $season = Season::where('is_active', true)->firstOrFail();
         $eater = User::findOrFail($data['eater_id']);
         $date = Carbon::parse($data['date'])->startOfDay();
+        $zurueck = $request->input('ziel') === 'protokoll'
+            ? redirect()->route('module.schulkantine.servings.protokoll', ['date' => $date->toDateString()])
+            : redirect()->to(route('module.schulkantine.servings.index', ['date' => $date->toDateString()]).'#tag-'.$date->toDateString());
 
+        if (LinearExport::abgerechnet($eater->id, $date)) {
+            return $zurueck->withErrors(['ogs' => 'Der '.$date->isoFormat('MMMM YYYY').' ist für '.$eater->name.' bereits abgerechnet – Änderungen bitte direkt in Linear.']);
+        }
+
+        // Schon ausgegeben? Die Ausgabe-Zeile geht mit – sonst bliebe ein Essen ohne Anmeldung.
+        Serving::where('season_id', $season->id)->where('user_id', $eater->id)->whereNull('category_id')
+            ->whereDate('date', $date->toDateString())->where('spontaneous', false)->delete();
         Order::where('season_id', $season->id)->where('user_id', $eater->id)->whereNull('category_id')
             ->whereDate('date', $date->toDateString())->where('status', Order::STATUS_ORDERED)->delete();
         \Intranet\Modules\Schulkantine\Support\MensaAudit::schreiben('kantine.abbestellt',
             'OGS-Nachtrag entfernt: '.$eater->name.' am '.$date->format('d.m.Y'), $eater, ['Tag' => $date->format('d.m.Y')]);
 
-        return redirect()->to(route('module.schulkantine.servings.index', ['date' => $date->toDateString()]).'#tag-'.$date->toDateString())
-            ->with('status', 'Entfernt: '.$eater->name.' am '.$date->format('d.m.Y').'.');
+        return $zurueck->with('status', 'Entfernt: '.$eater->name.' am '.$date->format('d.m.Y').'.');
     }
 
     /**
@@ -1391,8 +1528,13 @@ class ServingController
     {
         $dateStr = $date->toDateString();
 
+        // Nur Abos, deren Wochentags-Muster den Tag enthält (wie OgsAttendance) – sonst
+        // stünde ein Mo/Mi-Kind auch dienstags auf dem Board und würde beim Abhaken
+        // als spontan angemeldet.
         $subscribed = Subscription::where('season_id', $season->id)
             ->where('active', true)
+            ->get()
+            ->filter(fn (Subscription $s) => $s->eatsWeekday($date->dayOfWeekIso))
             ->pluck('user_id');
 
         $cancelled = Order::where('season_id', $season->id)
@@ -1878,6 +2020,8 @@ class ServingController
                 Order::where('season_id', $season->id)->where('user_id', $eater->id)
                     ->whereDate('date', $date->toDateString())->whereNull('category_id')->delete();
                 $removed = true;
+                MensaAudit::schreiben('kantine.abbestellt', 'OGS-Anmeldung an der Ausgabe zurückgenommen: '.$eater->name.' am '.$date->format('d.m.Y'),
+                    $eater, ['Tag' => $date->format('d.m.Y')]);
             }
 
             return response()->json(['ok' => true, 'served' => false, 'declined' => false, 'removed' => $removed]);
@@ -1899,6 +2043,8 @@ class ServingController
                         'date' => $date->toDateString(),
                         'status' => Order::STATUS_ORDERED,
                     ]);
+                    MensaAudit::schreiben('kantine.bestellt', 'OGS-Essen spontan an der Ausgabe angemeldet: '.$eater->name.' am '.$date->format('d.m.Y'),
+                        $eater, ['Tag' => $date->format('d.m.Y')]);
                 }
             }
 

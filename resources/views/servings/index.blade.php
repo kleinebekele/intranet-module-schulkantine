@@ -98,6 +98,10 @@
                                     @endif
                                 </div>
                                 <div class="flex items-center gap-4">
+                                    <a href="{{ route('module.schulkantine.servings.protokoll', ['date' => $d->toDateString()]) }}"
+                                       class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1 text-sm font-semibold text-white hover:bg-indigo-700">
+                                        <x-module-icon name="search" class="text-base" /> Tagesprotokoll
+                                    </a>
                                     @if ($darfBetrieb)
                                         <a href="{{ route('module.schulkantine.servings.besteller.pdf', ['date' => $d->toDateString()]) }}"
                                            class="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800">
