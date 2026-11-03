@@ -49,7 +49,7 @@
         @if ($ogsSpontan->isNotEmpty())
             <div class="overflow-hidden rounded-xl border border-amber-200 bg-white">
                 <div class="border-b border-amber-100 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800">
-                    OGS spontan ({{ $ogsSpontan->count() }}) – angemeldet, obwohl das Abo den Tag nicht abdeckt
+                    OGS spontan ({{ $ogsSpontan->count() }}) – ohne Vorbestellung, erst an der Ausgabe angemeldet
                 </div>
                 <ul class="divide-y divide-gray-100 text-sm">
                     @foreach ($ogsSpontan as $e)
@@ -151,8 +151,9 @@
 
         <p class="text-xs text-gray-400">
             Ausgabe-Zeilen zeigen den Stand der letzten Buchung am Terminal (wer, wann). Bestellungen, Abbestellungen und Rücknahmen
-            stammen aus dem Audit-Log. „Zurücknehmen" löscht nur die Ausgabe – die Bestellung bleibt bestehen; eine OGS-Anmeldung
-            ohne Abo-Tag entfernt der Knopf „Anmeldung entfernen" oben.
+            stammen aus dem Audit-Log. „Zurücknehmen" löscht nur die Ausgabe – die Bestellung bleibt bestehen; eine erst an der
+            Ausgabe angelegte OGS-Anmeldung entfernt der Knopf „Anmeldung entfernen" oben. Was Eltern vorab gebucht haben, ist
+            vorbestellt – auch außerhalb des Abos.
         </p>
     </div>
 </x-app-layout>

@@ -853,6 +853,7 @@ class ServingController
             $grund = match (true) {
                 ! $abo => 'kein OGS-Abo',
                 ! $abo->active => 'Abo pausiert',
+                $abo->eatsWeekday($date->dayOfWeekIso) => 'Abo-Tag, war aber abbestellt',
                 default => $wt[$date->dayOfWeekIso].' nicht im Abo (Abo: '.implode(', ', array_map(fn ($d) => $wt[(int) $d] ?? $d, (array) $abo->weekdays)).')',
             };
             $herkunft = $audit->where('aktion', 'kantine.bestellt')->where('betroffener_id', $e['user']->id)->last();
@@ -1255,13 +1256,13 @@ class ServingController
 
         $attending->loadMissing('roles');
 
-        // Nachgetragen = ausdrücklich angemeldet, ohne dass das Abo den Tag abdeckt.
-        $abos = Subscription::where('season_id', $season->id)->whereIn('user_id', $attending->pluck('id'))->get()->keyBy('user_id');
+        // Nachgetragen (= spontan) = erst an der Ausgabe angemeldet (Terminal-Suche, Nachtragen).
+        // Was Eltern vorab gebucht haben, ist vorbestellt – auch außerhalb des Abos.
         $einzeln = Order::where('season_id', $season->id)->whereNull('category_id')
             ->whereDate('date', $date->toDateString())->where('status', Order::STATUS_ORDERED)
+            ->where('an_ausgabe', true)
             ->whereIn('user_id', $attending->pluck('id'))->pluck('user_id')->flip();
-        $nachgetragen = fn (User $u) => $einzeln->has($u->id)
-            && ! (($abo = $abos->get($u->id)) && $abo->active && $abo->eatsWeekday($date->dayOfWeekIso));
+        $nachgetragen = fn (User $u) => $einzeln->has($u->id);
 
         // Nach Klasse (natürlich: 2a vor 10a, ohne Klasse ans Ende), dann Nachname, Vorname.
         return $attending->map(function (User $u) use ($servedIds, $nachgetragen) {
@@ -1332,7 +1333,7 @@ class ServingController
             Order::where('season_id', $season->id)->where('user_id', $eater->id)->whereNull('category_id')
                 ->whereDate('date', $date->toDateString())->delete();
             Order::create(['season_id' => $season->id, 'user_id' => $eater->id,
-                'date' => $date->toDateString(), 'status' => Order::STATUS_ORDERED]);
+                'date' => $date->toDateString(), 'status' => Order::STATUS_ORDERED, 'an_ausgabe' => true]);
         });
         \Intranet\Modules\Schulkantine\Support\MensaAudit::schreiben('kantine.bestellt',
             'OGS-Essen nachgetragen: '.$eater->name.' am '.$date->format('d.m.Y'), $eater, ['Tag' => $date->format('d.m.Y')]);
@@ -1365,7 +1366,7 @@ class ServingController
         Serving::where('season_id', $season->id)->where('user_id', $eater->id)->whereNull('category_id')
             ->whereDate('date', $date->toDateString())->where('spontaneous', false)->delete();
         Order::where('season_id', $season->id)->where('user_id', $eater->id)->whereNull('category_id')
-            ->whereDate('date', $date->toDateString())->where('status', Order::STATUS_ORDERED)->delete();
+            ->whereDate('date', $date->toDateString())->where('status', Order::STATUS_ORDERED)->where('an_ausgabe', true)->delete();
         \Intranet\Modules\Schulkantine\Support\MensaAudit::schreiben('kantine.abbestellt',
             'OGS-Nachtrag entfernt: '.$eater->name.' am '.$date->format('d.m.Y'), $eater, ['Tag' => $date->format('d.m.Y')]);
 
@@ -2010,16 +2011,16 @@ class ServingController
             Serving::where('season_id', $season->id)->where('user_id', $eater->id)
                 ->whereDate('date', $date->toDateString())->where('spontaneous', false)->delete();
 
-            // Nur spontan dabei (kein aktives Abo)? Dann Anwesenheit ganz entfernen –
-            // weg vom Board, keine Berechnung. Kommt es doch, erneut über die Suche.
-            // Abonnierte bleiben angemeldet (ihre Anwesenheit ist das Abo).
+            // Erst an der Ausgabe angemeldet? Dann Anwesenheit ganz entfernen – weg vom
+            // Board, keine Berechnung. Kommt es doch, erneut über die Suche. Abo-Tage und
+            // Vorbestellungen der Eltern bleiben stehen.
             $removed = false;
-            $subscribed = Subscription::where('season_id', $season->id)
-                ->where('user_id', $eater->id)->where('active', true)->exists();
-            if (! $subscribed) {
-                Order::where('season_id', $season->id)->where('user_id', $eater->id)
-                    ->whereDate('date', $date->toDateString())->whereNull('category_id')->delete();
-                $removed = true;
+            $anAusgabe = Order::where('season_id', $season->id)->where('user_id', $eater->id)
+                ->whereDate('date', $date->toDateString())->whereNull('category_id')
+                ->where('status', Order::STATUS_ORDERED)->where('an_ausgabe', true);
+            if ($anAusgabe->exists()) {
+                $anAusgabe->delete();
+                $removed = ! $this->isOgsAttending($season, $eater, $date);
                 MensaAudit::schreiben('kantine.abbestellt', 'OGS-Anmeldung an der Ausgabe zurückgenommen: '.$eater->name.' am '.$date->format('d.m.Y'),
                     $eater, ['Tag' => $date->format('d.m.Y')]);
             }
@@ -2042,6 +2043,7 @@ class ServingController
                         'user_id' => $eater->id,
                         'date' => $date->toDateString(),
                         'status' => Order::STATUS_ORDERED,
+                        'an_ausgabe' => true,
                     ]);
                     MensaAudit::schreiben('kantine.bestellt', 'OGS-Essen spontan an der Ausgabe angemeldet: '.$eater->name.' am '.$date->format('d.m.Y'),
                         $eater, ['Tag' => $date->format('d.m.Y')]);

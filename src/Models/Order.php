@@ -27,12 +27,14 @@ class Order extends Model
         'category_id',
         'price_snapshot',
         'status',
+        'an_ausgabe',
     ];
 
     protected function casts(): array
     {
         return [
             'date' => 'date',
+            'an_ausgabe' => 'boolean',
             'price_snapshot' => 'decimal:2',
         ];
     }
