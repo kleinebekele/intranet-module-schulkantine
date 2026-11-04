@@ -768,9 +768,20 @@ class ServingController
             return $request->wantsJson() ? response()->json(['ok' => false, 'error' => $msg]) : back()->withErrors(['ausgabe' => $msg]);
         }
 
-        $serving->loadMissing(['dish', 'servedBy']);
-        $was = self::servingText($serving);
-        $serving->delete();
+        $serving->loadMissing(['dish', 'servedBy', 'order.menuDay']);
+        $menueTag = $serving->spontaneous ? null : $serving->order?->menuDay;
+        if ($menueTag && $request->boolean('ganzes_menue')) {
+            // Tagesprotokoll zeigt ein Menü als eine Ausgabe → alle seine Gerichte zurücknehmen.
+            $zeilen = Serving::with(['dish', 'order'])->where('season_id', $serving->season_id)
+                ->where('user_id', $serving->user_id)->whereDate('date', $serving->date->toDateString())
+                ->where('spontaneous', false)->get()
+                ->filter(fn (Serving $z) => (int) $z->order?->menu_day_id === (int) $menueTag->id);
+            $was = self::menueText($menueTag->name, $zeilen);
+            $zeilen->each->delete();
+        } else {
+            $was = self::servingText($serving);
+            $serving->delete();
+        }
         MensaAudit::schreiben('kantine.ausgabe_zurueck', 'Ausgabe zurückgenommen: '.$was.($name ? ' für '.$name : ''), $serving->user, [
             'Tag' => $serving->date->format('d.m.Y'),
             'Ursprünglich' => $serving->created_at?->format('H:i').' Uhr'.($serving->servedBy ? ', '.$serving->servedBy->name : ''),
@@ -801,7 +812,7 @@ class ServingController
         $date = $this->resolveDate($request, $season);
         $tag = $date->format('d.m.Y');
 
-        $servings = Serving::with(['user.roles', 'dish', 'servedBy'])
+        $servings = Serving::with(['user.roles', 'dish', 'servedBy', 'order.menuDay'])
             ->where('season_id', $season->id)->whereDate('date', $date->toDateString())->get();
 
         $audit = AuditEintrag::whereIn('aktion', ['kantine.bestellt', 'kantine.abbestellt', 'kantine.bestellung_geloescht', 'kantine.ausgabe_zurueck'])
@@ -831,17 +842,24 @@ class ServingController
                 'serving' => null,
             ]);
         }
-        foreach ($servings as $s) {
+        // Gerichte eines Menüs (gleicher Esser, gleicher Menü-Tag) als EINE Ausgabe zeigen.
+        $gruppen = $servings->groupBy(fn (Serving $s) => ! $s->spontaneous && $s->order?->menu_day_id
+            ? 'menue-'.$s->user_id.'-'.$s->order->menu_day_id
+            : 'zeile-'.$s->id);
+        foreach ($gruppen as $zeilen) {
+            $s = $zeilen->first();
+            $menue = $s->spontaneous ? null : $s->order?->menuDay;
             $eintraege->push([
-                'zeit' => $s->updated_at ?? $s->created_at,
+                'zeit' => $zeilen->max(fn (Serving $z) => $z->updated_at ?? $z->created_at),
                 'art' => 'ausgabe',
                 'person' => $s->user ? self::sortName($s->user) : '–',
                 'klasse' => $klasseVon($s->user),
-                'was' => self::servingText($s),
+                'was' => $menue ? self::menueText($menue->name, $zeilen) : self::servingText($s),
                 'zusatz' => null,
                 'wer' => $s->servedBy?->name ?? '–',
                 'quelle' => 'Ausgabe',
                 'serving' => $s,
+                'menue' => (bool) $menue,
             ]);
         }
         $eintraege = $eintraege->sortByDesc(fn ($e) => $e['zeit']?->timestamp ?? 0)->values();
@@ -878,6 +896,23 @@ class ServingController
             'darfZuruecknehmen' => Access::canServe($user),
             'darfOgsEntfernen' => Access::canServe($user) || Access::canViewOgsList($user),
         ] + $this->dayNav($season, $date, []));
+    }
+
+    /**
+     * Klartext einer Menü-Ausgabe: „Menü 1 ausgegeben: Gemüsereis mit Dip · Götterspeise",
+     * Abweichungen je Gericht in Klammern (Alternative / nicht genommen).
+     */
+    private static function menueText(string $menue, Collection $zeilen): string
+    {
+        $alleAbgelehnt = $zeilen->every(fn (Serving $z) => (bool) $z->declined);
+        $gerichte = $zeilen->map(fn (Serving $z) => ($z->dish?->name ?? 'Gericht').match (true) {
+            $alleAbgelehnt => '',
+            (bool) $z->declined => ' (nicht genommen)',
+            (bool) $z->alternative => ' (Alternative)',
+            default => '',
+        })->implode(' · ');
+
+        return $menue.($alleAbgelehnt ? ' nicht genommen: ' : ' ausgegeben: ').$gerichte;
     }
 
     /** Klartext einer Ausgabe-Zeile („OGS-Essen abgeholt", „spontan: Eis (1,50 €)" …). */

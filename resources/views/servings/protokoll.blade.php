@@ -136,6 +136,7 @@
                                                       data-titel="Ausgabe zurücknehmen" data-knopf="Zurücknehmen">
                                                     @csrf
                                                     @method('DELETE')
+                                                    @if ($e['menue'] ?? false)<input type="hidden" name="ganzes_menue" value="1">@endif
                                                     <button type="submit" class="whitespace-nowrap rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50">Zurücknehmen</button>
                                                 </form>
                                             @endif
