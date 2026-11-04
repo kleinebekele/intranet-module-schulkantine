@@ -1965,7 +1965,9 @@ class ServingController
                     'people' => $people,
                 ];
             })
-            ->sortBy('name')->values();
+            // Meistausgegebenes oben, bei Gleichstand nach Name.
+            ->sort(fn (array $a, array $b) => [$b['served'], $a['name']] <=> [$a['served'], $b['name']])
+            ->values();
     }
 
     /**
