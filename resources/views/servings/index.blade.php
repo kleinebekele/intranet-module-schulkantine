@@ -136,7 +136,7 @@
                                                 <div x-show="open" x-cloak class="border-t border-amber-100">
                                                     <ul class="divide-y divide-gray-100">
                                                         @foreach ($tag['noShowGroups'] as $ns)
-                                                            <li class="flex items-start gap-3 px-4 py-2 text-sm">
+                                                            <li class="flex items-start gap-3 px-4 py-2 text-base">
                                                                 <span class="w-20 shrink-0 text-xs leading-5 text-gray-500">{{ $ns['klasse'] ?? '–' }}</span>
                                                                 <span class="font-medium text-gray-800">{{ $ns['sortName'] }}</span>
                                                                 <span class="ml-auto text-right text-gray-500">{{ implode(', ', array_filter($ns['dishes'])) }}</span>
@@ -151,7 +151,7 @@
 
                                 {{-- Mengen je Menü und Gericht --}}
                                 <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
-                                    <div class="border-b border-gray-100 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700">Mengen je Menü und Gericht</div>
+                                    <div class="border-b border-gray-100 bg-gray-50 px-4 py-2 text-base font-semibold text-gray-700">Mengen je Menü und Gericht</div>
                                     {{-- OGS-Essen als eigene Zeile: bestellt = angemeldet, spontan = nachgetragen,
                                          offen gibt es nicht (OGS wird an der Ausgabe nicht abgehakt). --}}
                                     @php
@@ -164,9 +164,9 @@
                                         <p class="px-4 py-6 text-center text-sm text-gray-500">Für diesen Tag ist nichts im Speiseplan.</p>
                                     @else
                                         <div class="overflow-x-auto">
-                                            <table class="min-w-full text-sm">
+                                            <table class="min-w-full text-base">
                                                 <thead>
-                                                    <tr class="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400">
+                                                    <tr class="border-b border-gray-100 text-left text-sm uppercase tracking-wide text-gray-400">
                                                         <th class="px-4 py-2 font-medium">Menü / Gericht</th>
                                                         <th class="px-3 py-2 font-medium">Kategorie</th>
                                                         <th class="px-3 py-2 text-center font-medium">Bestellt</th>
@@ -183,7 +183,7 @@
                                                             <td class="px-4 py-2 font-medium text-gray-800">
                                                                 {{ $m['name'] }}
                                                                 @if ($m['inhalt'])
-                                                                    <div class="text-xs font-normal text-gray-400">{{ implode(', ', $m['inhalt']) }}</div>
+                                                                    <div class="text-sm font-normal text-gray-400">{{ implode(', ', $m['inhalt']) }}</div>
                                                                 @endif
                                                             </td>
                                                             <td class="px-3 py-2">
