@@ -332,7 +332,8 @@ class ServingController
         $roleIds = $user->roles->pluck('role_id');
         foreach (['teacher' => 'Lehrer', 'staff' => 'Mitarbeiter', 'parent' => 'Eltern', 'student' => 'Schüler'] as $rolle => $text) {
             if ($roleIds->contains($rolle)) {
-                return $text;
+                // Schüler mit Klasse (aus Linear), damit gleiche Namen unterscheidbar sind.
+                return $rolle === 'student' && ($k = self::klasse($user)) ? $text.' · '.$k : $text;
             }
         }
 
@@ -1647,6 +1648,7 @@ class ServingController
             'closedReason' => $open ? null : $this->closedReason($season, $date),
             'planGroups' => $open ? $this->terminalPlanDishes($season, $date) : collect(),
             'walkinGroups' => $open ? $this->terminalWalkinGroups($season, $date) : collect(),
+            'spontan' => $open ? $this->terminalSpontan($season, $date) : collect(),
             'ogsEaters' => $open ? $this->terminalOgsEaters($season, $date) : collect(),
             'week' => $this->terminalWeek($season, $date),
             'simChips' => $simChips,
@@ -1707,7 +1709,7 @@ class ServingController
             $abfrage = User::where('name', 'like', '%'.$q.'%')
                 ->whereHas('roles', fn ($r) => $r->whereIn('roles.role_id', $ogsRoleIds));
             $gesamt = (clone $abfrage)->count();
-            $users = $abfrage->orderBy('name')->limit(6)->get();
+            $users = $abfrage->with('roles')->orderBy('name')->limit(6)->get();
 
             return response()->json([
                 'total' => $gesamt,
@@ -1715,7 +1717,7 @@ class ServingController
                     'id' => $u->id,
                     'name' => $u->name,
                     'group' => 'OGS',
-                    'label' => 'OGS',
+                    'label' => ($k = self::klasse($u)) ? 'OGS · '.$k : 'OGS',
                 ])->values(),
             ]);
         }
@@ -1773,7 +1775,9 @@ class ServingController
                 'id' => $u->id,
                 'name' => $u->name,
                 'group' => ($g = CustomerGroup::forUser($u, $groups))?->name,
-                'label' => $g?->ordering_mode === CustomerGroup::MODE_JA_NEIN ? 'OGS' : self::personLabel($u, $g),
+                'label' => $g?->ordering_mode === CustomerGroup::MODE_JA_NEIN
+                    ? (($k = self::klasse($u)) ? 'OGS · '.$k : 'OGS')
+                    : self::personLabel($u, $g),
                 'rolle' => self::personenRolle($u),
                 // OGS-Kinder bucht das Terminal als „abgeholt" statt über den Menü-Fluss.
                 'ogs' => $g?->ordering_mode === CustomerGroup::MODE_JA_NEIN,
@@ -1931,7 +1935,37 @@ class ServingController
             'name' => $eater->name,
             // Aktualisierte Tages-Zähler, damit die linke Spalte ohne Reload nachzieht.
             'plan' => $this->terminalPlanDishes($season, $date),
+            'spontan' => $this->terminalSpontan($season, $date),
         ]);
+    }
+
+    /**
+     * Spontan Ausgegebenes des Tages je Gericht (Extras ohne Gericht als „Nachschlag"),
+     * für die linke Terminal-Spalte im Leerlauf: Anzahl + wer (Tipp auf die Zahl).
+     */
+    private function terminalSpontan(Season $season, Carbon $date): Collection
+    {
+        return Serving::with(['dish', 'user'])
+            ->where('season_id', $season->id)->whereDate('date', $date->toDateString())
+            ->where('spontaneous', true)->where('declined', false)
+            ->get()
+            ->groupBy(fn (Serving $s) => $s->dish_id ?? 'nachschlag')
+            ->map(function (Collection $zeilen, $schluessel) {
+                $dish = $zeilen->first()->dish;
+                $people = $zeilen->groupBy('user_id')->map(fn (Collection $z) => [
+                    'name' => ($z->count() > 1 ? $z->count().'× ' : '').($z->first()->user ? self::sortName($z->first()->user) : '–'),
+                    'status' => 'served',
+                ])->sortBy(fn ($p) => self::sortierbar(preg_replace('/^\d+× /u', '', $p['name'])))->values()->all();
+
+                return [
+                    'id' => $schluessel === 'nachschlag' ? 'nachschlag' : $dish?->id,
+                    'name' => $schluessel === 'nachschlag' ? 'Nachschlag / Extras' : ($dish?->name ?? 'Gericht'),
+                    'photo' => $dish?->photoUrl(),
+                    'served' => $zeilen->count(),
+                    'people' => $people,
+                ];
+            })
+            ->sortBy('name')->values();
     }
 
     /**

@@ -56,6 +56,7 @@
             open: @js($open),
             planGroups: @js($planGroups),
             walkinGroups: @js($walkinGroups),
+            spontan: @js($spontan),        // heute spontan Ausgegebenes (linke Spalte im Leerlauf)
             ogsEaters: @js($ogsEaters),   // OGS-Ansicht: heute essende OGS-Kinder (+ served/declined)
             ogsBusy: false,
             ogsPressTimer: null,   // Long-Press-Erkennung (öffnet Detail-Modal)
@@ -619,9 +620,15 @@
                 this.hist.unshift({ id: Date.now() + '-' + Math.random(), t: this.histNow(), name, quelle, ergebnis, art });
                 this.histSave();
             },
-            histDone(ergebnis, art) {
+            histDone(ergebnis, art, betrag = 0) {
                 const e = this.hist.find(x => x.art === 'offen');
-                if (e) { e.ergebnis = ergebnis; e.art = art; this.histSave(); }
+                if (e) { e.ergebnis = ergebnis; e.art = art; e.betrag = betrag; this.histSave(); }
+            },
+            // Summen für den Kopf der Historie: Vorgänge, ausgegeben, ohne Buchung, Fehler, Extras in €.
+            get histSummen() {
+                const s = { alle: this.hist.length, ok: 0, nichts: 0, fehler: 0, betrag: 0 };
+                this.hist.forEach(x => { if (s[x.art] !== undefined) s[x.art]++; s.betrag += Number(x.betrag) || 0; });
+                return s;
             },
 
             // ---- Personen hinter den Zahlen (linke Spalte) ----
@@ -712,8 +719,9 @@
                     }
                     if (!data.ok) { this.banner = { ok:false, text: data.error || 'Buchung fehlgeschlagen.' }; this.busy = false; return false; }
                     const summe = this.bookingSummary();
-                    this.histDone(summe.text, summe.art);
+                    this.histDone(summe.text, summe.art, this.extrasTotal);
                     if (data.plan) this.planGroups = data.plan; // Zaehler aktualisieren
+                    if (data.spontan) this.spontan = data.spontan;
                     if (!silent) this.banner = { ok:true, text: 'Gebucht: ' + data.name + (this.extrasTotal > 0 ? ' · Extras ' + this.euro(this.extrasTotal) : '') };
                     this.person = null;
                     this.servedOnLoad = false;
@@ -1321,6 +1329,28 @@
                         </fieldset>
                     </template>
                     <div x-show="!planGroups.length" class="py-10 text-center text-gray-400">Kein vorbestellbares Menü an diesem Tag.</div>
+
+                    {{-- Spontan Ausgegebenes – nur im Leerlauf (kein Chip), Tipp auf die Zahl zeigt wer. --}}
+                    <fieldset x-show="!person && spontan.length" x-cloak class="rounded-2xl border-2 border-indigo-300 bg-indigo-50/40 px-3 pb-3 pt-2">
+                        <legend class="px-1.5 text-sm font-bold uppercase tracking-wide text-indigo-700">Spontan ausgegeben</legend>
+                        <div class="space-y-3">
+                            <template x-for="s in spontan" :key="s.id">
+                                <div class="flex w-full items-stretch gap-3 rounded-2xl border-2 border-gray-200 bg-white p-2.5">
+                                    <div class="relative h-20 w-20 shrink-0 self-center overflow-hidden rounded-xl border border-black/5 bg-gray-50">
+                                        <template x-if="s.photo"><img :src="s.photo" alt="" class="h-20 w-20 object-cover"></template>
+                                        <template x-if="!s.photo"><x-schulkantine::dish-placeholder /></template>
+                                    </div>
+                                    <div class="flex min-w-0 flex-1 flex-col justify-center">
+                                        <span class="text-xl font-bold leading-tight text-gray-800" x-text="s.name"></span>
+                                    </div>
+                                    <div class="flex shrink-0 flex-col justify-center font-bold">
+                                        <button type="button" @click="openPeople(s, 'served')" title="Wer hat spontan bekommen?"
+                                                class="inline-flex h-11 min-w-12 items-center justify-center rounded-xl border-2 border-green-300 bg-green-100 px-3 text-xl text-green-700 shadow-sm active:bg-green-200" x-text="s.served"></button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </fieldset>
                 </div>
             </div>
         </section>
@@ -1625,6 +1655,13 @@
                 <h3 class="text-lg font-bold text-gray-800">Historie · {{ $date->isoFormat('dd, D.M.') }}
                     <span class="ml-2 text-sm font-medium text-gray-400">dieses Gerät</span></h3>
                 <button @click="histOpen = false" class="rounded-lg px-3 py-1 text-xl text-gray-400 hover:bg-gray-100">✕</button>
+            </div>
+            <div x-show="hist.length" class="mb-3 grid grid-cols-5 gap-2 text-center">
+                <div class="rounded-xl bg-gray-100 px-2 py-2"><div class="text-2xl font-bold text-gray-800" x-text="histSummen.alle"></div><div class="text-xs font-semibold uppercase text-gray-500">Vorgänge</div></div>
+                <div class="rounded-xl bg-green-100 px-2 py-2"><div class="text-2xl font-bold text-green-700" x-text="histSummen.ok"></div><div class="text-xs font-semibold uppercase text-green-700">ausgegeben</div></div>
+                <div class="rounded-xl bg-gray-100 px-2 py-2"><div class="text-2xl font-bold text-gray-500" x-text="histSummen.nichts"></div><div class="text-xs font-semibold uppercase text-gray-500">ohne Buchung</div></div>
+                <div class="rounded-xl bg-red-100 px-2 py-2"><div class="text-2xl font-bold text-red-700" x-text="histSummen.fehler"></div><div class="text-xs font-semibold uppercase text-red-700">Fehler</div></div>
+                <div class="rounded-xl bg-indigo-100 px-2 py-2"><div class="text-2xl font-bold text-indigo-700" x-text="euro(histSummen.betrag)"></div><div class="text-xs font-semibold uppercase text-indigo-700">Extras</div></div>
             </div>
             <div class="min-h-0 flex-1 overflow-y-auto">
                 <template x-for="(e, i) in hist" :key="e.id">

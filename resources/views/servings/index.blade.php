@@ -177,6 +177,8 @@
                                                 </thead>
                                                 <tbody class="divide-y divide-gray-50">
                                                     @foreach ($tag['menuByDish'] as $m)
+                                                        {{-- Nichts bestellt, ausgegeben oder spontan – Zeile weglassen. --}}
+                                                        @continue(! $m['ordered'] && ! $m['served'] && ! $m['spontaneous'])
                                                         <tr>
                                                             <td class="px-4 py-2 font-medium text-gray-800">
                                                                 {{ $m['name'] }}
