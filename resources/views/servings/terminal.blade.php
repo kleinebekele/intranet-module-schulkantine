@@ -116,6 +116,7 @@
             searching: false,
             hist: [],              // Historie dieses Geräts für den gewählten Tag
             histOpen: false,
+            histFilter: '',        // Historie: '' | ok | spontan | nichts | fehler
             peopleModal: null,     // { name, titel, liste } – Personen hinter einer Zahl
             isFull: false,         // Vollbild aktiv?
             searchDebounce: null,
@@ -620,14 +621,35 @@
                 this.hist.unshift({ id: Date.now() + '-' + Math.random(), t: this.histNow(), name, quelle, ergebnis, art });
                 this.histSave();
             },
-            histDone(ergebnis, art, betrag = 0) {
+            histDone(ergebnis, art, betrag = 0, menu = null, spontan = null) {
                 const e = this.hist.find(x => x.art === 'offen');
-                if (e) { e.ergebnis = ergebnis; e.art = art; e.betrag = betrag; this.histSave(); }
+                if (e) { e.ergebnis = ergebnis; e.art = art; e.betrag = betrag; e.menu = menu; e.spontan = spontan; this.histSave(); }
             },
-            // Summen für den Kopf der Historie: Vorgänge, ausgegeben, ohne Buchung, Fehler, Extras in €.
+            // Ausgegeben (Vorbestelltes/OGS) bzw. spontan (Extras, Nachschlag) – ältere Einträge ohne
+            // Merker werden aus dem Text erkannt.
+            histMenu(x) {
+                if (x.art !== 'ok') return false;
+                if (x.menu !== undefined && x.menu !== null) return x.menu;
+                return / ausgegeben| → |OGS-Essen abgeholt|OGS abgelehnt/.test(x.ergebnis || '');
+            },
+            histSpontan(x) {
+                if (x.art !== 'ok') return false;
+                if (x.spontan !== undefined && x.spontan !== null) return x.spontan;
+                return (Number(x.betrag) || 0) > 0 || /\(spontan\)|Extras /.test(x.ergebnis || '');
+            },
+            histPasst(x) {
+                return this.histFilter === '' || (this.histFilter === 'ok' ? this.histMenu(x)
+                    : this.histFilter === 'spontan' ? this.histSpontan(x) : x.art === this.histFilter);
+            },
+            histFiltern(f) { this.histFilter = this.histFilter === f ? '' : f; },
+            // Summen für den Kopf der Historie (zugleich Filter).
             get histSummen() {
-                const s = { alle: this.hist.length, ok: 0, nichts: 0, fehler: 0, betrag: 0 };
-                this.hist.forEach(x => { if (s[x.art] !== undefined) s[x.art]++; s.betrag += Number(x.betrag) || 0; });
+                const s = { alle: this.hist.length, ok: 0, spontan: 0, nichts: 0, fehler: 0, betrag: 0 };
+                this.hist.forEach(x => {
+                    if (this.histMenu(x)) s.ok++;
+                    if (this.histSpontan(x)) { s.spontan++; s.betrag += Number(x.betrag) || 0; }
+                    if (x.art === 'nichts' || x.art === 'fehler') s[x.art]++;
+                });
                 return s;
             },
 
@@ -682,7 +704,9 @@
                     teile.push(q + '× ' + name + ' (spontan)');
                 }
                 if (this.nachschlagTotal > 0) { ausgegeben = true; teile.push('Extras ' + this.euro(this.nachschlagTotal)); }
-                return { text: teile.length ? teile.join(' · ') : 'nichts ausgegeben', art: ausgegeben ? 'ok' : 'nichts' };
+                const spontan = Object.values(this.walkinQty).some(q => q > 0) || this.nachschlagTotal > 0;
+                const menu = Object.keys(this.orderMeta).some(key => this.unitOutcome(key) !== 'declined');
+                return { text: teile.length ? teile.join(' · ') : 'nichts ausgegeben', art: ausgegeben ? 'ok' : 'nichts', menu, spontan };
             },
 
             buildPayload() {
@@ -719,7 +743,7 @@
                     }
                     if (!data.ok) { this.banner = { ok:false, text: data.error || 'Buchung fehlgeschlagen.' }; this.busy = false; return false; }
                     const summe = this.bookingSummary();
-                    this.histDone(summe.text, summe.art, this.extrasTotal);
+                    this.histDone(summe.text, summe.art, this.extrasTotal, summe.menu, summe.spontan);
                     if (data.plan) this.planGroups = data.plan; // Zaehler aktualisieren
                     if (data.spontan) this.spontan = data.spontan;
                     if (!silent) this.banner = { ok:true, text: 'Gebucht: ' + data.name + (this.extrasTotal > 0 ? ' · Extras ' + this.euro(this.extrasTotal) : '') };
@@ -1657,14 +1681,14 @@
                 <button @click="histOpen = false" class="rounded-lg px-3 py-1 text-xl text-gray-400 hover:bg-gray-100">✕</button>
             </div>
             <div x-show="hist.length" class="mb-3 grid grid-cols-5 gap-2 text-center">
-                <div class="rounded-xl bg-gray-100 px-2 py-2"><div class="text-2xl font-bold text-gray-800" x-text="histSummen.alle"></div><div class="text-xs font-semibold uppercase text-gray-500">Vorgänge</div></div>
-                <div class="rounded-xl bg-green-100 px-2 py-2"><div class="text-2xl font-bold text-green-700" x-text="histSummen.ok"></div><div class="text-xs font-semibold uppercase text-green-700">ausgegeben</div></div>
-                <div class="rounded-xl bg-gray-100 px-2 py-2"><div class="text-2xl font-bold text-gray-500" x-text="histSummen.nichts"></div><div class="text-xs font-semibold uppercase text-gray-500">ohne Buchung</div></div>
-                <div class="rounded-xl bg-red-100 px-2 py-2"><div class="text-2xl font-bold text-red-700" x-text="histSummen.fehler"></div><div class="text-xs font-semibold uppercase text-red-700">Fehler</div></div>
-                <div class="rounded-xl bg-indigo-100 px-2 py-2"><div class="text-2xl font-bold text-indigo-700" x-text="euro(histSummen.betrag)"></div><div class="text-xs font-semibold uppercase text-indigo-700">Extras</div></div>
+                <button type="button" @click="histFiltern('')" class="rounded-xl px-2 py-2 bg-gray-100 text-gray-800" :class="histFilter === '' ? 'ring-4 ring-indigo-500' : ''"><div class="text-2xl font-bold" x-text="histSummen.alle"></div><div class="text-xs font-semibold uppercase">Vorgänge</div></button>
+                <button type="button" @click="histFiltern('ok')" class="rounded-xl px-2 py-2 bg-green-100 text-green-700" :class="histFilter === 'ok' ? 'ring-4 ring-indigo-500' : ''"><div class="text-2xl font-bold" x-text="histSummen.ok"></div><div class="text-xs font-semibold uppercase">ausgegeben</div></button>
+                <button type="button" @click="histFiltern('spontan')" class="rounded-xl bg-indigo-100 px-2 py-2 text-indigo-700" :class="histFilter === 'spontan' ? 'ring-4 ring-indigo-500' : ''"><div class="text-2xl font-bold"><span x-text="histSummen.spontan"></span> <span class="text-base" x-text="'· ' + euro(histSummen.betrag)"></span></div><div class="text-xs font-semibold uppercase">spontan ausgegeben</div></button>
+                <button type="button" @click="histFiltern('nichts')" class="rounded-xl px-2 py-2 bg-gray-100 text-gray-500" :class="histFilter === 'nichts' ? 'ring-4 ring-indigo-500' : ''"><div class="text-2xl font-bold" x-text="histSummen.nichts"></div><div class="text-xs font-semibold uppercase">ohne Buchung</div></button>
+                <button type="button" @click="histFiltern('fehler')" class="rounded-xl px-2 py-2 bg-red-100 text-red-700" :class="histFilter === 'fehler' ? 'ring-4 ring-indigo-500' : ''"><div class="text-2xl font-bold" x-text="histSummen.fehler"></div><div class="text-xs font-semibold uppercase">Fehler</div></button>
             </div>
             <div class="min-h-0 flex-1 overflow-y-auto">
-                <template x-for="(e, i) in hist" :key="e.id">
+                <template x-for="(e, i) in hist.filter(x => histPasst(x))" :key="e.id">
                     <div class="flex items-start gap-3 border-l-4 px-3 py-2"
                          :class="{ 'border-green-500': e.art === 'ok', 'border-gray-300': e.art === 'nichts', 'border-red-500': e.art === 'fehler', 'border-indigo-400 bg-indigo-50': e.art === 'offen', 'bg-gray-50': i % 2 && e.art !== 'offen' }">
                         <span class="w-12 shrink-0 font-mono text-sm text-gray-500" x-text="e.t"></span>
