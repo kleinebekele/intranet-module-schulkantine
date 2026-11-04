@@ -97,7 +97,7 @@
             hasOgs: @js($hasOgs ?? false),   // gibt/gab es OGS in der Saison? (steuert den Umschalter)
             // „Übersicht"-Ansicht (Männchen-Button): Wochen-Matrix aller Esser.
             ovLoaded: false, ovLoading: false, ovPeople: [], ovDays: [],
-            ovSearchOpen: false, ovQuery: '', ovKlasse: '', ovNurVertrag: false, ovNurBesteller: false,
+            ovSearchOpen: false, ovQuery: '', ovKlasse: '', ovNurVertrag: false, ovNurBesteller: true, ovMitOgs: false,  // Standard: nur Vorbesteller, ohne OGS
             ovReturnMode: 'vorbesteller',  // Ansicht, aus der die Übersicht geöffnet wurde
             sbw: 0,   // Scrollleisten-Breite (für die bündige Übersicht-Matrix)
             rcw: 80,  // Breite der rechten Header-Steuerung (› + Übersicht-Button)
@@ -890,8 +890,8 @@
             ovBackspace() { this.ovQuery = this.ovQuery.slice(0, -1); },
             ovClear() { this.ovQuery = ''; },
             // Filter zurücksetzen: Suchtext UND Klasse.
-            ovReset() { this.ovQuery = ''; this.ovKlasse = ''; this.ovNurVertrag = false; this.ovNurBesteller = false; },
-            get ovFilterAktiv() { return this.ovQuery.trim() !== '' || !!this.ovKlasse || this.ovNurVertrag || this.ovNurBesteller; },
+            ovReset() { this.ovQuery = ''; this.ovKlasse = ''; this.ovNurVertrag = false; this.ovNurBesteller = true; this.ovMitOgs = false; },
+            get ovFilterAktiv() { return this.ovQuery.trim() !== '' || !!this.ovKlasse || this.ovNurVertrag || !this.ovNurBesteller || this.ovMitOgs; },
             // Klassen-Knöpfe: alle Klassen der Liste, natürlich sortiert (2a vor 10b).
             get ovKlassen() {
                 return [...new Set(this.ovPeople.map(p => p.klasse).filter(Boolean))]
@@ -900,7 +900,8 @@
             ovKlasseWaehlen(k) { this.ovKlasse = this.ovKlasse === k ? '' : k; },
             get ovFiltered() {
                 const liste = this.ovPeople.filter(p => (!this.ovKlasse || p.klasse === this.ovKlasse)
-                    && (!this.ovNurVertrag || p.vertrag) && (!this.ovNurBesteller || p.besteller));
+                    && (!this.ovNurVertrag || p.vertrag) && (!this.ovNurBesteller || p.besteller)
+                    && (this.ovMitOgs || p.mode !== 'ogs'));
                 const q = this.ovQuery.trim().toLowerCase();
                 if (q.length < 3) return liste;
                 // Auch nach Klasse filterbar ("5a").
@@ -1177,6 +1178,10 @@
                         class="inline-flex items-center gap-2 rounded-xl border-2 px-4 py-2 text-base font-semibold"
                         :class="ovNurBesteller ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-indigo-200 bg-white text-indigo-700'">
                     <span x-text="ovNurBesteller ? '☑' : '☐'"></span> nur Besteller</button>
+                <button type="button" @click="ovMitOgs = ! ovMitOgs"
+                        class="inline-flex items-center gap-2 rounded-xl border-2 px-4 py-2 text-base font-semibold"
+                        :class="ovMitOgs ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-indigo-200 bg-white text-indigo-700'">
+                    <span x-text="ovMitOgs ? '☑' : '☐'"></span> OGS</button>
             </div>
             <button type="button" x-show="ovFilterAktiv" x-cloak @click="ovReset()"
                     class="shrink-0 rounded-xl bg-indigo-600 px-6 py-3 text-lg font-bold text-white shadow hover:bg-indigo-700">✕ Suche zurücksetzen</button>
