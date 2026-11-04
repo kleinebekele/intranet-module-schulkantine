@@ -2389,7 +2389,7 @@ class ServingController
             ->get()
             ->flatMap(fn (MenuDay $md) => $md->slots->sortBy('position')->map(fn ($s) => $s->dish));
 
-        return Menu::where('season_id', $season->id)
+        $gerichte = Menu::where('season_id', $season->id)
             ->whereDate('date', $date->toDateString())
             ->with($this->terminalDishRelations())
             ->orderBy('sort_order')->orderBy('id')
@@ -2397,12 +2397,28 @@ class ServingController
             ->map(fn (Menu $m) => $m->dish)
             ->concat($menueGerichte)
             ->filter(fn (?Dish $d) => $d && $d->category && $d->category->allows_walkin)
-            ->unique('id')
+            ->unique('id');
+
+        // Was in den letzten 60 Tagen öfter spontan mitgenommen wurde, steht oben – Gerichte
+        // innerhalb der Kategorie und die Kategorien untereinander. Gleichstand: Speiseplan-Reihenfolge.
+        $haeufigkeit = Serving::where('spontaneous', true)
+            ->whereIn('dish_id', $gerichte->pluck('id'))
+            ->whereDate('date', '>=', $date->copy()->subDays(60)->toDateString())
+            ->selectRaw('dish_id, count(*) as n')
+            ->groupBy('dish_id')
+            ->pluck('n', 'dish_id');
+
+        return $gerichte
             ->groupBy(fn (Dish $d) => $d->category?->name ?? 'Ohne Kategorie')
             ->map(fn (Collection $dishes, string $cat) => [
                 'category' => $cat,
-                'dishes' => $dishes->map(fn (Dish $d) => $this->terminalDishPayload($d))->values(),
-            ])->values();
+                'summe' => $dishes->sum(fn (Dish $d) => (int) ($haeufigkeit[$d->id] ?? 0)),
+                'dishes' => $dishes->sortByDesc(fn (Dish $d) => (int) ($haeufigkeit[$d->id] ?? 0))
+                    ->map(fn (Dish $d) => $this->terminalDishPayload($d))->values(),
+            ])
+            ->sortByDesc('summe')
+            ->map(fn (array $g) => collect($g)->except('summe')->all())
+            ->values();
     }
 
     /** Eager-Load-Pfade für die Gericht-Details (Allergene/Zusatzstoffe/Diäten). */
