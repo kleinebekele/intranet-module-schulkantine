@@ -789,19 +789,29 @@
             },
 
             // ---- OGS-Ansicht ----
-            // Nach Vorname sortiert (Umlaut-tolerant); bei Gleichstand nach vollem Namen.
+            // Nach Klasse (natürlich: 2a vor 10a, ohne Klasse ans Ende), dann Nachname, Vorname.
+            // Klassenfilter oben (1.–4. Klasse): '' = alle. Bleibt am Gerät gemerkt.
+            ogsKlasse: (() => { try { return localStorage.getItem('kantine_ogs_klasse') || '' } catch (e) { return '' } })(),
+            ogsKlasseSetzen(k) {
+                this.ogsKlasse = this.ogsKlasse === k ? '' : k;
+                try { localStorage.setItem('kantine_ogs_klasse', this.ogsKlasse); } catch (e) {}
+            },
+            ogsKlasseVon(e) { const m = String(e.klasse || '').match(/^\d+/); return m ? m[0] : ''; },
+            ogsOffenIn(k) { return this.ogsEaters.filter(e => !e.served && this.ogsKlasseVon(e) === k).length; },
+            get ogsGefiltert() { return this.ogsKlasse ? this.ogsEaters.filter(e => this.ogsKlasseVon(e) === this.ogsKlasse) : this.ogsEaters; },
             get ogsSorted() {
-                return [...this.ogsEaters].sort((a, b) =>
-                    (a.first || '').localeCompare(b.first || '', 'de', { sensitivity: 'base' })
-                    || (a.name || '').localeCompare(b.name || '', 'de'));
+                return [...this.ogsGefiltert].sort((a, b) =>
+                    (!a.klasse - !b.klasse)
+                    || (a.klasse || '').localeCompare(b.klasse || '', 'de', { numeric: true, sensitivity: 'base' })
+                    || (a.sortName || a.name || '').localeCompare(b.sortName || b.name || '', 'de', { sensitivity: 'base' }));
             },
             // Offene zuerst, erledigte (abgeholt=grün / abgelehnt=rot) ans Ende – beide
-            // je nach Vorname sortiert. So sinken erledigte in den Spalten nach unten.
+            // nach Klasse, Nachname sortiert. So sinken erledigte in den Spalten nach unten.
             get ogsActive() { return this.ogsSorted.filter(e => !e.served); },
             get ogsPicked() { return this.ogsSorted.filter(e => e.served); },
             get ogsOrdered() { return [...this.ogsActive, ...this.ogsPicked]; },
-            get ogsServedCount() { return this.ogsEaters.filter(e => e.served && !e.declined).length; },
-            get ogsDeclinedCount() { return this.ogsEaters.filter(e => e.served && e.declined).length; },
+            get ogsServedCount() { return this.ogsGefiltert.filter(e => e.served && !e.declined).length; },
+            get ogsDeclinedCount() { return this.ogsGefiltert.filter(e => e.served && e.declined).length; },
             ogsSonderkost(e) { return [...(e.allergens || []), ...(e.diets || [])]; },
 
             // Long-Press öffnet das Detail-Modal (Unverträglichkeiten + abgeholt/abgelehnt);
@@ -1105,8 +1115,25 @@
                     <span class="rounded-full bg-green-100 px-3 py-1 text-green-700"><span x-text="ogsServedCount"></span> abgeholt</span>
                     <span x-show="ogsDeclinedCount" x-cloak class="rounded-full bg-red-100 px-3 py-1 text-red-700"><span x-text="ogsDeclinedCount"></span> abgelehnt</span>
                     <span class="rounded-full bg-gray-100 px-3 py-1 text-gray-600"><span x-text="ogsActive.length"></span> offen</span>
-                    <span class="text-gray-400">von <span x-text="ogsEaters.length"></span></span>
+                    <span class="text-gray-400">von <span x-text="ogsGefiltert.length"></span></span>
                 </div>
+            </div>
+
+            {{-- Klassenfilter: Tipp auf eine Klasse zeigt nur deren Kinder, erneuter Tipp (oder „Alle") alle.
+                 Die kleine Zahl = noch offen in dieser Klasse. --}}
+            <div x-show="ogsEaters.length" x-cloak class="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-4 py-2">
+                <button type="button" @click="ogsKlasseSetzen('')"
+                        class="rounded-xl px-5 py-2.5 text-lg font-bold shadow-sm"
+                        :class="ogsKlasse === '' ? 'bg-indigo-600 text-white' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'">Alle</button>
+                <template x-for="k in ['1', '2', '3', '4']" :key="k">
+                    <button type="button" @click="ogsKlasseSetzen(k)"
+                            class="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-lg font-bold shadow-sm"
+                            :class="ogsKlasse === k ? 'bg-indigo-600 text-white' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'">
+                        <span x-text="k + '. Klasse'"></span>
+                        <span class="rounded-full px-2 py-0.5 text-xs"
+                              :class="ogsKlasse === k ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'" x-text="ogsOffenIn(k)"></span>
+                    </button>
+                </template>
             </div>
 
             {{-- Leerfall: heute isst kein OGS-Kind --}}
@@ -1139,10 +1166,11 @@
                             <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl font-bold"
                                  :class="!e.served ? 'bg-indigo-100 text-indigo-700'
                                          : (e.declined ? 'bg-red-200 text-red-800' : 'bg-green-200 text-green-800')"
-                                 x-text="(e.first || '?').slice(0,1)"></div>
+                                 x-text="(e.sortName || e.name || '?').slice(0,1)"></div>
                             <div class="min-w-0 flex-1">
                                 <div class="truncate text-lg font-bold leading-tight"
-                                     :class="!e.served ? 'text-gray-800' : (e.declined ? 'text-red-900' : 'text-green-900')" x-text="e.name"></div>
+                                     :class="!e.served ? 'text-gray-800' : (e.declined ? 'text-red-900' : 'text-green-900')" x-text="e.sortName || e.name"></div>
+                                <div x-show="e.klasse" x-cloak class="text-xs text-gray-500" x-text="'Klasse ' + e.klasse"></div>
                                 <div x-show="ogsSonderkost(e).length" x-cloak class="truncate text-xs font-semibold text-amber-700">
                                     ⚠ <span x-text="ogsSonderkost(e).join(', ')"></span>
                                 </div>

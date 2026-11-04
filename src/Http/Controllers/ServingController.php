@@ -1990,9 +1990,13 @@ class ServingController
             ->get()
             ->keyBy('user_id');
 
+        $attending->loadMissing('roles');
+
         return $attending->map(fn (User $u) => [
             'user_id' => $u->id,
             'name' => $u->name,
+            'klasse' => self::klasse($u),
+            'sortName' => self::sortName($u),
             'first' => \Illuminate\Support\Str::of($u->name)->trim()->explode(' ')->first(),
             'served' => $servings->has($u->id),
             'declined' => (bool) optional($servings->get($u->id))->declined,
@@ -2118,7 +2122,7 @@ class ServingController
     /** Board-Eintrag eines einzelnen OGS-Kindes (Form wie in terminalOgsEaters()). */
     private function terminalOgsEaterPayload(Season $season, User $eater, Carbon $date): array
     {
-        $eater->loadMissing(['kantineAllergens', 'kantineDiets']);
+        $eater->loadMissing(['kantineAllergens', 'kantineDiets', 'roles']);
 
         $sv = Serving::where('season_id', $season->id)->where('user_id', $eater->id)
             ->whereDate('date', $date->toDateString())->where('spontaneous', false)->first();
@@ -2126,6 +2130,8 @@ class ServingController
         return [
             'user_id' => $eater->id,
             'name' => $eater->name,
+            'klasse' => self::klasse($eater),
+            'sortName' => self::sortName($eater),
             'first' => \Illuminate\Support\Str::of($eater->name)->trim()->explode(' ')->first(),
             'served' => $sv !== null,
             'declined' => $sv ? (bool) $sv->declined : false,
