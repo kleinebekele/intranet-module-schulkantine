@@ -796,7 +796,8 @@
                 this.ogsKlasse = this.ogsKlasse === k ? '' : k;
                 try { localStorage.setItem('kantine_ogs_klasse', this.ogsKlasse); } catch (e) {}
             },
-            ogsKlasseVon(e) { const m = String(e.klasse || '').match(/^\d+/); return m ? m[0] : ''; },
+            // Linear schreibt Klassen mit führender Null (03a) – daher als Zahl vergleichen.
+            ogsKlasseVon(e) { const m = String(e.klasse || '').match(/\d+/); return m ? String(parseInt(m[0], 10)) : ''; },
             ogsOffenIn(k) { return this.ogsEaters.filter(e => !e.served && this.ogsKlasseVon(e) === k).length; },
             get ogsGefiltert() { return this.ogsKlasse ? this.ogsEaters.filter(e => this.ogsKlasseVon(e) === this.ogsKlasse) : this.ogsEaters; },
             get ogsSorted() {
