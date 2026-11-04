@@ -1952,7 +1952,9 @@ class ServingController
             ->groupBy(fn (Serving $s) => $s->dish_id ?? 'nachschlag')
             ->map(function (Collection $zeilen, $schluessel) {
                 $dish = $zeilen->first()->dish;
-                $people = $zeilen->groupBy('user_id')->map(fn (Collection $z) => [
+                // 'id' ist Pflicht: das Personen-Modal schlüsselt die Liste über p.id.
+                $people = $zeilen->groupBy('user_id')->map(fn (Collection $z, $userId) => [
+                    'id' => $userId,
                     'name' => ($z->count() > 1 ? $z->count().'× ' : '').($z->first()->user ? self::sortName($z->first()->user) : '–'),
                     'status' => 'served',
                 ])->sortBy(fn ($p) => self::sortierbar(preg_replace('/^\d+× /u', '', $p['name'])))->values()->all();
