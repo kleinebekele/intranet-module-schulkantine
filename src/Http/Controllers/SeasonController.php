@@ -145,9 +145,12 @@ class SeasonController
             $count++;
         }
 
-        return back()->with('status', $count === 1
+        $storniert = ClosedDay::$storniertePersonen;
+
+        return back()->with('status', ($count === 1
             ? 'Schließtag gespeichert.'
-            : "{$count} Schließtage gespeichert.");
+            : "{$count} Schließtage gespeichert.")
+            .($storniert ? " Tagesmenü-Bestellungen von {$storniert} ".($storniert === 1 ? 'Person' : 'Personen').' storniert (ohne Mail, siehe Tagesprotokoll).' : ''));
     }
 
     /** Schließtag anlegen oder aktualisieren (Datums-Abgleich per whereDate, siehe HolidayImporter). */

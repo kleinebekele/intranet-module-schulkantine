@@ -64,6 +64,11 @@ Das ist ein Startpunkt, kein Endergebnis: Bewegliche Ferientage, pädagogische T
 Sonderschließungen kennt keine bundesweite Quelle. Alle Schließtage bleiben deshalb
 bearbeitbar, und Sie können jederzeit welche hinzufügen oder löschen.
 
+Wird ein Schließtag nachträglich angelegt, storniert das System die Tagesmenü-Bestellungen
+dieses Tages automatisch – ohne Mail an die Eltern. Jede Stornierung steht im Tagesprotokoll.
+Wird der Schließtag wieder gelöscht, kommen die Bestellungen nicht zurück. OGS-Essen wird an
+Schließtagen ohnehin nicht berechnet.
+
 ## Warum der Kalender tragend ist
 
 rollen: admin
