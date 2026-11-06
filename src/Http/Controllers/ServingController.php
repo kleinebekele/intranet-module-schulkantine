@@ -173,6 +173,8 @@ class ServingController
                 ->whereDate('date', $date->toDateString())
                 ->where('spontaneous', false)
                 ->delete();
+            MensaAudit::schreiben('kantine.ausgabe_zurueck', 'Ausgabe zurückgenommen (abgehakt) für '.$eater->name,
+                $eater, ['Tag' => $date->format('d.m.Y')]);
 
             return back()->with('status', 'Zurückgenommen: '.$eater->name.' am '.$date->format('d.m.Y').'.');
         }
@@ -182,6 +184,7 @@ class ServingController
         if ($result['created'] === 0) {
             return back()->withErrors(['ausgabe' => $eater->name.' hat für diesen Tag keine Bestellung – nutze „spontane Abholung".']);
         }
+        $this->ausgabeProtokollieren($season, $eater, $date);
 
         return back()->with('status', 'Ausgegeben: '.$eater->name.' am '.$date->format('d.m.Y').'.');
     }
@@ -293,6 +296,7 @@ class ServingController
                 'served_by' => $user->id,
             ]);
         }
+        $this->ausgabeProtokollieren($season, $eater, $date);
 
         return response()->json(['ok' => true, 'status' => 'served', 'name' => $eater->name]);
     }
@@ -519,6 +523,34 @@ class ServingController
         return ['created' => $orders->count(), 'dishes' => $dishes];
     }
 
+    /**
+     * Audit: nach jeder Buchung an der Ausgabe den vollständigen Tagesstand dieses Essers
+     * festhalten („Menü 1 ausgegeben: … · 2× spontan: Eis (1,50 €)"). Weil die Ausgabe-Zeilen
+     * bei erneutem Vorhalten ersetzt werden, ist das Audit-Log der einzige Verlauf.
+     */
+    private function ausgabeProtokollieren(Season $season, User $eater, Carbon $date): void
+    {
+        $zeilen = Serving::with(['dish', 'order.menuDay'])
+            ->where('season_id', $season->id)->where('user_id', $eater->id)
+            ->whereDate('date', $date->toDateString())->orderBy('id')->get();
+
+        $teile = $zeilen->groupBy(fn (Serving $s) => ! $s->spontaneous && $s->order?->menu_day_id
+            ? 'menue-'.$s->order->menu_day_id
+            : 'zeile-'.self::servingText($s))
+            ->map(function (Collection $g) {
+                $s = $g->first();
+                $menue = $s->spontaneous ? null : $s->order?->menuDay;
+
+                return $menue
+                    ? self::menueText($menue->name, $g)
+                    : ($g->count() > 1 ? $g->count().'× ' : '').self::servingText($s);
+            });
+
+        MensaAudit::schreiben('kantine.ausgegeben',
+            ($teile->isEmpty() ? 'Keine Ausgabe mehr' : $teile->implode(' · ')).' für '.$eater->name,
+            $eater, ['Tag' => $date->format('d.m.Y')]);
+    }
+
     /** Ist dieser Esser an dem Tag bereits (vorbestellt) ausgegeben? */
     private function isServed(Season $season, User $eater, Carbon $date): bool
     {
@@ -634,6 +666,7 @@ class ServingController
                 : back()->withErrors(['ausgabe' => $ergebnis['fehler']]);
         }
         $serving = $ergebnis['serving'];
+        $this->ausgabeProtokollieren($season, $eater, $date);
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -1964,6 +1997,7 @@ class ServingController
         if (! $pruefung['ok']) {
             return response()->json(['ok' => false, 'error' => $pruefung['fehler'], 'budget_frage' => $pruefung['frage'] ?? false], 200);
         }
+        $this->ausgabeProtokollieren($season, $eater, $date);
 
         return response()->json([
             'ok' => true,
@@ -2085,8 +2119,12 @@ class ServingController
 
         // Zurücknehmen → Ausgabe-Zeile weg; spontane Anwesenheit (kein Abo) ganz raus.
         if ($outcome === 'open') {
-            Serving::where('season_id', $season->id)->where('user_id', $eater->id)
+            $geloescht = Serving::where('season_id', $season->id)->where('user_id', $eater->id)
                 ->whereDate('date', $date->toDateString())->where('spontaneous', false)->delete();
+            if ($geloescht) {
+                MensaAudit::schreiben('kantine.ausgabe_zurueck', 'Ausgabe zurückgenommen: OGS-Essen für '.$eater->name,
+                    $eater, ['Tag' => $date->format('d.m.Y')]);
+            }
 
             // Erst an der Ausgabe angemeldet? Dann Anwesenheit ganz entfernen – weg vom
             // Board, keine Berechnung. Kommt es doch, erneut über die Suche. Abo-Tage und
@@ -2148,6 +2186,7 @@ class ServingController
                 'served_by' => $user->id,
             ]);
         });
+        $this->ausgabeProtokollieren($season, $eater, $date);
 
         return response()->json([
             'ok' => true,
