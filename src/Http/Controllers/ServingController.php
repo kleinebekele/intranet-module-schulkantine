@@ -1728,6 +1728,34 @@ class ServingController
     }
 
     /**
+     * Ausgabe OGS: normale Unterseite (Seitenleiste bleibt) für die OGS-Ausgabe an
+     * einem Ort ohne Terminal. Inhalt wie die OGS-Ansicht des Terminals, aber für
+     * Maus und Tastatur. Gebucht wird über dieselben Endpunkte wie im Terminal
+     * (terminalOgsToggle / terminalSearch mit mode=ogs).
+     */
+    public function ogsAusgabe(Request $request)
+    {
+        abort_unless(Access::canServe($request->user()), 403, 'Kein Zugriff auf die OGS-Ausgabe.');
+
+        $season = Season::where('is_active', true)->first();
+        if (! $season) {
+            return view('schulkantine::servings.ogs-ausgabe', ['season' => null]);
+        }
+
+        $date = $this->resolveDate($request, $season);
+        $open = $season->isOpenOn($date);
+
+        return view('schulkantine::servings.ogs-ausgabe', [
+            'season' => $season,
+            'date' => $date,
+            'open' => $open,
+            'closedReason' => $open ? null : $this->closedReason($season, $date),
+            'ogsEaters' => $open ? $this->terminalOgsEaters($season, $date) : collect(),
+            'istZukunft' => $date->gt(Carbon::today()),
+        ] + $this->dayNav($season, $date, []));
+    }
+
+    /**
      * Alle Öffnungstage der Saison als [YYYY-MM-DD]-Liste – für den Touch-Kalender.
      * Bewusst in EINEM Rutsch (Schließtage einmal laden, dann PHP-Schleife), statt
      * Season::isOpenOn() je Tag aufzurufen (das würde je Tag die DB abfragen).
@@ -2064,9 +2092,11 @@ class ServingController
             ->keyBy('user_id');
 
         $attending->loadMissing('roles');
+        $abo = $this->ogsAboStatus($season, $date, $attending->pluck('id'));
 
         return $attending->map(fn (User $u) => [
             'user_id' => $u->id,
+            'abo' => $abo($u->id),
             'name' => $u->name,
             'klasse' => self::klasse($u),
             'sortName' => self::sortName($u),
@@ -2197,6 +2227,45 @@ class ServingController
         ]);
     }
 
+    /**
+     * Abo-Status je OGS-Kind für die Kacheln der Ausgabe OGS – damit die Betreuung
+     * den Eltern sagen kann, was eingestellt ist. Liefert eine Funktion user_id →
+     * ['text' => …, 'spontan' => bool]:
+     *  - kein Abo, an der Ausgabe dazugekommen → „Spontan"
+     *  - kein Abo, von den Eltern einzeln gebucht → „Einzelbuchung"
+     *  - Abo → „Abo Mo, Mi, Fr" (bzw. „Abo Mo–Fr", „Abo pausiert"),
+     *    heute außerhalb des Abos dazugekommen → zusätzlich „heute spontan".
+     *
+     * @return \Closure(int): array{text: string, spontan: bool}
+     */
+    private function ogsAboStatus(Season $season, Carbon $date, Collection $userIds): \Closure
+    {
+        $abos = Subscription::where('season_id', $season->id)->whereIn('user_id', $userIds)->get()->keyBy('user_id');
+        $anAusgabe = Order::where('season_id', $season->id)->whereNull('category_id')
+            ->whereDate('date', $date->toDateString())->where('status', Order::STATUS_ORDERED)
+            ->where('an_ausgabe', true)->whereIn('user_id', $userIds)->pluck('user_id')->flip();
+        $wt = ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+        $offen = array_values(array_map('intval', $season->opening_weekdays ?: [1, 2, 3, 4, 5]));
+        sort($offen);
+
+        return function (int $id) use ($abos, $anAusgabe, $wt, $offen): array {
+            $spontan = $anAusgabe->has($id);
+            $abo = $abos->get($id);
+            if (! $abo) {
+                return ['text' => $spontan ? 'Spontan' : 'Einzelbuchung', 'spontan' => $spontan];
+            }
+            $tage = array_values(array_intersect($offen, array_map('intval', (array) ($abo->weekdays ?: $offen))));
+            $text = match (true) {
+                ! $abo->active => 'Abo pausiert',
+                $tage === $offen => 'Abo '.$wt[$offen[0]].'–'.$wt[end($offen)],
+                $tage === [] => 'Abo ohne Tage',
+                default => 'Abo '.implode(', ', array_map(fn ($d) => $wt[$d], $tage)),
+            };
+
+            return ['text' => $spontan ? $text.' · heute spontan' : $text, 'spontan' => $spontan];
+        };
+    }
+
     /** Board-Eintrag eines einzelnen OGS-Kindes (Form wie in terminalOgsEaters()). */
     private function terminalOgsEaterPayload(Season $season, User $eater, Carbon $date): array
     {
@@ -2207,6 +2276,7 @@ class ServingController
 
         return [
             'user_id' => $eater->id,
+            'abo' => $this->ogsAboStatus($season, $date, collect([$eater->id]))($eater->id),
             'name' => $eater->name,
             'klasse' => self::klasse($eater),
             'sortName' => self::sortName($eater),

@@ -112,6 +112,7 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
                 visibleWhen: fn () => \Intranet\Modules\Schulkantine\Models\Season::ratingsEnabledForActive())
             ->item('servings', 'Ausgabe', 'module.schulkantine.servings.index', icon: 'serving')
             ->item('servings-terminal', 'Ausgabe Terminal', 'module.schulkantine.servings.terminal', icon: 'grid')
+            ->item('servings-ogs', 'Ausgabe OGS', 'module.schulkantine.ogs-ausgabe.index', icon: 'users')
             ->item('bestellterminal', 'Bestell-Terminal', 'module.schulkantine.bestellterminal.index', icon: 'cart', adminsOnly: true)
             ->item('reports', 'Auswertung', 'module.schulkantine.reports.index', icon: 'chart')
             ->item('seasons', 'Saisons & Kalender', 'module.schulkantine.seasons.index', icon: 'calendar')
@@ -123,7 +124,7 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
             ->item('guide', 'Anleitung', 'module.schulkantine.guide.index', icon: 'book', adminsOnly: true)
             // Zugriffsstufen, wo die Regel aus Anfrageart/Routenname nicht passt
             // (MODULES.md im Core, „Zugriffsstufen").
-            ->lesend('servings.lookup', 'servings.lookup-eater', 'servings.terminal.search', 'servings.ogs.search') // suchen nur
+            ->lesend('servings.lookup', 'servings.lookup-eater', 'servings.terminal.search', 'servings.ogs.search', 'ogs-ausgabe.search') // suchen nur
             // OGS nachtragen: OGS-Betreuer sehen die Ausgabe nur lesend – das Recht prüft der Controller.
             ->lesend('servings.ogs.add', 'servings.ogs.remove')
             ->stufe(Zugriffsstufe::Verwalten, 'seasons.import', 'eaters.chip.issue', 'chips.register', 'seasons.menueserve.buchungen.uebernehmen', 'seasons.menueserve.ogs.angleichen', 'seasons.menueserve.ogs.abos', 'eaters.als') // legen an
