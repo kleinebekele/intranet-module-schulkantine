@@ -79,8 +79,10 @@
                     </div>
                 @endif
 
-                {{-- Meldung der letzten Buchung --}}
-                <div x-show="banner" x-cloak class="mb-3 flex items-center justify-between gap-3 rounded-lg px-4 py-2 text-sm font-medium"
+                {{-- Meldung der letzten Buchung: schwebt unten rechts, damit die Liste nicht
+                     verrutscht. Erfolg verschwindet nach ein paar Sekunden, Fehler bleiben. --}}
+                <div x-show="banner" x-cloak x-transition.opacity
+                     class="fixed bottom-6 right-6 z-40 flex max-w-sm items-center justify-between gap-3 rounded-lg px-4 py-2 text-sm font-medium shadow-lg"
                      :class="banner && banner.ok ? 'border border-green-200 bg-green-50 text-green-800' : 'border border-red-200 bg-red-50 text-red-800'">
                     <span x-text="banner && banner.text"></span>
                     <button type="button" @click="banner = null" class="text-lg leading-none opacity-60 hover:opacity-100">✕</button>
@@ -242,7 +244,14 @@
                         q: '', treffer: [], gesamt: 0, aktiv: 0, laedt: false, suchTimer: null,
                         klasse: (() => { try { return localStorage.getItem('kantine_ogs_ausgabe_klasse') || '' } catch (e) { return '' } })(),
 
-                        init() { this.$nextTick(() => this.$refs.suche?.focus()); },
+                        bannerTimer: null,
+                        init() {
+                            this.$nextTick(() => this.$refs.suche?.focus());
+                            this.$watch('banner', (b) => {
+                                clearTimeout(this.bannerTimer);
+                                if (b && b.ok) this.bannerTimer = setTimeout(() => { this.banner = null; }, 3000);
+                            });
+                        },
 
                         // „/" springt in die Suche (wie in vielen Web-Anwendungen).
                         globaleTaste(ev) {
