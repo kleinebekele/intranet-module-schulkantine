@@ -11,28 +11,58 @@
             Es ist keine Saison als „aktiv" markiert.
         </div>
     @else
-        {{-- Tages-Navigation --}}
-        <div class="mb-4 flex items-center justify-between gap-4">
-            <div class="w-40">
-                @if ($prevDate)
-                    <a href="{{ route('module.schulkantine.ogs-ausgabe.index', ['date' => $prevDate]) }}"
-                       class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">‹ Vorheriger Tag</a>
-                @endif
-            </div>
-            <div class="text-center">
-                <div class="text-sm font-semibold text-gray-800">{{ $date->isoFormat('dddd') }}, {{ $date->format('d.m.Y') }}</div>
-                @if (! $date->isToday())
-                    <a href="{{ route('module.schulkantine.ogs-ausgabe.index') }}" class="text-xs font-medium text-indigo-600 hover:text-indigo-800">zu heute</a>
+        {{-- Kalenderleiste wie im Ausgabe-Terminal: Woche zurück · KW/Datum (Kalender) ·
+             Öffnungstage der Woche mit Zahl essender OGS-Kinder · Woche vor. --}}
+        <div class="mb-4 flex items-stretch overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            @if ($woche['prev'])
+                <a href="{{ route('module.schulkantine.ogs-ausgabe.index', ['date' => $woche['prev']]) }}" title="Woche zurück"
+                   class="flex w-9 shrink-0 items-center justify-center border-r border-gray-200 text-2xl font-bold text-gray-500 hover:bg-gray-100">‹</a>
+            @else
+                <span class="flex w-9 shrink-0 items-center justify-center border-r border-gray-200 text-2xl font-bold text-gray-200">‹</span>
+            @endif
+
+            <div class="flex w-44 shrink-0 flex-col items-center justify-center gap-0.5 border-r border-gray-200 px-2 py-1.5 {{ $date->isToday() ? 'bg-gray-50' : 'bg-amber-100' }}">
+                <div class="text-lg font-bold leading-tight text-indigo-700">KW {{ $woche['kw'] }}</div>
+                <label class="relative cursor-pointer text-sm font-semibold leading-tight {{ $date->isToday() ? 'text-gray-800' : 'text-amber-800' }} hover:underline" title="Tag im Kalender wählen">
+                    📅 {{ $date->isoFormat('dd, D.M.YYYY') }}
+                    <input type="date" value="{{ $date->toDateString() }}"
+                           min="{{ $season->start_date->toDateString() }}" max="{{ $season->end_date->toDateString() }}"
+                           onchange="if (this.value) location.href = @js(route('module.schulkantine.ogs-ausgabe.index')) + '?date=' + this.value"
+                           onclick="try { this.showPicker(); } catch (e) {}"
+                           class="absolute inset-0 h-full w-full cursor-pointer opacity-0">
+                </label>
+                @if ($date->isToday())
+                    <div class="text-[10px] font-medium text-gray-400">heute</div>
                 @else
-                    <div class="text-xs text-gray-400">heute</div>
+                    <a href="{{ route('module.schulkantine.ogs-ausgabe.index') }}"
+                       class="rounded bg-amber-500 px-2 py-px text-xs font-bold text-white hover:bg-amber-600">Heute</a>
                 @endif
             </div>
-            <div class="flex w-40 justify-end">
-                @if ($nextDate)
-                    <a href="{{ route('module.schulkantine.ogs-ausgabe.index', ['date' => $nextDate]) }}"
-                       class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Nächster Tag ›</a>
-                @endif
+
+            <div class="flex min-w-0 flex-1 divide-x divide-gray-100 overflow-x-auto">
+                @forelse ($woche['tage'] as $t)
+                    <a href="{{ route('module.schulkantine.ogs-ausgabe.index', ['date' => $t['date']]) }}"
+                       class="flex min-w-[7rem] flex-1 flex-col justify-center px-3 py-1.5 hover:bg-indigo-50 {{ $t['aktiv'] ? 'ring-4 ring-inset ring-indigo-500' : '' }}">
+                        <span class="text-sm font-semibold {{ $t['aktiv'] ? 'text-indigo-700' : 'text-gray-700' }}">
+                            {{ $t['wochentag'] }} {{ $t['tag'] }}
+                            @if ($t['heute'])<span class="ml-1 text-[10px] font-medium text-gray-400">heute</span>@endif
+                        </span>
+                        <span class="flex items-baseline gap-1 leading-tight">
+                            <span class="text-2xl font-bold {{ $t['ogs'] ? 'text-indigo-700' : 'text-gray-300' }}">{{ $t['ogs'] }}</span>
+                            <span class="text-[11px] font-medium text-gray-400">essen</span>
+                        </span>
+                    </a>
+                @empty
+                    <div class="flex flex-1 items-center px-4 text-sm text-gray-400">In dieser Woche hat die Mensa geschlossen.</div>
+                @endforelse
             </div>
+
+            @if ($woche['next'])
+                <a href="{{ route('module.schulkantine.ogs-ausgabe.index', ['date' => $woche['next']]) }}" title="Woche vor"
+                   class="flex w-9 shrink-0 items-center justify-center border-l border-gray-200 text-2xl font-bold text-gray-500 hover:bg-gray-100">›</a>
+            @else
+                <span class="flex w-9 shrink-0 items-center justify-center border-l border-gray-200 text-2xl font-bold text-gray-200">›</span>
+            @endif
         </div>
 
         @if (! $open)

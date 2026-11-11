@@ -1752,11 +1752,55 @@ class ServingController
             'closedReason' => $open ? null : $this->closedReason($season, $date),
             'ogsEaters' => $open ? $this->terminalOgsEaters($season, $date) : collect(),
             'istZukunft' => $date->gt(Carbon::today()),
+            'woche' => $this->ogsWoche($season, $date),
             // Abo-Text als Link zum Abo-Dialog – nur mit Verwaltungsrecht am Menüpunkt.
             'darfAbo' => app(\App\Modules\Support\Modulzugriff::class)->darfRoute('module.schulkantine.ogs-ausgabe.abo', $request->user()),
             'wochentage' => collect($season->opening_weekdays ?: [1, 2, 3, 4, 5])->map(fn ($d) => (int) $d)->sort()
                 ->mapWithKeys(fn ($d) => [$d => ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][$d]])->all(),
-        ] + $this->dayNav($season, $date, []));
+        ]);
+    }
+
+    /**
+     * Kalenderleiste der Ausgabe OGS: Öffnungstage der Woche mit Zahl essender
+     * OGS-Kinder, dazu der erste Öffnungstag der vorigen/nächsten Woche (Wochen
+     * ganz ohne Öffnungstag werden übersprungen).
+     */
+    private function ogsWoche(Season $season, Carbon $date): array
+    {
+        $montag = $date->copy()->startOfWeek(Carbon::MONDAY);
+        $tage = [];
+        for ($i = 0; $i < 7; $i++) {
+            $d = $montag->copy()->addDays($i);
+            if ($season->isOpenOn($d)) {
+                $tage[] = [
+                    'date' => $d->toDateString(),
+                    'wochentag' => ucfirst($d->isoFormat('dd')),
+                    'tag' => $d->format('d.m.'),
+                    'aktiv' => $d->isSameDay($date),
+                    'heute' => $d->isToday(),
+                    'ogs' => $this->attendingOgsIds($season, $d)->count(),
+                ];
+            }
+        }
+
+        $erster = function (int $richtung) use ($season, $montag): ?string {
+            for ($w = 1; $w <= 60; $w++) {
+                $start = $montag->copy()->addWeeks($richtung * $w);
+                if ($start->copy()->endOfWeek(Carbon::SUNDAY)->lt($season->start_date) || $start->gt($season->end_date)) {
+                    return null;
+                }
+                for ($i = 0; $i < 7; $i++) {
+                    $d = $start->copy()->addDays($i);
+                    if ($season->isOpenOn($d)) {
+                        return $d->toDateString();
+                    }
+                }
+            }
+
+            return null;
+        };
+
+        return ['kw' => $date->isoWeek(), 'tage' => $tage, 'prev' => $erster(-1), 'next' => $erster(1)];
     }
 
     /**
