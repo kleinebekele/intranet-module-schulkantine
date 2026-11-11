@@ -139,11 +139,11 @@
                             <div class="flex shrink-0 gap-1.5">
                                 <button type="button" :disabled="busy" @click="buchen(e.user_id, e.served && !e.declined ? 'open' : 'served', e.name)"
                                         :title="e.served && !e.declined ? 'Zurücknehmen' : 'Da – Essen abgeholt'"
-                                        class="rounded-md px-3 py-1.5 text-sm font-semibold disabled:opacity-60"
+                                        class="w-20 rounded-md py-1.5 text-center text-sm font-semibold disabled:opacity-60"
                                         :class="e.served && !e.declined ? 'bg-green-600 text-white hover:bg-green-700' : 'border border-green-600 bg-white text-green-700 hover:bg-green-50'">Da</button>
                                 <button type="button" :disabled="busy" @click="buchen(e.user_id, e.served && e.declined ? 'open' : 'declined', e.name)"
                                         :title="e.served && e.declined ? 'Zurücknehmen' : 'Nicht da'"
-                                        class="rounded-md px-3 py-1.5 text-sm font-semibold disabled:opacity-60"
+                                        class="w-20 rounded-md py-1.5 text-center text-sm font-semibold disabled:opacity-60"
                                         :class="e.served && e.declined ? 'bg-red-600 text-white hover:bg-red-700' : 'border border-red-600 bg-white text-red-700 hover:bg-red-50'">Nicht da</button>
                             </div>
                         </div>
