@@ -1752,7 +1752,20 @@ class ServingController
             'closedReason' => $open ? null : $this->closedReason($season, $date),
             'ogsEaters' => $open ? $this->terminalOgsEaters($season, $date) : collect(),
             'istZukunft' => $date->gt(Carbon::today()),
+            // Abo-Text als Link zum Abo-Dialog – nur mit Verwaltungsrecht am Menüpunkt.
+            'darfAbo' => app(\App\Modules\Support\Modulzugriff::class)->darfRoute('module.schulkantine.ogs-ausgabe.abo', $request->user()),
+            'wochentage' => collect($season->opening_weekdays ?: [1, 2, 3, 4, 5])->map(fn ($d) => (int) $d)->sort()
+                ->mapWithKeys(fn ($d) => [$d => ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][$d]])->all(),
         ] + $this->dayNav($season, $date, []));
+    }
+
+    /**
+     * OGS-Abo aus der Ausgabe OGS ändern. Das Recht (Stufe „verwalten" am Menüpunkt)
+     * prüft die Modul-Middleware; gespeichert wird wie bei den Eltern.
+     */
+    public function ogsAbo(Request $request, OrderController $orders)
+    {
+        return $orders->aboSpeichern($request, $request->user(), verwaltung: true);
     }
 
     /**
@@ -2236,7 +2249,9 @@ class ServingController
      *  - Abo → „Abo Mo, Mi, Fr" (bzw. „Abo Mo–Fr", „Abo pausiert"),
      *    heute außerhalb des Abos dazugekommen → zusätzlich „heute spontan".
      *
-     * @return \Closure(int): array{text: string, spontan: bool}
+     * Dazu für den Abo-Dialog: hatAbo, aktiv, tage (ISO-Wochentage).
+     *
+     * @return \Closure(int): array{text: string, spontan: bool, hatAbo: bool, aktiv: bool, tage: array<int, int>}
      */
     private function ogsAboStatus(Season $season, Carbon $date, Collection $userIds): \Closure
     {
@@ -2252,7 +2267,8 @@ class ServingController
             $spontan = $anAusgabe->has($id);
             $abo = $abos->get($id);
             if (! $abo) {
-                return ['text' => $spontan ? 'Spontan' : 'Einzelbuchung', 'spontan' => $spontan];
+                return ['text' => $spontan ? 'Spontan' : 'Einzelbuchung', 'spontan' => $spontan,
+                    'hatAbo' => false, 'aktiv' => false, 'tage' => []];
             }
             $tage = array_values(array_intersect($offen, array_map('intval', (array) ($abo->weekdays ?: $offen))));
             $text = match (true) {
@@ -2262,7 +2278,8 @@ class ServingController
                 default => 'Abo '.implode(', ', array_map(fn ($d) => $wt[$d], $tage)),
             };
 
-            return ['text' => $spontan ? $text.' · heute spontan' : $text, 'spontan' => $spontan];
+            return ['text' => $spontan ? $text.' · heute spontan' : $text, 'spontan' => $spontan,
+                'hatAbo' => true, 'aktiv' => (bool) $abo->active, 'tage' => $tage];
         };
     }
 

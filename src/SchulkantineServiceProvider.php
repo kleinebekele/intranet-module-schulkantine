@@ -127,7 +127,7 @@ class SchulkantineServiceProvider extends ModuleServiceProvider
             ->lesend('servings.lookup', 'servings.lookup-eater', 'servings.terminal.search', 'servings.ogs.search', 'ogs-ausgabe.search') // suchen nur
             // OGS nachtragen: OGS-Betreuer sehen die Ausgabe nur lesend – das Recht prüft der Controller.
             ->lesend('servings.ogs.add', 'servings.ogs.remove')
-            ->stufe(Zugriffsstufe::Verwalten, 'seasons.import', 'eaters.chip.issue', 'chips.register', 'seasons.menueserve.buchungen.uebernehmen', 'seasons.menueserve.ogs.angleichen', 'seasons.menueserve.ogs.abos', 'eaters.als') // legen an
+            ->stufe(Zugriffsstufe::Verwalten, 'seasons.import', 'eaters.chip.issue', 'chips.register', 'seasons.menueserve.buchungen.uebernehmen', 'seasons.menueserve.ogs.angleichen', 'seasons.menueserve.ogs.abos', 'eaters.als', 'ogs-ausgabe.abo') // legen an / Abo ändern
             ->stufe(Zugriffsstufe::Bearbeiten, 'dishes.photo.delete') // Teil von „Gericht bearbeiten"
             // Bereiche, die auf der Seite eines anderen Menüpunkts gepflegt werden –
             // sonst gälte die höchste Stufe im ganzen Modul (bei Eltern „verwalten").

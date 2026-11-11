@@ -82,11 +82,11 @@
                                 + <span x-text="gesamt - treffer.length"></span> weitere – genauer tippen
                             </div>
                         </div>
-                        <p class="mt-1 text-xs text-gray-400">Enter bucht den markierten Treffer als abgeholt – auch Kinder, die heute nicht angemeldet sind.</p>
+                        <p class="mt-1 text-xs text-gray-400">Enter bucht den markierten Treffer als „da“ – auch Kinder, die heute nicht angemeldet sind.</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2 text-sm font-semibold">
-                        <span class="rounded-full bg-green-100 px-3 py-1 text-green-700"><span x-text="servedCount"></span> abgeholt</span>
-                        <span x-show="declinedCount" x-cloak class="rounded-full bg-red-100 px-3 py-1 text-red-700"><span x-text="declinedCount"></span> abgelehnt</span>
+                        <span class="rounded-full bg-green-100 px-3 py-1 text-green-700"><span x-text="servedCount"></span> da</span>
+                        <span x-show="declinedCount" x-cloak class="rounded-full bg-red-100 px-3 py-1 text-red-700"><span x-text="declinedCount"></span> nicht da</span>
                         <span class="rounded-full bg-gray-100 px-3 py-1 text-gray-600"><span x-text="offene.length"></span> offen</span>
                         <span class="text-gray-400">von <span x-text="gefiltert.length"></span></span>
                     </div>
@@ -113,74 +113,85 @@
                     An diesem Tag isst kein OGS-Kind.
                 </div>
 
-                {{-- Kinderliste: offene zuerst, abgeholte grün ans Ende. Klick = abgeholt ⇄ offen,
-                     ⋯ bzw. Rechtsklick = Details (Unverträglichkeiten, abgelehnt). --}}
-                <div x-show="eaters.length" x-cloak class="columns-2 gap-2 md:columns-3 xl:columns-4">
+                {{-- Kinderliste: offene zuerst, erledigte ans Ende. Je Kind zwei Knöpfe:
+                     „Da" (abgeholt) und „Nicht da" (abgelehnt); erneuter Klick auf den
+                     gewählten Knopf nimmt zurück. Der Abo-Text öffnet für Verwalter den Abo-Dialog. --}}
+                <div x-show="eaters.length" x-cloak class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                     <template x-for="e in sortiert" :key="e.user_id">
-                        <div class="mb-2 flex break-inside-avoid items-stretch overflow-hidden rounded-lg border shadow-sm"
+                        <div class="flex items-center gap-3 rounded-lg border px-3 py-2 shadow-sm"
                              :class="!e.served ? 'border-gray-200 bg-white' : (e.declined ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50')">
-                            <button type="button" :disabled="busy" @click="umschalten(e.user_id)" @contextmenu.prevent="details(e.user_id)"
-                                    :title="!e.served ? 'Als abgeholt buchen' : 'Zurücknehmen'"
-                                    class="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 disabled:opacity-60">
-                                <span class="shrink-0 text-xl"
-                                      :class="!e.served ? 'text-gray-300' : (e.declined ? 'text-red-600' : 'text-green-600')"
-                                      x-text="!e.served ? '○' : (e.declined ? '✗' : '✓')"></span>
-                                <span class="min-w-0 flex-1">
-                                    <span class="block truncate text-sm font-semibold"
-                                          :class="!e.served ? 'text-gray-800' : (e.declined ? 'text-red-900' : 'text-green-900')" x-text="e.sortName || e.name"></span>
-                                    <span class="block truncate text-xs text-gray-500">
-                                        <span x-show="e.klasse" x-text="'Klasse ' + e.klasse"></span>
-                                        <span x-show="e.abo" class="ml-1 rounded px-1.5 py-px font-semibold"
-                                              :class="e.abo && e.abo.spontan ? 'bg-orange-100 text-orange-800' : 'bg-indigo-50 text-indigo-700'"
-                                              x-text="e.abo && e.abo.text"></span>
-                                        <span x-show="sonderkost(e).length" class="font-semibold text-amber-700">⚠ <span x-text="sonderkost(e).join(', ')"></span></span>
-                                    </span>
-                                </span>
-                            </button>
-                            <button type="button" @click="details(e.user_id)" title="Details"
-                                    class="shrink-0 border-l border-black/5 px-3 text-gray-400 hover:bg-black/5 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500">⋯</button>
+                            <div class="min-w-0 flex-1">
+                                <div class="truncate text-sm font-semibold"
+                                     :class="!e.served ? 'text-gray-800' : (e.declined ? 'text-red-900' : 'text-green-900')" x-text="e.sortName || e.name"></div>
+                                <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
+                                    <span x-show="e.klasse" x-text="'Klasse ' + e.klasse"></span>
+                                    <template x-if="e.abo && darfAbo">
+                                        <button type="button" @click="aboOeffnen(e)" title="Abo ändern"
+                                                class="rounded px-1.5 py-px font-semibold underline decoration-dotted underline-offset-2 hover:decoration-solid"
+                                                :class="aboFarbe(e)" x-text="e.abo.text"></button>
+                                    </template>
+                                    <template x-if="e.abo && !darfAbo">
+                                        <span class="rounded px-1.5 py-px font-semibold" :class="aboFarbe(e)" x-text="e.abo.text"></span>
+                                    </template>
+                                    <span x-show="sonderkost(e).length" class="font-semibold text-amber-700">⚠ <span x-text="sonderkost(e).join(', ')"></span></span>
+                                </div>
+                            </div>
+                            <div class="flex shrink-0 gap-1.5">
+                                <button type="button" :disabled="busy" @click="buchen(e.user_id, e.served && !e.declined ? 'open' : 'served', e.name)"
+                                        :title="e.served && !e.declined ? 'Zurücknehmen' : 'Da – Essen abgeholt'"
+                                        class="rounded-md px-3 py-1.5 text-sm font-semibold disabled:opacity-60"
+                                        :class="e.served && !e.declined ? 'bg-green-600 text-white hover:bg-green-700' : 'border border-green-600 bg-white text-green-700 hover:bg-green-50'">Da</button>
+                                <button type="button" :disabled="busy" @click="buchen(e.user_id, e.served && e.declined ? 'open' : 'declined', e.name)"
+                                        :title="e.served && e.declined ? 'Zurücknehmen' : 'Nicht da'"
+                                        class="rounded-md px-3 py-1.5 text-sm font-semibold disabled:opacity-60"
+                                        :class="e.served && e.declined ? 'bg-red-600 text-white hover:bg-red-700' : 'border border-red-600 bg-white text-red-700 hover:bg-red-50'">Nicht da</button>
+                            </div>
                         </div>
                     </template>
                 </div>
 
-                {{-- Detail-Dialog: Unverträglichkeiten + abgeholt / abgelehnt / zurücknehmen --}}
-                <div x-show="modal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-                     @click.self="modal = null" @keydown.escape.window="modal = null">
-                    <template x-if="modal">
-                        <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl">
-                            <div class="mb-3 flex items-start justify-between gap-3">
-                                <div class="min-w-0">
-                                    <h3 class="truncate text-lg font-bold text-gray-800" x-text="modal.name"></h3>
-                                    <div class="text-sm font-medium"
-                                         :class="!modal.served ? 'text-gray-400' : (modal.declined ? 'text-red-600' : 'text-green-600')"
-                                         x-text="!modal.served ? 'Status: offen' : (modal.declined ? 'Status: abgelehnt' : 'Status: abgeholt')"></div>
-                                    <div x-show="modal.abo" class="text-sm text-gray-500" x-text="modal.abo && modal.abo.text"></div>
+                @if ($darfAbo)
+                    {{-- Abo-Dialog (nur mit Verwaltungsrecht): Wochentage + an/aus. Normales
+                         Formular – nach dem Speichern lädt die Seite mit der Meldung neu. --}}
+                    <div x-show="abo" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                         @click.self="abo = null" @keydown.escape.window="abo = null">
+                        <template x-if="abo">
+                            <form method="POST" action="{{ route('module.schulkantine.ogs-ausgabe.abo') }}" class="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl">
+                                @csrf
+                                <input type="hidden" name="eater_id" :value="abo.user_id">
+                                <input type="hidden" name="active" :value="abo.active ? 1 : 0">
+                                <div class="mb-3 flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <h3 class="truncate text-lg font-bold text-gray-800" x-text="'OGS-Abo: ' + abo.name"></h3>
+                                        <div class="text-sm text-gray-500" x-text="'Bisher: ' + abo.text"></div>
+                                    </div>
+                                    <button type="button" @click="abo = null" class="rounded-lg px-2 py-1 text-gray-400 hover:bg-gray-100">✕</button>
                                 </div>
-                                <button type="button" @click="modal = null" class="rounded-lg px-2 py-1 text-gray-400 hover:bg-gray-100">✕</button>
-                            </div>
-                            <div class="rounded-lg bg-gray-50 p-3">
-                                <div class="text-xs font-bold uppercase tracking-wide text-gray-400">Unverträglichkeiten</div>
-                                <div class="mt-1.5 flex flex-wrap gap-1.5">
-                                    <template x-for="a in (modal.allergens || [])" :key="'a'+a">
-                                        <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800" x-text="a"></span>
-                                    </template>
-                                    <template x-for="d in (modal.diets || [])" :key="'d'+d">
-                                        <span class="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-800" x-text="d"></span>
-                                    </template>
-                                    <span x-show="!sonderkost(modal).length" class="text-sm text-gray-400">keine hinterlegt</span>
+                                <label class="flex items-center gap-2 text-sm font-medium text-gray-700">
+                                    <input type="checkbox" x-model="abo.active" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                    Abo aktiv
+                                </label>
+                                <div class="mt-3" :class="abo.active ? '' : 'opacity-40'">
+                                    <div class="mb-1 text-xs font-bold uppercase tracking-wide text-gray-400">Isst an</div>
+                                    <div class="flex flex-wrap gap-2">
+                                        @foreach ($wochentage as $nr => $kurz)
+                                            <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
+                                                <input type="checkbox" name="weekdays[]" value="{{ $nr }}" x-model.number="abo.weekdays" :disabled="!abo.active"
+                                                       class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                                {{ $kurz }}
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                    <p class="mt-1 text-xs text-gray-400">Alle angehakt = an allen Öffnungstagen. Die Änderung gilt ab dem nächsten noch bestellbaren Tag.</p>
                                 </div>
-                            </div>
-                            <div class="mt-4 grid grid-cols-2 gap-2">
-                                <button type="button" @click="setzen('served')" :disabled="busy"
-                                        class="rounded-lg bg-green-600 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60">✓ Abgeholt</button>
-                                <button type="button" @click="setzen('declined')" :disabled="busy"
-                                        class="rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">✗ Abgelehnt</button>
-                            </div>
-                            <button type="button" x-show="modal.served" @click="setzen('open')" :disabled="busy"
-                                    class="mt-2 w-full rounded-lg border border-gray-300 bg-white py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-60">↺ Zurücknehmen (offen)</button>
-                        </div>
-                    </template>
-                </div>
+                                <div class="mt-4 flex justify-end gap-2">
+                                    <button type="button" @click="abo = null" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Abbrechen</button>
+                                    <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Abo speichern</button>
+                                </div>
+                            </form>
+                        </template>
+                    </div>
+                @endif
             </div>
 
             <script>
@@ -195,7 +206,9 @@
                         csrf: @js(csrf_token()),
                         busy: false,
                         banner: null,
-                        modal: null,
+                        abo: null,
+                        darfAbo: @js($darfAbo),
+                        oeffnungstage: @js(array_keys($wochentage)),
                         q: '', treffer: [], gesamt: 0, aktiv: 0, laedt: false, suchTimer: null,
                         klasse: (() => { try { return localStorage.getItem('kantine_ogs_ausgabe_klasse') || '' } catch (e) { return '' } })(),
 
@@ -203,7 +216,7 @@
 
                         // „/" springt in die Suche (wie in vielen Web-Anwendungen).
                         globaleTaste(ev) {
-                            if (ev.key !== '/' || this.modal) return;
+                            if (ev.key !== '/' || this.abo) return;
                             const t = ev.target.tagName;
                             if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || ev.target.isContentEditable) return;
                             ev.preventDefault();
@@ -269,21 +282,21 @@
                             const e = this.eaters.find(x => x.user_id === r.id);
                             this.sucheLeeren();
                             this.$refs.suche.focus();
-                            if (e && e.served) { this.banner = { ok: true, text: e.name + ' ist bereits ' + (e.declined ? 'als abgelehnt' : 'als abgeholt') + ' gebucht.' }; return; }
+                            if (e && e.served) { this.banner = { ok: true, text: e.name + ' ist bereits als ' + (e.declined ? '„nicht da“' : '„da“') + ' gebucht.' }; return; }
                             await this.buchen(r.id, 'served', r.name);
                         },
 
+                        // ---- Abo (nur Verwalter) ----
+                        aboFarbe(e) {
+                            if (e.abo.spontan) return 'bg-orange-100 text-orange-800';
+                            return e.abo.aktiv ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-100 text-gray-600';
+                        },
+                        aboOeffnen(e) {
+                            const tage = (e.abo.tage && e.abo.tage.length) ? e.abo.tage : this.oeffnungstage;
+                            this.abo = { user_id: e.user_id, name: e.name, text: e.abo.text, active: e.abo.aktiv || !e.abo.hatAbo, weekdays: [...tage] };
+                        },
+
                         // ---- Buchen ----
-                        umschalten(id) {
-                            const e = this.eaters.find(x => x.user_id === id);
-                            if (e) this.buchen(id, e.served ? 'open' : 'served', e.name);
-                        },
-                        details(id) { this.modal = this.eaters.find(x => x.user_id === id) || null; },
-                        async setzen(outcome) {
-                            const e = this.modal;
-                            this.modal = null;
-                            if (e) await this.buchen(e.user_id, outcome, e.name);
-                        },
                         async buchen(id, outcome, name) {
                             if (this.busy) return;
                             this.busy = true;
@@ -304,7 +317,7 @@
                                 } else if (data.eater) {
                                     this.eaters.push(data.eater); // spontan dazugekommenes Kind
                                 }
-                                this.banner = { ok: true, text: name + ': ' + (!data.served ? 'zurückgenommen' : (data.declined ? 'abgelehnt' : 'abgeholt')) + '.' };
+                                this.banner = { ok: true, text: name + ': ' + (!data.served ? 'zurückgenommen' : (data.declined ? 'nicht da' : 'da')) + '.' };
                             } catch (err) {
                                 this.banner = { ok: false, text: 'Fehler beim Buchen: ' + err };
                             } finally {

@@ -522,7 +522,7 @@ class OrderController
     }
 
     /** OGS-Abo im Namen von $user (Intranet-Konto oder Chip am Bestell-Terminal). */
-    public function aboSpeichern(Request $request, User $user)
+    public function aboSpeichern(Request $request, User $user, bool $verwaltung = false)
     {
         $data = $request->validate([
             'eater_id' => ['required', 'integer'],
@@ -534,7 +534,8 @@ class OrderController
         $season = Season::where('is_active', true)->firstOrFail();
         $eater = User::findOrFail($data['eater_id']);
 
-        abort_unless($this->mayOrderFor($user, $eater), 403, 'Du darfst für diese Person kein Abo verwalten.');
+        // $verwaltung: Aufruf aus der Ausgabe OGS – dort prüft die Modul-Middleware das Recht.
+        abort_unless($verwaltung || $this->mayOrderFor($user, $eater), 403, 'Du darfst für diese Person kein Abo verwalten.');
 
         if (! Essensvertrag::hat($eater)) {
             return back()->withErrors(['bestellung' => Essensvertrag::hinweis($eater)]);
