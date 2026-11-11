@@ -188,7 +188,7 @@
                     <div x-show="abo" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
                          @click.self="abo = null" @keydown.escape.window="abo = null">
                         <template x-if="abo">
-                            <form method="POST" action="{{ route('module.schulkantine.ogs-ausgabe.abo') }}" class="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl">
+                            <form method="POST" action="{{ route('module.schulkantine.ogs-ausgabe.abo') }}" class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-y-auto rounded-xl bg-white p-5 shadow-2xl">
                                 @csrf
                                 <input type="hidden" name="eater_id" :value="abo.user_id">
                                 <input type="hidden" name="active" :value="abo.active ? 1 : 0">
@@ -216,6 +216,44 @@
                                     </div>
                                     <p class="mt-1 text-xs text-gray-400">Alle angehakt = an allen Öffnungstagen. Die Änderung gilt ab dem nächsten noch bestellbaren Tag.</p>
                                 </div>
+                                {{-- Eltern + Verlauf: Was haben die Eltern wann eingestellt? --}}
+                                <div class="mt-4 rounded-lg bg-gray-50 p-3 text-sm">
+                                    <div class="mb-1 text-xs font-bold uppercase tracking-wide text-gray-400">Eltern im Intranet</div>
+                                    <div x-show="aboInfo === null" class="text-gray-400">lädt …</div>
+                                    <template x-if="aboInfo">
+                                        <div>
+                                            <div x-show="!aboInfo.eltern.length" class="font-semibold text-red-700">Kein Elternkonto hinterlegt.</div>
+                                            <template x-for="p in aboInfo.eltern" :key="p.name">
+                                                <div class="flex justify-between gap-3">
+                                                    <span class="text-gray-800" x-text="p.name"></span>
+                                                    <span class="shrink-0" :class="p.zuletzt ? 'text-gray-500' : 'font-semibold text-red-700'"
+                                                          x-text="p.zuletzt ? 'zuletzt angemeldet ' + p.zuletzt : 'noch nie angemeldet'"></span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+
+                                    <div class="mb-1 mt-3 text-xs font-bold uppercase tracking-wide text-gray-400">Verlauf (Abo und OGS-Tage)</div>
+                                    <template x-if="aboInfo">
+                                        <div class="max-h-60 divide-y divide-gray-200 overflow-y-auto">
+                                            <div x-show="!aboInfo.verlauf.length" class="text-gray-400">Noch nichts eingestellt.</div>
+                                            <template x-for="(v, i) in aboInfo.verlauf" :key="i">
+                                                <div class="py-1.5">
+                                                    <div class="flex flex-wrap items-baseline justify-between gap-x-3 text-xs text-gray-500">
+                                                        <span x-text="v.zeit"></span>
+                                                        <span>
+                                                            <span x-text="v.wer"></span>
+                                                            <span x-show="v.eltern" class="ml-1 rounded bg-indigo-50 px-1 font-semibold text-indigo-700">Eltern</span>
+                                                            <span x-show="v.quelle" x-text="'· ' + v.quelle"></span>
+                                                        </span>
+                                                    </div>
+                                                    <div :class="v.abo ? 'font-semibold text-gray-800' : 'text-gray-700'" x-text="v.text"></div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+
                                 <div class="mt-4 flex justify-end gap-2">
                                     <button type="button" @click="abo = null" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Abbrechen</button>
                                     <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Abo speichern</button>
@@ -239,6 +277,7 @@
                         busy: false,
                         banner: null,
                         abo: null,
+                        aboInfo: null,
                         darfAbo: @js($darfAbo),
                         oeffnungstage: @js(array_keys($wochentage)),
                         q: '', treffer: [], gesamt: 0, aktiv: 0, laedt: false, suchTimer: null,
@@ -333,6 +372,12 @@
                         aboOeffnen(e) {
                             const tage = (e.abo.tage && e.abo.tage.length) ? e.abo.tage : this.oeffnungstage;
                             this.abo = { user_id: e.user_id, name: e.name, text: e.abo.text, active: e.abo.aktiv || !e.abo.hatAbo, weekdays: [...tage] };
+                            this.aboInfo = null;
+                            const id = e.user_id;
+                            fetch(@js(route('module.schulkantine.ogs-ausgabe.abo-info')) + '?eater_id=' + id, { headers: { 'Accept': 'application/json' } })
+                                .then(r => r.json())
+                                .then(d => { if (this.abo && this.abo.user_id === id) this.aboInfo = d; })
+                                .catch(() => { if (this.abo && this.abo.user_id === id) this.aboInfo = { eltern: [], verlauf: [], fehler: true }; });
                         },
 
                         // ---- Buchen ----

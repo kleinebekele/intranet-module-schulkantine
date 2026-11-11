@@ -147,6 +147,7 @@ Route::middleware(['web', 'auth', AlsPerson::class])
         Route::post('ausgabe-ogs/abhaken', [ServingController::class, 'terminalOgsToggle'])->name('ogs-ausgabe.toggle');
         Route::post('ausgabe-ogs/suchen', [ServingController::class, 'terminalSearch'])->name('ogs-ausgabe.search');
         Route::post('ausgabe-ogs/abo', [ServingController::class, 'ogsAbo'])->name('ogs-ausgabe.abo');
+        Route::get('ausgabe-ogs/abo-verlauf', [ServingController::class, 'ogsAboInfo'])->name('ogs-ausgabe.abo-info');
         Route::get('ausgabe/mengen', [ServingController::class, 'quantities'])->name('servings.quantities');
         Route::get('ausgabe/mengen/pdf', [ServingController::class, 'mengenPdf'])->name('servings.mengen.pdf');
         Route::get('ausgabe/besteller/pdf', [ServingController::class, 'bestellerPdf'])->name('servings.besteller.pdf');

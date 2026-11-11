@@ -47,6 +47,7 @@ class MensaAudit
             request()->routeIs('kantine.bestellterminal.*') => 'Bestell-Terminal',
             request()->routeIs('module.schulkantine.servings.terminal*') => 'Ausgabe-Terminal',
             request()->routeIs('module.schulkantine.servings.*') => 'Ausgabe-Übersicht',
+            request()->routeIs('module.schulkantine.ogs-ausgabe.*') => 'Ausgabe OGS',
             default => 'Intranet',
         };
     }

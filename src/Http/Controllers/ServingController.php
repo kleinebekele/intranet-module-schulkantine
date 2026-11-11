@@ -1804,6 +1804,38 @@ class ServingController
     }
 
     /**
+     * Für den Abo-Dialog der Ausgabe OGS: die Eltern des Kindes mit Kontostand
+     * (nie angemeldet / zuletzt angemeldet) und der Verlauf aus dem Audit-Log –
+     * Abo-Änderungen sowie OGS-Tage an-/abbestellt, neueste zuerst.
+     */
+    public function ogsAboInfo(Request $request)
+    {
+        $kind = User::findOrFail((int) $request->query('eater_id'));
+        $eltern = $kind->parents()->orderBy('name')->get();
+        $elternIds = $eltern->pluck('id')->flip();
+
+        $verlauf = AuditEintrag::where('betroffener_id', $kind->id)
+            ->whereIn('aktion', ['kantine.abo_geaendert', 'kantine.bestellt', 'kantine.abbestellt', 'kantine.bestellung_geloescht'])
+            ->orderByDesc('created_at')->orderByDesc('id')->limit(40)->get()
+            ->map(fn ($a) => [
+                'zeit' => $a->created_at?->format('d.m.Y H:i'),
+                'abo' => $a->aktion === 'kantine.abo_geaendert',
+                'text' => $a->beschreibung,
+                'wer' => $a->akteur ?? 'System',
+                'eltern' => $a->user_id !== null && $elternIds->has($a->user_id),
+                'quelle' => $a->daten['Quelle'] ?? null,
+            ])->values();
+
+        return response()->json([
+            'eltern' => $eltern->map(fn (User $p) => [
+                'name' => $p->name,
+                'zuletzt' => $p->zuletzt_angemeldet_am?->format('d.m.Y'),
+            ])->values(),
+            'verlauf' => $verlauf,
+        ]);
+    }
+
+    /**
      * OGS-Abo aus der Ausgabe OGS ändern. Das Recht (Stufe „verwalten" am Menüpunkt)
      * prüft die Modul-Middleware; gespeichert wird wie bei den Eltern.
      */
