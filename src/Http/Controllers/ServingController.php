@@ -1733,9 +1733,20 @@ class ServingController
      * Maus und Tastatur. Gebucht wird über dieselben Endpunkte wie im Terminal
      * (terminalOgsToggle / terminalSearch mit mode=ogs).
      */
+    /**
+     * Terminal-Endpunkte, die auch die Ausgabe OGS nutzt: Ausgabe-Recht (Kellner)
+     * oder – über die Routen der Ausgabe OGS – die Freigabe am Menüpunkt.
+     */
+    private function darfAusgeben(Request $request): bool
+    {
+        return $request->routeIs('module.schulkantine.ogs-ausgabe.*')
+            ? Access::darfOgsAusgabe($request->user())
+            : Access::canServe($request->user());
+    }
+
     public function ogsAusgabe(Request $request)
     {
-        abort_unless(Access::canServe($request->user()), 403, 'Kein Zugriff auf die OGS-Ausgabe.');
+        abort_unless(Access::darfOgsAusgabe($request->user()), 403, 'Kein Zugriff auf die OGS-Ausgabe.');
 
         $season = Season::where('is_active', true)->first();
         if (! $season) {
@@ -1810,6 +1821,7 @@ class ServingController
      */
     public function ogsAboInfo(Request $request)
     {
+        abort_unless(Access::darfOgsAusgabe($request->user()), 403, 'Kein Zugriff auf die OGS-Ausgabe.');
         $kind = User::findOrFail((int) $request->query('eater_id'));
         $eltern = $kind->parents()->orderBy('name')->get();
         $elternIds = $eltern->pluck('id')->flip();
@@ -1841,6 +1853,7 @@ class ServingController
      */
     public function ogsAbo(Request $request, OrderController $orders)
     {
+        abort_unless(Access::darfOgsAusgabe($request->user()), 403, 'Kein Zugriff auf die OGS-Ausgabe.');
         return $orders->aboSpeichern($request, $request->user(), verwaltung: true);
     }
 
@@ -1879,7 +1892,7 @@ class ServingController
      */
     public function terminalSearch(Request $request)
     {
-        abort_unless(Access::canServe($request->user()), 403, 'Kein Zugriff auf das Ausgabe-Terminal.');
+        abort_unless($this->darfAusgeben($request), 403, 'Kein Zugriff auf das Ausgabe-Terminal.');
 
         $q = trim((string) $request->input('q', ''));
         if ($q === '') {
@@ -2209,7 +2222,7 @@ class ServingController
     public function terminalOgsToggle(Request $request)
     {
         $user = $request->user();
-        abort_unless(Access::canServe($user), 403, 'Du darfst die Ausgabe nicht erfassen.');
+        abort_unless($this->darfAusgeben($request), 403, 'Du darfst die Ausgabe nicht erfassen.');
 
         $data = $request->validate([
             'eater_id' => ['required', 'integer', 'exists:users,id'],

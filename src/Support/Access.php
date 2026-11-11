@@ -98,6 +98,15 @@ class Access
         return $item !== null && $item->isVisibleTo($user);
     }
 
+    /**
+     * Ausgabe OGS: wer den Menüpunkt sieht (Rollen am Menüpunkt), dazu Ausgabe-Personal
+     * und OGS-Betreuer.
+     */
+    public static function darfOgsAusgabe(?User $user): bool
+    {
+        return self::canServe($user) || self::canViewOgsList($user) || self::darfMenuepunkt($user, 'servings-ogs');
+    }
+
     /** OGS-Sammelliste ansehen: Admin oder OGS-Betreuer. */
     public static function canViewOgsList(?User $user): bool
     {
