@@ -83,7 +83,7 @@
                      verrutscht. Erfolg verschwindet nach ein paar Sekunden, Fehler bleiben. --}}
                 <div x-show="banner" x-cloak x-transition.opacity
                      class="fixed bottom-6 right-6 z-40 flex max-w-sm items-center justify-between gap-3 rounded-lg px-4 py-2 text-sm font-medium shadow-lg"
-                     :class="banner && banner.ok ? 'border border-green-200 bg-green-50 text-green-800' : 'border border-red-200 bg-red-50 text-red-800'">
+                     :class="banner && banner.hinweis ? 'border border-amber-300 bg-amber-100 text-amber-800' : (banner && banner.ok ? 'border border-green-200 bg-green-50 text-green-800' : 'border border-red-200 bg-red-50 text-red-800')">
                     <span x-text="banner && banner.text"></span>
                     <button type="button" @click="banner = null" class="text-lg leading-none opacity-60 hover:opacity-100">✕</button>
                 </div>
@@ -169,11 +169,11 @@
                                 </div>
                             </div>
                             <div class="flex shrink-0 gap-1.5">
-                                <button type="button" :disabled="busy" @click="buchen(e.user_id, e.served && !e.declined ? 'open' : 'served', e.name)"
+                                <button type="button" :disabled="busy" @pointerenter="zeigerAuf($event)" @click="absichtlich($event) && buchen(e.user_id, e.served && !e.declined ? 'open' : 'served', e.name)"
                                         :title="e.served && !e.declined ? 'Zurücknehmen' : 'Da – Essen abgeholt'"
                                         class="w-20 rounded-md py-1.5 text-center text-sm font-semibold disabled:opacity-60"
                                         :class="e.served && !e.declined ? 'bg-green-600 text-white hover:bg-green-700' : 'border border-green-600 bg-white text-green-700 hover:bg-green-50'">Da</button>
-                                <button type="button" :disabled="busy" @click="buchen(e.user_id, e.served && e.declined ? 'open' : 'declined', e.name)"
+                                <button type="button" :disabled="busy" @pointerenter="zeigerAuf($event)" @click="absichtlich($event) && buchen(e.user_id, e.served && e.declined ? 'open' : 'declined', e.name)"
                                         :title="e.served && e.declined ? 'Zurücknehmen' : 'Nicht da'"
                                         class="w-20 rounded-md py-1.5 text-center text-sm font-semibold disabled:opacity-60"
                                         :class="e.served && e.declined ? 'bg-red-600 text-white hover:bg-red-700' : 'border border-red-600 bg-white text-red-700 hover:bg-red-50'">Nicht da</button>
@@ -284,11 +284,12 @@
                         klasse: (() => { try { return localStorage.getItem('kantine_ogs_ausgabe_klasse') || '' } catch (e) { return '' } })(),
 
                         bannerTimer: null,
+                        zeigerSeit: 0,
                         init() {
                             this.$nextTick(() => this.$refs.suche?.focus());
                             this.$watch('banner', (b) => {
                                 clearTimeout(this.bannerTimer);
-                                if (b && b.ok) this.bannerTimer = setTimeout(() => { this.banner = null; }, 3000);
+                                if (b && (b.ok || b.hinweis)) this.bannerTimer = setTimeout(() => { this.banner = null; }, 3000);
                             });
                         },
 
@@ -381,6 +382,18 @@
                         },
 
                         // ---- Buchen ----
+                        // Klickschutz gegen das empfindliche Touchpad: Ein Mausklick zählt erst,
+                        // wenn der Zeiger kurz (250 ms) auf dem Knopf geruht hat. Ein Antippen im
+                        // Vorbeiziehen wird ignoriert. Tastatur (Enter/Leertaste) und Touchscreen
+                        // sind davon ausgenommen.
+                        zeigerAuf(ev) {
+                            this.zeigerSeit = ev.pointerType === 'mouse' ? Date.now() : 0;
+                        },
+                        absichtlich(ev) {
+                            if (ev.detail === 0 || !this.zeigerSeit || Date.now() - this.zeigerSeit >= 250) return true;
+                            this.banner = { hinweis: true, text: 'Klick nicht gezählt – der Mauszeiger war noch unterwegs. Zum Buchen kurz auf dem Knopf anhalten.' };
+                            return false;
+                        },
                         async buchen(id, outcome, name) {
                             if (this.busy) return;
                             this.busy = true;
