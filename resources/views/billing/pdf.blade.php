@@ -43,7 +43,7 @@
                         <td class="datum">{{ $p['datum']->locale('de')->isoFormat('dd DD.MM.') }}</td>
                         <td>
                             {{ $p['was'] }}
-                            @if ($p['hinweis'])<br><span class="{{ str_starts_with($p['hinweis'], 'No-Show') ? 'noshow' : 'hinweis' }}">{{ $p['hinweis'] }}</span>@endif
+                            @if ($p['hinweis'])<br><span class="{{ ($p['ton'] ?? null) === 'schlecht' ? 'noshow' : 'hinweis' }}">{{ $p['hinweis'] }}</span>@endif
                         </td>
                         <td class="num">{{ $euro($p['betrag']) }}</td>
                     </tr>

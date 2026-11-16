@@ -40,7 +40,8 @@
                                     @php $z = $mo['zellen'][$u->id]; @endphp
                                     <td class="px-3 py-2 text-right">
                                         <button type="button" @click="dialog = '{{ $key }}-{{ $u->id }}'"
-                                                class="tabular-nums hover:text-indigo-700 hover:underline {{ $z['betrag'] === null ? 'text-xs italic text-gray-400' : 'text-gray-700' }}">
+                                                title="Einzelposten anzeigen"
+                                                class="tabular-nums {{ $z['betrag'] === null ? 'text-xs italic text-gray-400 hover:text-indigo-700' : 'text-indigo-700 underline decoration-dotted underline-offset-4 hover:text-indigo-900' }}">
                                             {{ $z['betrag'] === null ? 'keine Daten' : $euro($z['betrag']) }}
                                         </button>
                                     </td>
@@ -48,7 +49,8 @@
                             @endif
                             <td class="px-3 py-2 text-right">
                                 <button type="button" @click="dialog = '{{ $key }}'"
-                                        class="tabular-nums hover:text-indigo-700 hover:underline {{ $mo['gesamt'] === null ? 'text-xs italic text-gray-400' : 'font-semibold text-gray-900' }}">
+                                        title="Einzelposten anzeigen"
+                                        class="tabular-nums {{ $mo['gesamt'] === null ? 'text-xs italic text-gray-400 hover:text-indigo-700' : 'font-semibold text-indigo-700 underline decoration-dotted underline-offset-4 hover:text-indigo-900' }}">
                                     {{ $mo['gesamt'] === null ? 'keine Daten' : $euro($mo['gesamt']) }}
                                 </button>
                             </td>

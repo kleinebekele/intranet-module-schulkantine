@@ -17,10 +17,12 @@
             <div class="space-y-2">
                 <div class="flex flex-wrap items-baseline justify-between gap-2">
                     <h2 class="text-base font-semibold text-gray-800">Saison „{{ $season->name }}"</h2>
-                    <span class="text-xs text-gray-400">
-                        Klick auf einen Betrag zeigt die Einzelposten.
-                        @if ($linearStand) Zahlungsstand aus der Buchhaltung: {{ $linearStand->format('d.m.Y') }}. @endif
-                    </span>
+                    @if ($linearStand)
+                        <span class="text-xs text-gray-400">Zahlungsstand aus der Buchhaltung: {{ $linearStand->format('d.m.Y') }}.</span>
+                    @endif
+                </div>
+                <div class="rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-700">
+                    Tippen Sie auf einen Betrag, um die Einzelposten zu sehen – mit jedem Tag und ob das Essen abgeholt wurde.
                 </div>
                 <p class="text-xs text-gray-500">
                     Ab November 2026 rechnet die Mensa über das Intranet ab. Aus dem alten System liegen nur die

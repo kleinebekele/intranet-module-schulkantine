@@ -247,7 +247,9 @@ class HaushaltsAbrechnung
      * Alle kostenpflichtigen Posten einer Zelle, nach Datum: Menüs/Gerichte (mit
      * No-Show), OGS-Tage, Spontankäufe. Leer, wenn es keine Einzelposten gibt.
      *
-     * @return list<array{datum: Carbon, was: string, hinweis: ?string, betrag: float}>
+     * `ton` färbt den Hinweis: gut (abgeholt), schlecht (nicht abgeholt), sonst neutral.
+     *
+     * @return list<array{datum: Carbon, was: string, hinweis: ?string, ton: ?string, betrag: float}>
      */
     public static function posten(array $zelle): array
     {
@@ -255,32 +257,39 @@ class HaushaltsAbrechnung
         if (! $d) {
             return [];
         }
-        $noShow = 'No-Show – nicht abgeholt, wird trotzdem berechnet';
+        $noShow = 'nicht abgeholt – wird trotzdem berechnet';
         $posten = [];
         foreach ($d['menu'] as $r) {
             $posten[] = ['datum' => Carbon::parse($r['date']), 'was' => ($r['is_menu'] ? $r['menu_name'].': ' : '').$r['dish'],
                 'hinweis' => match ($r['outcome']) {
-                    'none' => $noShow,
-                    'declined' => 'nicht genommen'.($r['reason'] ? ': '.$r['reason'] : ''),
-                    'alternative' => 'Alternativmenü genommen',
+                    'taken' => '✓ abgeholt',
+                    'none' => '✗ '.$noShow,
+                    'declined' => '✗ nicht genommen'.($r['reason'] ? ': '.$r['reason'] : '').' – wird trotzdem berechnet',
+                    'alternative' => '✓ abgeholt (Alternativmenü)',
+                    'pending' => 'noch nicht ausgegeben',
+                    default => null,
+                },
+                'ton' => match ($r['outcome']) {
+                    'taken', 'alternative' => 'gut',
+                    'none', 'declined' => 'schlecht',
                     default => null,
                 }, 'betrag' => (float) $r['price']];
         }
         foreach ($d['ogs']['dates'] as $o) {
             $posten[] = ['datum' => Carbon::parse($o['date']), 'was' => 'OGS-Mittagessen',
                 // OGS wird an der Ausgabe nicht abgehakt – „nicht abgeholt" wäre hier kein No-Show.
-                'hinweis' => $o['status'] === 'declined' ? 'nicht gegessen' : null,
+                'hinweis' => $o['status'] === 'declined' ? 'nicht gegessen' : null, 'ton' => null,
                 'betrag' => (float) $d['ogs']['price']];
         }
         foreach ($d['spontan'] as $s) {
-            $posten[] = ['datum' => Carbon::parse($s['date']), 'was' => $s['dish'], 'hinweis' => 'spontan an der Ausgabe', 'betrag' => (float) $s['price']];
+            $posten[] = ['datum' => Carbon::parse($s['date']), 'was' => $s['dish'], 'hinweis' => 'spontan an der Ausgabe', 'ton' => null, 'betrag' => (float) $s['price']];
         }
         usort($posten, fn ($a, $b) => $a['datum'] <=> $b['datum']);
 
         // Teil des Monats, den noch das alte System abgerechnet hat (ohne Einzelposten).
         if (($zelle['alt'] ?? 0) > 0.005) {
             array_unshift($posten, ['datum' => Carbon::parse($posten[0]['datum'] ?? self::intranetAb())->startOfMonth(),
-                'was' => 'Abrechnung aus dem alten System (bis zum Umstieg)', 'hinweis' => 'Einzelposten liegen nicht vor',
+                'was' => 'Abrechnung aus dem alten System (bis zum Umstieg)', 'hinweis' => 'Einzelposten liegen nicht vor', 'ton' => null,
                 'betrag' => (float) $zelle['alt']]);
         }
 

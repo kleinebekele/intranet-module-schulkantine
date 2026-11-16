@@ -14,7 +14,7 @@
                         <td class="py-1.5 pr-3 text-gray-800">
                             {{ $p['was'] }}
                             @if ($p['hinweis'])
-                                <span class="ml-1 text-xs {{ str_starts_with($p['hinweis'], 'No-Show') ? 'font-medium text-rose-600' : 'text-gray-400' }}">{{ $p['hinweis'] }}</span>
+                                <span class="ml-1 text-xs {{ ($p['ton'] ?? null) === 'schlecht' ? 'font-medium text-rose-600' : (($p['ton'] ?? null) === 'gut' ? 'text-green-700' : 'text-gray-400') }}">{{ $p['hinweis'] }}</span>
                             @endif
                         </td>
                         <td class="whitespace-nowrap py-1.5 text-right tabular-nums text-gray-800">{{ $euro($p['betrag']) }}</td>
