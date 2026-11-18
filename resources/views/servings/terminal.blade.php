@@ -1330,10 +1330,6 @@
             <div class="flex items-center justify-between border-b border-gray-200 px-4 py-2">
                 <div class="flex items-center gap-3">
                     <h2 class="text-lg font-bold text-gray-700">Menüs</h2>
-                    @if ($hasOgs)
-                        <button type="button" @click="mode = 'ogs'"
-                                class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700">↔ zur OGS wechseln</button>
-                    @endif
                 </div>
                 <div class="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide">
                     <span class="text-gray-500">bestellt</span>
