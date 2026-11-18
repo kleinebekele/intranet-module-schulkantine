@@ -202,7 +202,16 @@ class ServingController
         $data = $request->validate([
             'uid' => ['required', 'string', 'max:255'],
             'date' => ['required', 'date'],
+            'terminal' => ['nullable', 'string', 'max:64'],
         ]);
+
+        // Am Ausgabe-Terminal gelesen: an alle anderen offenen Terminals weitergeben.
+        if (! empty($data['terminal']) && Carbon::parse($data['date'])->isToday()) {
+            DB::table('kantine_terminal_scans')->where('created_at', '<', now()->subDay())->delete();
+            DB::table('kantine_terminal_scans')->insert([
+                'uid' => $data['uid'], 'terminal' => $data['terminal'], 'created_at' => now(),
+            ]);
+        }
 
         $season = Season::where('is_active', true)->firstOrFail();
         $date = Carbon::parse($data['date'])->startOfDay();
@@ -213,6 +222,29 @@ class ServingController
         }
 
         return response()->json(['found' => true] + $this->eaterServingInfo($season, $eater, $date));
+    }
+
+    /**
+     * Chip-Lesungen anderer Ausgabe-Terminals seit `nach` (letzte bekannte ID).
+     * Ohne `nach` nur die aktuelle höchste ID – so startet ein frisch geöffnetes
+     * Terminal ohne alte Lesungen. Nur Lesungen der letzten 30 Sekunden.
+     */
+    public function terminalScans(Request $request)
+    {
+        abort_unless(Access::canServe($request->user()), 403, 'Kein Zugriff auf das Ausgabe-Terminal.');
+
+        $letzte = (int) DB::table('kantine_terminal_scans')->max('id');
+        if (! $request->filled('nach')) {
+            return response()->json(['letzte' => $letzte, 'scans' => []]);
+        }
+
+        $scans = DB::table('kantine_terminal_scans')
+            ->where('id', '>', (int) $request->query('nach'))
+            ->where('terminal', '!=', (string) $request->query('terminal', ''))
+            ->where('created_at', '>=', now()->subSeconds(30))
+            ->orderBy('id')->limit(20)->get(['id', 'uid']);
+
+        return response()->json(['letzte' => $letzte, 'scans' => $scans]);
     }
 
     /** Wie lookup(), aber direkt per Esser (Modal aus der Liste „öffnen"). */

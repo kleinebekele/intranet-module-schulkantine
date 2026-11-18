@@ -140,6 +140,7 @@ Route::middleware(['web', 'auth', AlsPerson::class])
         Route::post('ausgabe-terminal/suchen', [ServingController::class, 'terminalSearch'])->name('servings.terminal.search');
         Route::post('ausgabe-terminal/ogs-abhaken', [ServingController::class, 'terminalOgsToggle'])->name('servings.terminal.ogs-toggle');
         Route::get('ausgabe-terminal/uebersicht', [ServingController::class, 'terminalOverview'])->name('servings.terminal.overview');
+        Route::get('ausgabe-terminal/scans', [ServingController::class, 'terminalScans'])->name('servings.terminal.scans');
 
         // Ausgabe OGS: normale Unterseite (mit Menü) für die OGS-Ausgabe ohne Terminal –
         // gleiche Liste wie die OGS-Ansicht des Terminals, bedient mit Maus und Tastatur.

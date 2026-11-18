@@ -50,6 +50,7 @@
                 commit: @js(route('module.schulkantine.servings.terminal.commit')),
                 ogsToggle: @js(route('module.schulkantine.servings.terminal.ogs-toggle')),
                 overview: @js(route('module.schulkantine.servings.terminal.overview')),
+                scans: @js(route('module.schulkantine.servings.terminal.scans')),
                 reportPerson: @js(url('modules/schulkantine/auswertung/person')),
                 base: @js(route('module.schulkantine.servings.terminal')),
             },
@@ -86,6 +87,10 @@
             // ab. Wir puffern nur solche Bursts (kurze Zeichenabstände) und geben die
             // Kennung an denselben Ablauf wie Web-NFC. UID wird serverseitig normalisiert.
             wedgeBuf: '',
+            // Chip-Lesungen anderer Terminals: eigene Kennung je geöffneter Seite,
+            // letzte bekannte Lesung (null = noch nicht abgefragt).
+            terminalId: Math.random().toString(36).slice(2) + Date.now().toString(36),
+            scanSeit: null,
             wedgeAt: 0,
             // Serieller Chipleser (alter 125-kHz-Leser am USB-COM-Adapter) per Web Serial
             // (Chrome/Edge am PC). Rahmen: STX + Kennung + ETX CR LF. Einmal „verbinden",
@@ -155,6 +160,27 @@
                 window.addEventListener('keydown', (e) => this.onWedgeKey(e));
                 // Bereits freigegebener COM-Leser: ohne Klick wieder verbinden.
                 if (this.hasSerial()) this.serialConnect(false);
+
+                // Ein Chip, der an einem anderen Terminal gelesen wird, wirkt hier genauso.
+                this.fremdeScans();
+                setInterval(() => this.fremdeScans(), 2000);
+            },
+
+            async fremdeScans() {
+                // Während hier gerade geladen/gebucht wird: beim nächsten Durchlauf nachholen.
+                if (this.busy) return;
+                try {
+                    const q = this.scanSeit === null ? '' : '?nach=' + this.scanSeit + '&terminal=' + encodeURIComponent(this.terminalId);
+                    const res = await fetch(this.urls.scans + q, { headers: { 'Accept':'application/json' } });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    if (this.scanSeit === null) { this.scanSeit = data.letzte; return; }
+                    for (const sc of data.scans || []) {
+                        this.scanSeit = Math.max(this.scanSeit, sc.id);
+                        await this.openFor(sc.uid, true);
+                    }
+                    if (!(data.scans || []).length) this.scanSeit = Math.max(this.scanSeit, data.letzte);
+                } catch (e) { /* Netz kurz weg – nächster Durchlauf */ }
             },
 
             // ---- Serieller Chipleser (Web Serial) ----
@@ -330,9 +356,12 @@
                 return false;
             },
 
-            async openFor(uid) {
+            // fremd = an einem anderen Terminal gelesen (wird nicht erneut weitergegeben).
+            async openFor(uid, fremd = false) {
                 if (!uid) { this.banner = { ok:false, text:'Chip ohne Kennung.' }; return; }
                 if (this.busy) return;
+                // Fremde Lesung, hier aber anderer Tag gewählt: still übergehen.
+                if (fremd && !this.isToday) return;
                 // Ein Chip bucht nur am heutigen Tag – sonst landete die Ausgabe am
                 // falsch gewählten Datum. Nachtragen geht über die Suche.
                 if (!this.isToday) {
@@ -345,17 +374,17 @@
                     const res = await fetch(this.urls.lookup, {
                         method: 'POST',
                         headers: { 'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': this.csrf },
-                        body: JSON.stringify({ uid, date: this.date }),
+                        body: JSON.stringify({ uid, date: this.date, terminal: fremd ? null : this.terminalId }),
                     });
                     const data = await res.json();
                     if (!data.found) {
                         this.banner = { ok:false, text:'Chip unbekannt oder zurueckgegeben.' };
-                        this.histAdd('Unbekannter Chip', 'Chip', 'Chip unbekannt – nichts gebucht', 'fehler');
+                        this.histAdd('Unbekannter Chip', fremd ? 'Chip (anderes Terminal)' : 'Chip', 'Chip unbekannt – nichts gebucht', 'fehler');
                         this.busy = false; return;
                     }
                     // Chip vorgehalten: aus Übersicht/OGS-Ansicht direkt in die Ausgabe springen.
                     if (data.mode !== 'ja_nein' && this.mode !== 'vorbesteller') { this.ovSearchOpen = false; this.mode = 'vorbesteller'; }
-                    this.histAdd(data.name, 'Chip');
+                    this.histAdd(data.name, fremd ? 'Chip (anderes Terminal)' : 'Chip');
                     this.loadPerson(data);
                 } catch (e) {
                     this.banner = { ok:false, text:'Fehler beim Lesen: ' + e };
