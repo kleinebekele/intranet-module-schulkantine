@@ -2587,7 +2587,11 @@ class ServingController
             ->whereDate('date', $dateStr)
             ->with(collect($this->terminalDishRelations())->map(fn ($r) => 'slots.'.$r)->all())
             ->orderBy('id')
-            ->get();
+            ->get()
+            // Menü ohne eingetragene Gerichte (z. B. leeres „Menü 2") nicht zeigen – außer es
+            // hat trotzdem jemand bestellt, dann muss es ausgebbar bleiben.
+            ->filter(fn (MenuDay $md) => $md->slots->contains(fn ($s) => $s->dish) || $personen->has('md'.$md->id))
+            ->values();
         if ($menuDays->isNotEmpty()) {
             $gruppen->push([
                 'category' => 'Menüs',
@@ -2772,7 +2776,9 @@ class ServingController
                 ->selectRaw('dish_id, COUNT(*) as c')->groupBy('dish_id')->pluck('c', 'dish_id');
 
             $menues = MenuDay::where('season_id', $season->id)->whereDate('date', $d->toDateString())
-                ->orderBy('id')->get()
+                ->with('slots')->orderBy('id')->get()
+                // Leeres Menü (kein Gericht eingetragen, niemand bestellt) nicht aufführen.
+                ->filter(fn (MenuDay $md) => $md->slots->contains(fn ($s) => $s->dish_id) || isset($menuZahl[$md->id]))
                 ->map(fn (MenuDay $md) => ['name' => $md->name, 'ordered' => (int) ($menuZahl[$md->id] ?? 0)]);
             $dishes = $menues->concat(Menu::where('season_id', $season->id)->whereDate('date', $d->toDateString())
                 ->with('dish.category')->orderBy('sort_order')->orderBy('id')->get()
