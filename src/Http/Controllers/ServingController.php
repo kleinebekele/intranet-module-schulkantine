@@ -2174,6 +2174,11 @@ class ServingController
      * Spontan Ausgegebenes des Tages je Gericht (Extras ohne Gericht als „Nachschlag"),
      * für die linke Terminal-Spalte im Leerlauf: Anzahl + wer (Tipp auf die Zahl).
      */
+    private static function istVerschiedenes(array $zeile): bool
+    {
+        return mb_strtolower(trim((string) $zeile['name'])) === 'verschiedenes';
+    }
+
     private function terminalSpontan(Season $season, Carbon $date): Collection
     {
         return Serving::with(['dish', 'user'])
@@ -2198,8 +2203,9 @@ class ServingController
                     'people' => $people,
                 ];
             })
-            // Meistausgegebenes oben, bei Gleichstand nach Name.
-            ->sort(fn (array $a, array $b) => [$b['served'], $a['name']] <=> [$a['served'], $b['name']])
+            // „Verschiedenes" immer zuoberst, danach Meistausgegebenes, bei Gleichstand nach Name.
+            ->sort(fn (array $a, array $b) => [self::istVerschiedenes($b), $b['served'], $a['name']]
+                <=> [self::istVerschiedenes($a), $a['served'], $b['name']])
             ->values();
     }
 
