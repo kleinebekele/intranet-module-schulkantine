@@ -462,7 +462,7 @@
                             this.ogsEaters.push(data.eater); // spontan dazugekommenes Kind aufs Board
                         }
                         this.banner = { ok:true, text: (existing?.name || data.eater?.name || 'Kind') + ' als abgeholt gebucht.' };
-                        this.histAdd(existing?.name || data.eater?.name || r.name, 'Suche', 'OGS-Essen abgeholt', 'ok');
+                        this.histAdd((existing?.name || data.eater?.name || r.name) + this.werLabel(existing || data.eater || r), 'Suche', 'OGS-Essen abgeholt', 'ok');
                     } catch (err) {
                         this.banner = { ok:false, text:'Fehler beim Buchen: ' + err };
                     }
@@ -646,7 +646,11 @@
             histSchliessen() { this.hist.forEach(x => { if (x.art === 'offen') { x.ergebnis = 'nichts gebucht'; x.art = 'nichts'; } }); },
             // Neuer Eintrag; ein offener (art 'offen') bekommt sein Ergebnis über histDone().
             // Klasse bzw. Funktion hinter dem Namen, z. B. „ (Klasse 3a)“ oder „ (Lehrer)“.
-            werLabel(p) { return p && p.label && p.label !== '–' ? ' (' + p.label + ')' : ''; },
+            werLabel(p) {
+                if (!p) return '';
+                if (p.label && p.label !== '–') return ' (' + p.label + ')';
+                return p.klasse ? ' (Klasse ' + String(p.klasse).replace(/^Klasse\s+/, '') + ')' : '';
+            },
             histAdd(name, quelle, ergebnis = null, art = 'offen') {
                 this.histSchliessen();
                 this.hist.unshift({ id: Date.now() + '-' + Math.random(), t: this.histNow(), name, quelle, ergebnis, art });
@@ -895,7 +899,7 @@
                         e.served = data.served;
                         e.declined = data.declined;
                     }
-                    this.histAdd(e.name, 'OGS-Liste', !data.served ? 'OGS zurückgenommen' : (data.declined ? 'OGS abgelehnt' : 'OGS-Essen abgeholt'),
+                    this.histAdd(e.name + this.werLabel(e), 'OGS-Liste', !data.served ? 'OGS zurückgenommen' : (data.declined ? 'OGS abgelehnt' : 'OGS-Essen abgeholt'),
                         data.served && !data.declined ? 'ok' : 'nichts');
                 } catch (err) {
                     this.banner = { ok:false, text:'Fehler beim Buchen: ' + err };
