@@ -384,7 +384,7 @@
                     }
                     // Chip vorgehalten: aus Übersicht/OGS-Ansicht direkt in die Ausgabe springen.
                     if (data.mode !== 'ja_nein' && this.mode !== 'vorbesteller') { this.ovSearchOpen = false; this.mode = 'vorbesteller'; }
-                    this.histAdd(data.name, fremd ? 'Chip (anderes Terminal)' : 'Chip');
+                    this.histAdd(data.name + this.werLabel(data), fremd ? 'Chip (anderes Terminal)' : 'Chip');
                     this.loadPerson(data);
                 } catch (e) {
                     this.banner = { ok:false, text:'Fehler beim Lesen: ' + e };
@@ -486,7 +486,7 @@
                     });
                     const data = await res.json();
                     if (!data.found) { this.banner = { ok:false, text:'Person nicht gefunden.' }; this.busy = false; return; }
-                    this.histAdd(data.name, quelle);
+                    this.histAdd(data.name + this.werLabel(data), quelle);
                     this.loadPerson(data);
                     this.closeSearch();
                 } catch (e) {
@@ -645,6 +645,8 @@
             // Liegengebliebene Einträge ohne Ergebnis (Person ohne Buchung gewechselt, Seite neu geladen).
             histSchliessen() { this.hist.forEach(x => { if (x.art === 'offen') { x.ergebnis = 'nichts gebucht'; x.art = 'nichts'; } }); },
             // Neuer Eintrag; ein offener (art 'offen') bekommt sein Ergebnis über histDone().
+            // Klasse bzw. Funktion hinter dem Namen, z. B. „ (Klasse 3a)“ oder „ (Lehrer)“.
+            werLabel(p) { return p && p.label && p.label !== '–' ? ' (' + p.label + ')' : ''; },
             histAdd(name, quelle, ergebnis = null, art = 'offen') {
                 this.histSchliessen();
                 this.hist.unshift({ id: Date.now() + '-' + Math.random(), t: this.histNow(), name, quelle, ergebnis, art });
@@ -775,7 +777,8 @@
                     this.histDone(summe.text, summe.art, this.extrasTotal, summe.menu, summe.spontan);
                     if (data.plan) this.planGroups = data.plan; // Zaehler aktualisieren
                     if (data.spontan) this.spontan = data.spontan;
-                    if (!silent) this.banner = { ok:true, text: 'Gebucht: ' + data.name + (this.extrasTotal > 0 ? ' · Extras ' + this.euro(this.extrasTotal) : '') };
+                    const wer = this.werLabel(this.person);
+                    if (!silent) this.banner = { ok:true, text: 'Gebucht: ' + data.name + wer + (this.extrasTotal > 0 ? ' · Extras ' + this.euro(this.extrasTotal) : '') };
                     this.person = null;
                     this.servedOnLoad = false;
                     this.resetSelection();
@@ -1349,6 +1352,27 @@
                 </div>
 
                 <div class="space-y-5">
+                    {{-- Spontan Ausgegebenes (Snacks) – immer oben; nur im Leerlauf (kein Chip), Tipp auf die Zahl zeigt wer. --}}
+                    <fieldset x-show="!person && spontan.length" x-cloak class="rounded-2xl border-2 border-indigo-300 bg-indigo-50/40 px-3 pb-3 pt-2">
+                        <legend class="px-1.5 text-sm font-bold uppercase tracking-wide text-indigo-700">Spontan ausgegeben</legend>
+                        <div class="space-y-3">
+                            <template x-for="s in spontan" :key="s.id">
+                                <div class="flex w-full items-stretch gap-3 rounded-2xl border-2 border-gray-200 bg-white p-2.5">
+                                    <div class="relative h-20 w-20 shrink-0 self-center overflow-hidden rounded-xl border border-black/5 bg-gray-50">
+                                        <template x-if="s.photo"><img :src="s.photo" alt="" class="h-20 w-20 object-cover"></template>
+                                        <template x-if="!s.photo"><x-schulkantine::dish-placeholder /></template>
+                                    </div>
+                                    <div class="flex min-w-0 flex-1 flex-col justify-center">
+                                        <span class="text-xl font-bold leading-tight text-gray-800" x-text="s.name"></span>
+                                    </div>
+                                    <div class="flex shrink-0 flex-col justify-center font-bold">
+                                        <button type="button" @click="openPeople(s, 'served')" title="Wer hat spontan bekommen?"
+                                                class="inline-flex h-11 min-w-12 items-center justify-center rounded-xl border-2 border-green-300 bg-green-100 px-3 text-xl text-green-700 shadow-sm active:bg-green-200" x-text="s.served"></button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </fieldset>
                     <template x-for="group in planGroups" :key="group.category_id">
                         <fieldset class="rounded-2xl border-2 px-3 pb-3 pt-2"
                                   :style="group.color ? ('border-color:' + group.color + ';background-color:' + group.color + '10') : ''"
@@ -1417,27 +1441,6 @@
                     </template>
                     <div x-show="!planGroups.length" class="py-10 text-center text-gray-400">Kein vorbestellbares Menü an diesem Tag.</div>
 
-                    {{-- Spontan Ausgegebenes – nur im Leerlauf (kein Chip), Tipp auf die Zahl zeigt wer. --}}
-                    <fieldset x-show="!person && spontan.length" x-cloak class="rounded-2xl border-2 border-indigo-300 bg-indigo-50/40 px-3 pb-3 pt-2">
-                        <legend class="px-1.5 text-sm font-bold uppercase tracking-wide text-indigo-700">Spontan ausgegeben</legend>
-                        <div class="space-y-3">
-                            <template x-for="s in spontan" :key="s.id">
-                                <div class="flex w-full items-stretch gap-3 rounded-2xl border-2 border-gray-200 bg-white p-2.5">
-                                    <div class="relative h-20 w-20 shrink-0 self-center overflow-hidden rounded-xl border border-black/5 bg-gray-50">
-                                        <template x-if="s.photo"><img :src="s.photo" alt="" class="h-20 w-20 object-cover"></template>
-                                        <template x-if="!s.photo"><x-schulkantine::dish-placeholder /></template>
-                                    </div>
-                                    <div class="flex min-w-0 flex-1 flex-col justify-center">
-                                        <span class="text-xl font-bold leading-tight text-gray-800" x-text="s.name"></span>
-                                    </div>
-                                    <div class="flex shrink-0 flex-col justify-center font-bold">
-                                        <button type="button" @click="openPeople(s, 'served')" title="Wer hat spontan bekommen?"
-                                                class="inline-flex h-11 min-w-12 items-center justify-center rounded-xl border-2 border-green-300 bg-green-100 px-3 text-xl text-green-700 shadow-sm active:bg-green-200" x-text="s.served"></button>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </fieldset>
                 </div>
             </div>
         </section>
