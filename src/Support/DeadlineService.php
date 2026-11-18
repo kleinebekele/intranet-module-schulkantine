@@ -19,7 +19,7 @@ use Intranet\Modules\Schulkantine\Models\Setting;
  *
  * Die Uhrzeiten kommen aus den globalen Einstellungen (Setting).
  *
- * $ohneFrist: Admin bei „Als Person handeln" – darf jederzeit (auch nachträglich)
+ * $ohneFrist: wer gerade „als Person handelt" – darf jederzeit (auch nachträglich)
  * bestellen und abbestellen; was schon an Linear abgerechnet ist, sperrt der Controller.
  */
 class DeadlineService

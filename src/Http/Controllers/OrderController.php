@@ -839,14 +839,16 @@ class OrderController
     }
 
     /**
-     * Admin handelt „als Person": keine Bestell-/Abbestellfrist, auch nachträglich –
-     * etwa wenn Eltern versehentlich abbestellt haben. Grenze ist nur die Abrechnung.
+     * Wer „als Person handeln" darf (Admin oder Teilnehmer-Verwaltung) und gerade
+     * als Person handelt: keine Bestell-/Abbestellfrist, auch nachträglich – etwa
+     * wenn Eltern versehentlich abbestellt haben. Grenze ist nur die Abrechnung.
+     * Das Attribut setzt AlsPerson nur, wenn das Recht bei dieser Anfrage noch gilt.
      */
     private static function ohneFrist(Request $request): bool
     {
         $echt = $request->attributes->get(\Intranet\Modules\Schulkantine\Http\Middleware\AlsPerson::ECHTER_USER);
 
-        return $echt instanceof User && $echt->isAdmin();
+        return $echt instanceof User;
     }
 
     private function resolveWeekStart(Request $request, Season $season): Carbon

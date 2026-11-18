@@ -281,7 +281,7 @@ $terminal optional: Bestell-Terminal ohne Intranet-Konto (keine Leserechte-Prüf
                                             @else
                                                 <div class="mt-0.5 {{ $t('text-[11px]', 'text-sm') }} {{ $day['canOrder'] && empty($day['ohneFrist']) ? 'text-gray-400' : 'text-amber-600' }}">
                                                     @if (! empty($day['ohneFrist']))
-                                                        Frist vorbei · als Admin änderbar
+                                                        Frist vorbei · über „Handeln als" änderbar
                                                     @elseif ($day['canOrder'] && $day['orderDeadline'])
                                                         Bestellschluss {{ $day['orderDeadline']->isoFormat('dd HH:mm') }}
                                                     @else
